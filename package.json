@@ -1,0 +1,35 @@
+{
+    "name": "sillytavern-worldinfo-workspace",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "webpack --mode production",
+        "dev": "webpack --watch --mode development",
+        "test": "vitest run",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.9.0",
+        "@types/node": "^22.5.0",
+        "@types/react": "^18.3.5",
+        "@types/react-dom": "^18.3.0",
+        "css-loader": "^7.1.2",
+        "eslint": "^9.9.0",
+        "eslint-config-prettier": "^9.1.0",
+        "prettier": "^3.3.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "sass": "^1.78.0",
+        "sass-loader": "^16.0.1",
+        "style-loader": "^4.0.0",
+        "ts-loader": "^9.5.1",
+        "typescript": "^5.5.4",
+        "typescript-eslint": "^8.5.0",
+        "vitest": "^3.0.0",
+        "webpack": "^5.94.0",
+        "webpack-cli": "^5.1.4"
+    }
+}

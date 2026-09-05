@@ -1,0 +1,11 @@
+{
+    "display_name": "World Info Workspace",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "dist/index.js",
+    "css": "",
+    "author": "Alamion",
+    "version": "0.1.0",
+    "auto_update": true
+}
