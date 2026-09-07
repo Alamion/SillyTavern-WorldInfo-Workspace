@@ -319,7 +319,11 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 ## Assumptions
 
 - Single local user per installation; no authentication, sharing, or multi-device sync.
-- The workspace coexists with the app's native World Info editor rather than replacing it.
+- The workspace replaces the app's native World Info editor (amended 2026-09-05 per
+  spec 002 clarification: the editor entry point is re-bound while the plugin is enabled,
+  as WorldInfoDrawer does; the native editor is not reachable). The workspace still owns
+  the active-books list; character/persona/chat binding panels remain native. Native-side
+  data changes (e.g., from other tools) are pulled in only via explicit import.
 - Default sync model is workspace-authoritative (one-way push on save, explicit import
   back) unless FR-012 is clarified otherwise.
 - The assistant uses the app's configured AI connections; model choice may constrain
@@ -348,4 +352,6 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 - Continuous file-watching markdown synchronization (manual import/export only for now;
   may be revisited later).
 - Managing non-World-Info content types (e.g., character cards).
-- Replacing the native World Info editor wholesale.
+- Replacing the app's lore-binding surfaces (character/persona/chat lore assignment
+  panels), which stay native (amended 2026-09-05: the World Info editor screen itself IS
+  replaced by the workspace).

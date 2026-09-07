@@ -8,8 +8,15 @@ workspace-authoritative sync into the native World Info format via designated "W
 Info" root folders, an in-workspace AI lore assistant, and bidirectional markdown
 conversion. Roadmap and full requirements: `specs/001-workspace-plugin-roadmap/`.
 
-**Current increment (spec 001)**: project initialization + tooling only. Feature work is
-deferred — see the Deferred Work table in `specs/001-workspace-plugin-roadmap/tasks.md`.
+**Current increment (spec 002)**: Phase 0 UI prototype APPROVED and closed (2026-09-05,
+six review iterations). Delivered: three-region workspace surface replacing the native
+World Info editor (`src/adapters/shell.ts` co-opts the native `#WorldInfo` drawer),
+sample 'Aldermeer' dataset with merged entry/image entities (`src/core/sample/`),
+tree toolbar (sort/filter/create) with drag-and-drop, drawer-style Essentials/Content/
+Advanced card editor with live markdown preview, assistant batch-proposal mock with
+per-item decisions and a diff modal, mobile bottom sheets with snap sizes. Next:
+Phase 1 spec (core workspace MVP) via `/speckit.specify`. Roadmap and requirements:
+`specs/001-workspace-plugin-roadmap/`.
 
 ## Key Reference
 
@@ -50,22 +57,39 @@ All four gates (`typecheck`, `lint`, `test`, `build`) MUST pass before any commi
 
 ## Project Structure
 
-Target layout (from `specs/001-workspace-plugin-roadmap/plan.md`). **No empty
+Real layout (from `specs/002-workspace-ui-prototype/plan.md`). **No empty
 files/folders**: directories are created only by the tasks of the feature that first
 needs them.
 
 ```
 src/
-├── core/        # Pure logic (tree, wi, md, assistant) — Vitest-first, no app imports   [future specs]
-├── adapters/    # App boundary: books, storage, events, llm wrappers                    [future specs]
-├── ui/          # React components (tree, card editor, assistant panel)                 [future specs]
-├── interop/     # Public event API, slash commands, macro                               [future specs]
-├── styles/      # SCSS using --SmartTheme* variables                                    [future specs]
-├── global.d.ts  # Typed SillyTavern API surface (grows per feature)
-└── index.ts     # Entry point: idempotent init, APP_READY subscription
+├── core/                # Pure logic (Vitest-first, no app imports)
+│   ├── assistant/       # diff.ts - LCS line diff (before/after panes)
+│   └── sample/          # Prototype sample lore: dataset.ts, tree.ts, fieldGroups.ts
+│                        #   (typed field schema + drawer-style layout), markdown.ts
+├── adapters/            # App boundary
+│   └── shell.ts         # Host drawer composition (#WorldInfo mount, body class,
+│                        #   open/close MutationObserver) — the ONLY host-DOM module
+├── ui/                  # React components
+│   ├── WorkspacePrototype.tsx   # Layout root: splitter, collapsed tree, mobile sheets
+│   ├── StructureTree.tsx        # Tree: toolbar (sort/filter/create), DnD, WI badge
+│   ├── ItemEditor.tsx           # entry / image / folder(+WI toggle) views
+│   ├── fieldGroups/FieldGroups.tsx  # Content textarea + md preview; drawer-style rows
+│   ├── AssistantPanel.tsx       # Batch proposals, per-item decisions, diff view
+│   ├── ReviewGuide.tsx          # Built-in review checklist overlay
+│   └── mount.tsx                # React root creation
+├── styles/
+│   └── prototype.scss   # Three-region layout, --SmartTheme* variables only
+├── global.d.ts          # Typed SillyTavern API surface (grows per feature)
+├── styles.d.ts          # SCSS module declaration
+└── index.ts             # Entry point: idempotent init, shell mount on APP_READY
 tests/
-├── manifest.test.ts   # Manifest contract test (tooling validation)
-└── unit|integration|contract/                                                         [future specs]
+├── manifest.test.ts     # Manifest contract test (spec 001)
+└── unit/
+    ├── sample-dataset.test.ts   # Dataset shape contract (FR-003, C1)
+    ├── sample-tree.test.ts      # Tree helper contract
+    ├── markdown.test.ts         # Markdown renderer contract
+    └── diff.test.ts             # Line diff contract
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
 manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver)
 ```
