@@ -262,6 +262,10 @@ body.wiw-active #WorldInfo > .wiw-root {
         outline: 1px dashed var(--SmartThemeQuoteColor);
         background: var(--SmartThemeBlurTintColor);
     }
+
+    &.wiw-menu-target {
+        outline: 1px solid var(--SmartThemeQuoteColor);
+    }
 }
 
 .wiw-tree-toggle {

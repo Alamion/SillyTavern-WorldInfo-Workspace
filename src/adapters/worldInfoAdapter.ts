@@ -3,6 +3,7 @@ import { getAppContext } from './appApi';
 import { emitSaveEvent } from './saveEvents';
 import { resolveFreeBookName } from '../core/sync/bookNaming';
 import { normalizeNativeEntry } from '../core/state/schema';
+import { fnv1a, stableStringify } from '../core/sync/fingerprint';
 
 /**
  * Book lifecycle over the app's World Info mechanisms (contract:
@@ -16,6 +17,12 @@ export interface WorldInfoAdapter {
     loadBook(name: string): Promise<WorldInfoBook | null>;
     saveBook(name: string, book: WorldInfoBook, immediately?: boolean): Promise<void>;
     getLastOutbound(name?: string): WorldInfoBook | null;
+    /**
+     * True when `book` (as loaded) is the workspace's own write that failed to
+     * reach the server: the app caches a payload BEFORE its fetch, so after a
+     * network failure the cache serves the unsent write, not a native change.
+     */
+    isUnsentOwnWrite(name: string, book: WorldInfoBook): boolean;
     resolveBookName(base: string): Promise<string>;
     uploadBook(file: File): Promise<{ name: string } | null>;
     createBook(baseName: string): Promise<{ bookName: string } | null>;
@@ -37,6 +44,7 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
     // a single lastOutbound slot would misclassify the earlier book's event as
     // external. Track one reference per book name.
     const outboundByBook = new Map<string, WorldInfoBook>();
+    const unsentByBook = new Map<string, string>();
 
     const setOutbound = (name: string, payload: WorldInfoBook): void => {
         lastOutbound = payload;
@@ -64,6 +72,15 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
         }
     };
 
+    const normalizeBook = (book: WorldInfoBook): WorldInfoBook => ({
+        ...book,
+        entries: Object.fromEntries(
+            Object.keys(book.entries ?? {}).map((key) => [key, normalizeNativeEntry(book.entries[key]!)])
+        ),
+    });
+
+    const bookFingerprint = (book: WorldInfoBook): string => fnv1a(stableStringify(book));
+
     const loadBook = async (name: string): Promise<WorldInfoBook | null> => {
         // Never load a name outside the current list — the module cache cannot be
         // evicted externally after an adapter-level delete (research R3 caveat).
@@ -77,16 +94,7 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
         // Normalize on read (additive): entries from other tools may lack newer
         // fields. Comparisons and fingerprints are stable only against complete
         // entries; without this, plan/refresh hashing loops forever.
-        const normalized: WorldInfoBook = {
-            ...book,
-            entries: Object.fromEntries(
-                Object.keys(book.entries ?? {}).map((key) => [
-                    key,
-                    normalizeNativeEntry(book.entries[key]!),
-                ])
-            ),
-        };
-        return normalized;
+        return normalizeBook(book);
     };
 
     const saveBook = async (name: string, book: WorldInfoBook, immediately = false): Promise<void> => {
@@ -96,6 +104,7 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
         try {
             await ctx.saveWorldInfo(name, payload, immediately);
         } catch (error) {
+            unsentByBook.set(name, bookFingerprint(normalizeBook(structuredClone(payload))));
             emitSaveEvent({
                 kind: 'failure',
                 scope: 'book',
@@ -106,6 +115,8 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
             lastOutbound = outboundByBook.get(name) ?? null;
             throw error;
         }
+        unsentByBook.delete(name);
+        emitSaveEvent({ kind: 'success', scope: 'book', bookName: name });
     };
 
     const resolveBookName = async (base: string): Promise<string> => {
@@ -206,6 +217,10 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
         saveBook,
         getLastOutbound: (name?: string): WorldInfoBook | null =>
             name ? (outboundByBook.get(name) ?? null) : lastOutbound,
+        isUnsentOwnWrite: (name: string, book: WorldInfoBook): boolean => {
+            const unsent = unsentByBook.get(name);
+            return unsent !== undefined && unsent === bookFingerprint(book);
+        },
         resolveBookName,
         createBook,
         deleteBook,

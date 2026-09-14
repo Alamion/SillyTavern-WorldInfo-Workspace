@@ -163,8 +163,9 @@ generation; import an existing lorebook and round-trip it (quickstart S5–S11).
 - [X] T048 Performance pass per SC-007: memoized tree rows, selector-scoped subscriptions (avoid full-tree re-render on save badges), verify 300+ node scroll/edit latency and 100-entry sync non-blocking (quickstart S12); virtualize only if measurements demand
 - [X] T049 [P] Mobile/touch pass: long-press menu + "Move to…"/"Move up/down" inside bottom sheets, snap sizes unaffected (quickstart S13)
 - [X] T050 [P] Update `AGENTS.md` (module surfaces, settings schema, sync semantics) and bump `manifest.json` version (constitution: AGENTS.md updated in the same change)
-- [ ] T051 Run all four gates (`pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build`) and execute `specs/003-core-workspace-mvp/quickstart.md` S1–S13 end-to-end; record results
-  - Automated portion (2026-09-08): typecheck/lint/test(115)/build all pass. The S1–S13 manual walkthrough requires a running SillyTavern instance — execute per quickstart.md before release.
+- [X] T051 Run all four gates (`pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build`) and execute `specs/003-core-workspace-mvp/quickstart.md` S1–S13 end-to-end; record results
+  - Automated portion (2026-09-08): typecheck/lint/test(115)/build all pass.
+  - Manual walkthrough (2026-09-13/14): S1–S13 pass after the fixes recorded in quickstart.md "Validation run — 2026-09-14"; gates at close: typecheck/lint clean, tests 161, production build OK.
 
 ---
 

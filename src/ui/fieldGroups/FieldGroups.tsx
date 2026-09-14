@@ -5,6 +5,7 @@ import type { SampleFieldMeta, SampleFieldName } from '../../core/fieldSchema';
 import { ADVANCED_LAYOUT, FIELD_SCHEMA } from '../../core/fieldSchema';
 import { renderMarkdown, type ImageResolver } from '../../core/preview';
 import { NodeHeader } from '../NodeHeader';
+import { CharacterFilterControl, MultiSelectControl } from './MultiSelect';
 
 type Values = Record<string, unknown>;
 type Strategy = 'constant' | 'normal' | 'vectorized';
@@ -159,6 +160,8 @@ export function FieldControl({
     const wide =
         span >= 6 ||
         meta.type === 'stringList' ||
+        meta.type === 'multiSelect' ||
+        meta.type === 'characterFilter' ||
         meta.type === 'json' ||
         meta.type === 'longText' ||
         meta.name === 'comment';
@@ -228,6 +231,19 @@ export function FieldControl({
             break;
         case 'stringList':
             control = <StringListControl value={value} onChange={onChange} />;
+            break;
+        case 'multiSelect':
+            control = (
+                <MultiSelectControl
+                    options={meta.choices ?? []}
+                    value={Array.isArray(value) ? value.map(String) : []}
+                    placeholder={meta.placeholder}
+                    onChange={onChange}
+                />
+            );
+            break;
+        case 'characterFilter':
+            control = <CharacterFilterControl value={value} placeholder={meta.placeholder} onChange={onChange} />;
             break;
         case 'json':
             control = (

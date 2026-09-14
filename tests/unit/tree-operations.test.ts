@@ -118,10 +118,32 @@ describe('tree operations: move & reorder', () => {
 
     it('bulk-moves multiple entries into a target folder', () => {
         const fx = fixture();
-        const next = bulkMoveNodes(fx.state, [fx.entryA, 'ad'], fx.folderB);
+        const next = expectState(bulkMoveNodes(fx.state, [fx.entryA, 'ad'], fx.folderB));
         const target = findNode(next, fx.folderB);
         expect(target?.kind === 'folder' && target.children.some((c) => c.id === fx.entryA)).toBe(true);
         expect(target?.kind === 'folder' && target.children.some((c) => c.id === 'ad')).toBe(true);
+    });
+
+    it('bulk-moves a block in tree order at the drop index', () => {
+        const fx = fixture();
+        // Selection order differs from tree order; b1 sits at index 0 of B.
+        const next = expectState(bulkMoveNodes(fx.state, ['ad', fx.entryA], fx.folderB, 0));
+        const target = findNode(next, fx.folderB);
+        expect(target?.kind === 'folder' && target.children.map((c) => c.id)).toEqual(['a1', 'ad', 'b1']);
+        expect(findNode(next, 'ad')?.parentId).toBe(fx.folderB);
+    });
+
+    it('keeps nodes nested in a moved folder inside it', () => {
+        const fx = fixture();
+        const next = expectState(bulkMoveNodes(fx.state, ['deep', 'ad'], fx.folderB));
+        const deep = findNode(next, 'deep');
+        expect(deep?.parentId).toBe(fx.folderB);
+        expect(deep?.kind === 'folder' && deep.children.map((c) => c.id)).toEqual(['ad']);
+    });
+
+    it('rejects a bulk move into a folder that is part of the block', () => {
+        const fx = fixture();
+        expect(bulkMoveNodes(fx.state, [fx.folderA, fx.folderB], 'deep')).toBeNull();
     });
 });
 
@@ -161,5 +183,26 @@ describe('tree operations: rename & delete', () => {
         expect(entry?.kind === 'entry' && entry.native.disable).toBe(true);
         const folder = findNode(next, fx.folderA);
         expect(folder?.kind === 'folder' && folder.children.length).toBeGreaterThan(0);
+    });
+
+    it('bulk enable/disable marks every book copy dirty so the books are pushed', () => {
+        const fx = fixture();
+        const entry = findNode(fx.state, fx.entryA);
+        if (entry?.kind !== 'entry') {
+            throw new Error('expected entry');
+        }
+        entry.sync.books = {
+            One: { uid: 1, hash: 'h', status: 'in-sync' },
+            Two: { uid: 7, hash: 'h', status: 'in-sync' },
+        };
+        const next = bulkSetDisable(fx.state, [fx.entryA], true);
+        const updated = findNode(next, fx.entryA);
+        expect(updated?.kind === 'entry' && Object.values(updated.sync.books).map((b) => b.status)).toEqual([
+            'dirty',
+            'dirty',
+        ]);
+        // No-op toggles leave the books untouched.
+        const again = bulkSetDisable(next, [fx.entryA], true);
+        expect(again).toEqual(next);
     });
 });

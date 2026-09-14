@@ -161,11 +161,13 @@ describe('activeBooksAdapter contract (FR-017)', () => {
         document.body.innerHTML = '';
     });
 
-    it('reads activation state from the native select', () => {
+    // Native updateWorldInfoList builds `new Option(name, index)`: the value is an
+    // index into world_names, the book name is the option TEXT.
+    it('reads activation state from the native select by option text', () => {
         const select = document.createElement('select');
         select.id = 'world_info';
         select.multiple = true;
-        select.innerHTML = '<option value="A" selected></option><option value="B"></option>';
+        select.innerHTML = '<option value="0" selected>A</option><option value="1">B</option>';
         document.body.appendChild(select);
         const adapter = createActiveBooksAdapter();
         expect(adapter.getActiveBooks()).toEqual(['A']);
@@ -175,7 +177,7 @@ describe('activeBooksAdapter contract (FR-017)', () => {
         const select = document.createElement('select');
         select.id = 'world_info';
         select.multiple = true;
-        select.innerHTML = '<option value="A"></option><option value="B"></option>';
+        select.innerHTML = '<option value="0">A</option><option value="1">B</option>';
         document.body.appendChild(select);
         let changeEvents = 0;
         select.addEventListener('change', () => {
@@ -184,6 +186,8 @@ describe('activeBooksAdapter contract (FR-017)', () => {
         const adapter = createActiveBooksAdapter();
         adapter.setActiveBooks(['B']);
         expect(adapter.getActiveBooks()).toEqual(['B']);
+        // The native handler reads indices from .val().
+        expect(Array.from(select.selectedOptions).map((option) => option.value)).toEqual(['1']);
         expect(changeEvents).toBe(1);
     });
 });

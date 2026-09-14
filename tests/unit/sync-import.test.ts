@@ -56,9 +56,7 @@ function nativeEntry(
         delay: null,
         automationId: '',
         triggers: [],
-        characterFilterNames: [],
-        characterFilterTags: [],
-        characterFilterExclude: false,
+        characterFilter: { isExclude: false, names: [], tags: [] },
         addMemo: true,
         displayIndex: overrides?.displayIndex,
     };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deepValidateState, findNode, type TreeNode } from '../../src/core/state/schema';
+import { createDefaultState, deepValidateState, findNode, migrate, type TreeNode } from '../../src/core/state/schema';
 import { createDemoState } from '../../src/core/demo/dataset';
 
 let counter = 0;
@@ -13,6 +13,15 @@ describe('demo dataset (FR-001, research R9)', () => {
         const state = createDemoState(() => `id-${demoCounter()}`);
         expect(state.version).toBe(1);
         expect(deepValidateState(state)).toEqual([]);
+    });
+
+    it('stays valid after being grafted into the live workspace root and reloaded', () => {
+        const live = createDefaultState();
+        live.root.children.push(...createDemoState(() => `id-${demoCounter()}`).root.children);
+        expect(deepValidateState(live)).toEqual([]);
+        const reloaded = migrate(JSON.parse(JSON.stringify(live)));
+        expect(reloaded._recovered).toBeUndefined();
+        expect(reloaded.root.children.length).toBeGreaterThan(0);
     });
 
     it('contains at least 3 levels of nesting, 10 entries and 2 images', () => {

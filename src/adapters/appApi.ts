@@ -12,6 +12,20 @@ import type { SillyTavernContext } from '../global';
  */
 let cached: SillyTavernContext | null = null;
 
+/**
+ * A fresh context for DATA reads (characters, tags, current character id): the
+ * app copies these values into each new context object and reassigns some of
+ * them (tags on settings load), so the memoized instance goes stale.
+ */
+export function getLiveAppContext(): SillyTavernContext {
+    const ctx = window.SillyTavern?.getContext();
+    if (!ctx) {
+        throw new Error('[WorldInfoWorkspace] SillyTavern.getContext() is not available');
+    }
+    return ctx;
+}
+
+
 export function getAppContext(): SillyTavernContext {
     if (!cached) {
         const ctx = window.SillyTavern?.getContext();

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent } from 'react';
 import type { CreateKind } from '../core/tree/operations';
 import {
@@ -51,6 +51,7 @@ interface RowProps {
     sortMode: SortMode;
     allowReorder: boolean;
     dragOverId: string | null;
+    menuTargetId: string | null;
     setDragOverId(id: string | null): void;
     onSelect: StructureTreeProps['onSelect'];
     onExpand: StructureTreeProps['onExpand'];
@@ -83,6 +84,8 @@ const MENU_ITEMS: ReadonlyArray<{ action: TreeMenuAction; icon: string; label: s
     { action: 'delete', icon: 'fa-trash-can', label: 'Delete' },
 ];
 
+const STICKY_MENU_ACTIONS: ReadonlySet<TreeMenuAction> = new Set(['move-up', 'move-down']);
+
 function Row({
     node,
     depth,
@@ -92,6 +95,7 @@ function Row({
     sortMode,
     allowReorder,
     dragOverId,
+    menuTargetId,
     setDragOverId,
     onSelect,
     onExpand,
@@ -106,6 +110,7 @@ function Row({
     const indentStyle: CSSProperties = { paddingLeft: `${depth * 12 + 4}px` };
     const selected = selectedIds.has(node.id);
     const isDragOver = dragOverId === node.id;
+    const isMenuTarget = menuTargetId === node.id;
     let pressTimer: number | null = null;
     const kindIcon =
         node.kind === 'folder'
@@ -134,7 +139,7 @@ function Row({
     return (
         <>
             <div
-                className={`wiw-tree-row${selected ? ' wiw-selected' : ''}${isDragOver ? ' wiw-drag-over' : ''}`}
+                className={`wiw-tree-row${selected ? ' wiw-selected' : ''}${isDragOver ? ' wiw-drag-over' : ''}${isMenuTarget ? ' wiw-menu-target' : ''}`}
                 style={indentStyle}
                 draggable={allowReorder}
                 onDragStart={(event) => {
@@ -245,6 +250,7 @@ function Row({
                         sortMode={sortMode}
                         allowReorder={allowReorder}
                         dragOverId={dragOverId}
+                        menuTargetId={menuTargetId}
                         setDragOverId={setDragOverId}
                         onSelect={onSelect}
                         onExpand={onExpand}
@@ -294,6 +300,33 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
     const [query, setQuery] = useState('');
     const [scope, setScope] = useState<SearchScope>('title+prompt');
     const [dragOverId, setDragOverId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const closeMenuRef = useRef(props.onCloseMenu);
+    closeMenuRef.current = props.onCloseMenu;
+    const menuOpen = menu !== null;
+    useEffect(() => {
+        if (!menuOpen) {
+            return;
+        }
+        // Any press outside the menu closes it — anywhere on the page, not only
+        // inside the tree (the menu is position: fixed and outlives scrolling).
+        const onPointerDown = (event: PointerEvent): void => {
+            if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) {
+                closeMenuRef.current();
+            }
+        };
+        const onKeyDown = (event: KeyboardEvent): void => {
+            if (event.key === 'Escape') {
+                closeMenuRef.current();
+            }
+        };
+        document.addEventListener('pointerdown', onPointerDown, true);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', onPointerDown, true);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [menuOpen]);
     const visibleIds = useMemo(
         () => collectVisible(root, kinds, query.trim(), scope, sortMode),
         [root, kinds, query, scope, sortMode]
@@ -310,7 +343,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
         });
     };
     return (
-        <div className="wiw-tree" onClick={menu ? props.onCloseMenu : undefined}>
+        <div className="wiw-tree">
             <div className="wiw-tree-toolbar">
                 <select
                     className="wiw-tree-sort"
@@ -410,6 +443,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
                 sortMode={sortMode}
                 allowReorder={sortMode === 'custom'}
                 dragOverId={dragOverId}
+                menuTargetId={menu?.id ?? null}
                 setDragOverId={setDragOverId}
                 onSelect={props.onSelect}
                 onExpand={props.onExpand}
@@ -418,6 +452,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
             />
             {menu && (
                 <div
+                    ref={menuRef}
                     className="wiw-tree-menu"
                     style={{ left: menu.x, top: menu.y }}
                     onClick={(event) => event.stopPropagation()}
@@ -428,7 +463,11 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
                             type="button"
                             className="wiw-tree-menu-item"
                             onClick={() => {
-                                props.onCloseMenu();
+                                // Reordering is repeated step by step on touch devices:
+                                // the menu stays open until an outside tap.
+                                if (!STICKY_MENU_ACTIONS.has(item.action)) {
+                                    props.onCloseMenu();
+                                }
                                 props.onMenuAction(item.action, menu.id);
                             }}
                         >

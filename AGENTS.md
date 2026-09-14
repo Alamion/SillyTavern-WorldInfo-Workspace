@@ -8,7 +8,8 @@ workspace-authoritative sync into the native World Info format via designated "W
 Info" root folders, an in-workspace AI lore assistant, and bidirectional markdown
 conversion. Roadmap and full requirements: `specs/001-workspace-plugin-roadmap/`.
 
-**Current increment (spec 003)**: Phase 1 Core Workspace MVP delivered (2026-09-08):
+**Current increment (spec 003)**: Phase 1 Core Workspace MVP implemented and validated
+(owner walkthrough S1–S13, 2026-09-14; results in `quickstart.md`):
 the workspace runs on real persisted data (`extensionSettings['WorldInfoWorkspace']`,
 schema v1 with migration/recovery), full tree CRUD with multi-select bulk actions and a
 touch-safe move affordance (long-press menu), trustworthy editing (commit-on-change,
@@ -17,7 +18,8 @@ flush before generation), and workspace-authoritative native WI sync via designa
 roots: books created on designation (inactive, FR-022/FR-023 naming invariant),
 flattened pushes with divergence guards in both directions, orphan retention/resolution
 (FR-018), delete disclosure (FR-021), lossless import incl. per-entry conflict
-resolution, and the replacement all-books activation list. Design contracts:
+resolution, and the Lorebooks panel (all native books: activation, import next to the
+tree selection / update from native, delete — search, filters, pagination). Design contracts:
 `specs/003-core-workspace-mvp/` (research/data-model/contracts/quickstart/tasks).
 Next: Phase 2 (AI assistant) per the roadmap.
 
@@ -69,18 +71,21 @@ src/
 ├── core/                # Pure logic (Vitest-first, no app imports)
 │   ├── state/           # schema.ts (WorkspaceState v1 + migrate), store.ts
 │   ├── tree/            # operations.ts, browse.ts, validation.ts
-│   ├── sync/            # flatten.ts, convert.ts, fingerprint.ts, divergence.ts,
-│   │                    #   import.ts, bookNaming.ts
+│   ├── sync/            # flatten.ts, fingerprint.ts, divergence.ts, import.ts,
+│   │                    #   bookNaming.ts
+│   ├── books/           # listing.ts (book search/filters/pagination for book lists)
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
 │   ├── fieldSchema.ts   # Typed field schema + drawer layout (from Phase 0)
 │   ├── preview.ts       # Markdown renderer + placeholder hook (FR-010)
 │   └── assistant/       # diff.ts (assistant mock, Phase 2 scope)
 ├── adapters/            # App boundary — the ONLY host-facing modules
 │   ├── shell.ts             # Host drawer composition (#WorldInfo mount)
-│   ├── appApi.ts            # Single typed getContext() accessor
+│   ├── appApi.ts            # getAppContext() (memoized API) + getLiveAppContext()
+│   │                        #   (fresh context for data snapshots: characters, tags, characterId)
 │   ├── settingsStore.ts     # extensionSettings bridge + services bootstrap
 │   ├── worldInfoAdapter.ts  # Book load/save/create/delete/rename composition
-│   ├── activeBooksAdapter.ts# Native #world_info select read + drive (FR-017)
+│   ├── activeBooksAdapter.ts# Native #world_info select read + drive by option TEXT (FR-017)
+│   ├── bookStates.ts        # Book facts: global activation, character/chat binding, bound folder
 │   ├── syncEngine.ts        # Push pipeline, divergence reports, orphan/import flows
 │   ├── saveEvents.ts        # Save outcome events (failure banner, FR-009)
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
@@ -89,13 +94,19 @@ src/
 │   ├── WorkspaceApp.tsx     # Layout root: splitter, bulk bar, banners, modals
 │   ├── StructureTree.tsx    # Real tree: toolbar, DnD + long-press menu, multi-select
 │   ├── ItemEditor.tsx       # entry / image / folder(+root book settings) views
-│   ├── ActiveBooksPanel.tsx # Replacement book list with activation checkboxes
-│   ├── ImportDialog.tsx     # Native lorebook import + per-entry conflict resolution
+│   ├── LorebooksPanel.tsx   # All native books: activation, import/update (+ conflict
+│   │                        #   resolution), delete (bound book = book + folder)
+│   ├── BookList.tsx         # Shared book list: useBookFacts, search, filter chips, pager
+│   ├── NodeHeader.tsx       # Unified item header (icon, enable, name, duplicate/delete)
+│   ├── Sheet.tsx            # Mobile bottom sheet
 │   ├── fieldGroups/FieldGroups.tsx  # Essentials/Content/Advanced rows (store-bound)
+│   ├── fieldGroups/MultiSelect.tsx  # Chip multi-select; CharacterFilterControl (chars + tags)
 │   ├── AssistantPanel.tsx   # Batch-proposal mock (Phase 2 scope)
 │   └── mount.tsx            # React root creation
 ├── styles/
-│   └── prototype.scss   # Three-region layout + banners/menus/modals
+│   ├── wiw-theme.scss   # SHARED style system (buttons, panels, rows, banners, menus,
+│   │                    #   multi-select, book lists)
+│   └── prototype.scss   # Three-region layout (uses wiw-theme)
 ├── global.d.ts          # Typed SillyTavern API surface (grows per feature)
 ├── styles.d.ts          # SCSS module declaration
 └── index.ts             # Entry: init state+services, shell mount on APP_READY
@@ -103,7 +114,12 @@ tests/
 ├── manifest.test.ts     # Manifest contract test (spec 001)
 ├── contract/
 │   └── native-wi.test.ts        # Adapter usage vs app contract (jsdom)
-└── unit/                # state, tree, sync, preview, fingerprint, naming, demo, diff
+├── integration/
+│   └── sync-engine.test.ts      # REAL engine + adapters vs FakeHost mirroring the app's
+│                                #   save/cache/event mechanics; scenarios A–W (every live
+│                                #   discrepancy becomes a scenario here)
+└── unit/                # state (+recovery), tree, sync, books listing, preview,
+                         #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
 manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.2.0)
 ```
@@ -112,12 +128,17 @@ manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver
 
 Workspace state persists under `extensionSettings['WorldInfoWorkspace']` (schema v1,
 saved via `saveSettingsDebounced` after every mutation): `{ version: 1, root:
-FolderNode-tree, settings: { sortMode } }`. Node kinds: folder (expanded, isWiRoot,
-book binding `bookName` + orphans), entry (full `NativeWorldInfoEntry` + sync state),
-image (src/caption + sync). Per-entity sync bookkeeping: `bookName`, `uid` (stable slot
-in its book), `status` (new/in-sync/dirty/orphaned), `lastExportedHash` (FNV-1a of the
-native entry), `nativeDrift`. Full contract:
-`specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
+FolderNode-tree, settings: { sortMode }, _recovered? }`. Node kinds: folder (expanded,
+isWiRoot, book binding `{ bookName, orphans, tombstones }`), entry (full native entry
+incl. `triggers` and the native `characterFilter` object + sync), image (src/caption).
+Sync is PER BOOK: `sync.books[bookName] = { uid, hash (FNV-1a), status in-sync|dirty }`.
+
+Load rules (`migrate`): `parentId` is derived from the nesting; missing native fields
+are filled and legacy shapes migrated (v1 single-book sync, flat character-filter keys)
+with sync hashes carried over. An invalid payload yields an empty workspace that is NOT
+published before the user's first edit (settings are shared across devices); the raw
+payload stays under `_recovered` until Restore/Discard in the recovery banner. Full
+contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
 
 ## World Info sync (Phase 1 semantics)
 
@@ -126,18 +147,22 @@ native entry), `nativeDrift`. Full contract:
   payload via `saveWorldInfo(immediately)`; flushes on `GENERATION_STARTED` and panel
   close.
 - Books are created on root designation and stay inactive; activation is driven through
-  the native `#world_info` select by the workspace's ActiveBooksPanel (FR-017).
+  the native `#world_info` select (option value = index, name = option text) from the
+  Lorebooks panel (FR-017).
+- Failed saves: the app caches a payload before its fetch; the adapter fingerprints the
+  unsent write so Retry pushes it without a false divergence, and every successful save
+  emits a `success` save event (clears that book's failure banner).
 - Workspace vs native editor is a MODE toggle (2026-09-08 amendment): the native
   Worlds/Lorebooks editor is the default; `shell.ts` inserts a "Workspace" button into
   the native book row, and the workspace header's "Worlds/Lorebooks" button switches
   back (`body.wiw-active` controls visibility).
 - Book names are assigned once through the app's collision-resolved flow ("Name (N)")
   and are opaque handles thereafter — folder renames never rename books (FR-023).
-- Divergence (native-side drift or foreign entries) blocks automatic pushes in BOTH
-  directions and is resolved via per-entry import/push choices — never silent (FR-015).
-- Orphans (entries moved out of a root) are retained in the book until the user
-  resolves them (FR-018); deleted entities are disclosed in the delete confirmation and
-  removed at the next sync (FR-021).
+- Clean-side native changes merge silently (refreshes, additions, deletions); only
+  genuine conflicts (both sides edited) and validation blocks raise banners (FR-015).
+- Move-out removes an entry from the book at the next push via tombstones, move-in adds
+  it (FR-018 amended 2026-09-14); deleted entities are disclosed in the delete
+  confirmation and removed at the next sync (FR-021).
 - Images and folders are workspace-only: they never export and never import (owner
   decision 2026-09-08; the former wiw-marker image encoding is retired). Sync state is
   PER BOOK (`sync.books[bookName] = { uid, hash, status }`) — nested WI roots give an
@@ -157,7 +182,16 @@ Read-only reference material lives in `context/` (git-ignored, never bundled):
   `public/scripts/world-info.js` are the primary references)
 - `context/SillyTavern-3DDiceRolls/` — author's previous extension; baseline pattern
 - `context/SillyTavern-WorldInfo-Recommender/`, `context/SillyTavern-WorldInfoDrawer/` —
-  functional baselines this plugin unifies
+  functional baselines this plugin unifies (installed live on the `reference` account
+  for side-by-side comparison)
+
+## Live test accounts
+
+The local instance (`http://127.0.0.1:8634`, data under `ST-Data/`) has two passwordless
+accounts safe to modify: `dev` (this extension's working copy lives in
+`ST-Data/dev/extensions/`) and `reference` (WorldInfoDrawer + WorldInfo-Recommender).
+Browser checks: `playwright-cli` with the system Chromium (`/usr/bin/chromium-browser`
+via a `.playwright/cli.config.json` `launchOptions.executablePath`).
 - `context/variables.css` — all SillyTavern theme variables
 
 ## Style system (constitution amendment 1.2.0)

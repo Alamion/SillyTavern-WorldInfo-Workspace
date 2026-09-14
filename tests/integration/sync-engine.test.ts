@@ -3,15 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NativeWorldInfoEntry, SillyTavernContext, WorldInfoBook } from '../../src/global';
 import {
     createDefaultState,
+    isFreshRecovery,
     migrate,
     createEntryNode,
     createFolderNode,
     createImageNode,
 } from '../../src/core/state/schema';
 import { WorkspaceStore } from '../../src/core/state/store';
+import { bulkSetDisable, commitEntryField } from '../../src/core/tree/operations';
 import { createWorldInfoAdapter } from '../../src/adapters/worldInfoAdapter';
 import { createSyncEngine, type SyncEngine } from '../../src/adapters/syncEngine';
 import { fingerprintEntry } from '../../src/core/sync/fingerprint';
+import { onSaveEvent } from '../../src/adapters/saveEvents';
 
 /**
  * Integration harness: the REAL sync engine + adapters driven against a host
@@ -78,9 +81,20 @@ class FakeHost {
         return book ? (structuredClone(book) as WorldInfoBook) : null;
     };
 
-    // cloneOnSet: false — cache keeps the caller's reference; emit same reference
+    /** Simulated network outage: saves update the cache, then the fetch throws. */
+    offline = false;
+    /** What the server actually holds (successful saves only). */
+    server = new Map<string, WorldInfoBook>();
+
+    // Native _save order (world-info.js): cache set BEFORE the fetch; the fetch
+    // rejects on a network failure, so WORLDINFO_UPDATED is never emitted then.
+    // cloneOnSet: false — cache keeps the caller's reference; emit same reference.
     saveWorldInfo = async (name: string, data: WorldInfoBook): Promise<void> => {
         this.books.set(name, data);
+        if (this.offline) {
+            throw new TypeError('NetworkError when attempting to fetch resource.');
+        }
+        this.server.set(name, structuredClone(data));
         await this.eventSource.emit(EVENTS.WORLDINFO_UPDATED, name, data);
     };
 
@@ -800,16 +814,93 @@ describe('moves across WI boundaries and reload stability', () => {
         expect(comments).toEqual(['Keeper']);
     });
 
-    it('S: leftover _recovered from an earlier recovery does not re-trigger the warning', async () => {
+    it('T: bulk disable reaches the native book like a single toggle', async () => {
+        const rig = buildRig();
+        seedSyncedRoot(rig);
+
+        rig.store.replace(bulkSetDisable(rig.store.getState(), ['e1'], true));
+        await rig.advanceTimers();
+
+        expect(rig.host.books.get('Book')!.entries['5']?.disable).toBe(true);
+    });
+
+    it('U: triggers and character filter edits reach the book in the native shape', async () => {
+        const rig = buildRig();
+        seedSyncedRoot(rig);
+
+        let next = commitEntryField(rig.store.getState(), 'e1', 'triggers', ['normal', 'swipe']);
+        next = commitEntryField(next, 'e1', 'characterFilter', { isExclude: true, names: ['alice'], tags: ['7'] });
+        rig.store.replace(next);
+        await rig.advanceTimers();
+
+        const native = rig.host.books.get('Book')!.entries['5']! as unknown as Record<string, unknown>;
+        expect(native['triggers']).toEqual(['normal', 'swipe']);
+        expect(native['characterFilter']).toEqual({ isExclude: true, names: ['alice'], tags: ['7'] });
+        expect('characterFilterNames' in native).toBe(false);
+    });
+
+    it('V: importing a book into a folder inside a root places it there and feeds the parent book', async () => {
+        const rig = buildRig();
+        seedSyncedRoot(rig);
+        rig.store.update((draft) => {
+            const root = draft.root.children[0]!;
+            if (root.kind === 'folder') {
+                root.children.push(createFolderNode({ id: 'G', parentId: 'R', name: 'Group', now: NOW }));
+            }
+        });
+        const imported = createEntryNode({ id: 'x', parentId: 'x', name: 'Imported', now: NOW, nativeUid: 3 });
+        rig.host.books.set('Other', { entries: { '3': structuredClone(imported.native) } });
+        await rig.host.updateWorldInfoList();
+
+        await rig.engine.importUnboundBook('Other', 'G');
+        await rig.advanceTimers();
+
+        const group = rig.store.getState().root.children[0]!;
+        const groupFolder = group.kind === 'folder' ? group.children.find((node) => node.id === 'G') : undefined;
+        const otherFolder = groupFolder?.kind === 'folder' ? groupFolder.children[0] : undefined;
+        expect(otherFolder?.name).toBe('Other');
+        expect(otherFolder?.parentId).toBe('G');
+        expect(rig.store.getState().root.children).toHaveLength(1);
+        const parentComments = Object.values(rig.host.books.get('Book')!.entries).map((entry) => entry.comment);
+        expect(parentComments).toContain('Imported');
+    });
+
+    it('W: a push that failed offline is retried without a false divergence and reports success', async () => {
+        const rig = buildRig();
+        seedSyncedRoot(rig);
+        const events: string[] = [];
+        const off = onSaveEvent((event) => events.push(event.kind));
+
+        rig.host.offline = true;
+        rig.store.replace(commitEntryField(rig.store.getState(), 'e1', 'content', 'written offline'));
+        await rig.advanceTimers();
+        expect(events).toContain('failure');
+        expect(rig.host.server.get('Book')).toBeUndefined();
+
+        rig.host.offline = false;
+        events.length = 0;
+        await rig.engine.pushPendingNow('retry');
+
+        expect(rig.engine.getReports().size).toBe(0);
+        expect(rig.host.server.get('Book')?.entries['5']?.content).toBe('written offline');
+        expect(events).toEqual(['success']);
+        const root = rig.store.getState().root.children[0]!;
+        const entry = root.kind === 'folder' ? root.children[0] : undefined;
+        expect(entry?.kind === 'entry' && entry.sync.books['Book']?.status).toBe('in-sync');
+        off();
+    });
+
+    it('S: a backup from an earlier recovery is kept but is not a fresh recovery', async () => {
         const rig = buildRig();
         seedSyncedRoot(rig);
         const serialized = JSON.parse(JSON.stringify(rig.store.getState()));
-        // Simulate the stuck state: a valid payload that carries a stale
-        // `_recovered` key from a previous recovery.
+        // A valid payload that carries the backup of a previous recovery (e.g.
+        // written by a stale bundle on another device).
         (serialized as { _recovered: unknown })._recovered = { version: 1, root: {} };
 
         const migrated = migrate(serialized);
-        expect(migrated._recovered).toBeUndefined();
+        expect(migrated._recovered).toEqual({ version: 1, root: {} });
+        expect(isFreshRecovery(serialized, migrated)).toBe(false);
         expect(migrated.root.children).toHaveLength(1);
     });
 });

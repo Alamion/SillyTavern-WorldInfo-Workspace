@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Implemented (validated 2026-09-14, quickstart S1–S13)
 
 **Input**: User description: "Изучи результаты spec-000 и spec-001. Давай приступим к
 Phase 1 — Core Workspace MVP (US2–US4 из roadmap-спеки: гибкое дерево с реальным
@@ -37,6 +37,36 @@ Phase 1 inherits the owner-approved Phase 0 outcome as its UI and data-model bas
   resolution of app-wide placeholders (`{{user}}`, `{{char}}`, …) in the content preview.
 
 ## Clarifications
+
+### Session 2026-09-13/14 (UC walkthrough S1–S13)
+
+- Q: What happens to the native copy of an entry moved out from under its root? →
+  A: Move-out removes it from that book at the next push (tombstone), move-in adds it
+  (owner decision during validation). This supersedes the flag-and-decide orphan flow
+  of FR-018 and US3 scenario 4; orphan bookkeeping remains only for legacy data.
+- Q: How are the Books list and the lorebook import presented? → A: ONE "Lorebooks"
+  panel lists every native book (search, filters All / Active / Character & chat / In
+  workspace / Not in workspace, pages of 50) with global activation, import (books
+  outside the workspace; lands in the folder next to the tree selection) or update from
+  native (bound books), and delete. Deleting a bound book there removes BOTH the native
+  file and its workspace folder after one confirmation; deleting a designated root from
+  the tree keeps the keep-or-delete choice (FR-019). The current character's primary
+  book and the current chat's book are marked (additional character books are not
+  exposed by the app context).
+- Q: How is persisted data protected across devices? → A: A payload that fails
+  validation is never overwritten before the user's first edit; the raw payload is kept
+  as a durable backup (`_recovered`) with Restore / Discard actions. `parentId` links
+  are derived from the nesting on load and never cause recovery (real bug: the demo
+  seed wrote stale links, wiping seeded workspaces on reload).
+- Q: Which native shapes must the editor follow exactly? → A: `triggers` is a
+  multi-select over the app's generation types; the character filter is ONE
+  multi-select over current characters and tags plus Exclude, stored as the native
+  `characterFilter` object (legacy flat keys migrate on load). Multi-selection drags
+  move the whole selection as one block; bulk enable/disable pushes to the books.
+- Q: What does Retry guarantee after a failed save? → A: The unsent write is pushed
+  without a false divergence (the app caches a payload before its fetch), the result
+  is reported (toast on success, banner stays on failure), and a success clears that
+  book's failure banner.
 
 ### Session 2026-09-08
 
@@ -195,9 +225,8 @@ it.
 3. **Given** the workspace's active-books list, **When** the user toggles which roots
    participate in generation, **Then** generation follows exactly that selection.
 4. **Given** an entry moved out from under a root it was previously synced under,
-   **When** the next sync/inspection happens, **Then** the leftover native counterpart is
-   flagged as orphaned and the user explicitly chooses to remove it from the native book
-   or restore the entry under the root — nothing changes silently.
+   **When** the next sync happens, **Then** its native counterpart is removed from that
+   book, and moving it back re-adds it (amended 2026-09-14; see Clarifications).
 5. **Given** a native book changed outside the workspace while the workspace holds
    unexported edits to its entries, **When** the user imports that book, **Then** a
    divergence warning identifies the conflicts and the workspace changes are not
@@ -306,9 +335,9 @@ it.
   and warn the user before an import overwrites unexported workspace changes (never
   silent).
 - **FR-016**: The user MUST be able to import an existing native lorebook into the
-  workspace as a folder of entries with all field values preserved; importing a book that
-  is already bound to a root MUST go through the same divergence flow instead of
-  silently overwriting.
+  workspace as a folder of entries with all field values preserved, placed in the folder
+  next to the current tree selection; importing a book that is already bound to a root
+  MUST go through the same divergence flow instead of silently overwriting.
 - **FR-017**: The workspace MUST own the active-books list (which roots participate in
   generation); designating a root MUST NOT auto-activate its book — activation happens
   only through explicit user action in that list (in the app, "active" World Info means
@@ -328,13 +357,14 @@ it.
   MUST NOT rename the book; book renames MUST be explicit (root settings) and go
   through the same collision-checked flow; at most one binding per book name MUST exist
   at any time. After assignment, the book name is treated as an opaque handle.
-- **FR-018**: Entries whose native counterpart was exported under a root they no longer
-  sit beneath MUST be flagged as orphaned, and the user MUST explicitly choose to remove
-  the native counterpart or restore the entry under the root; the system MUST NOT resolve
-  this silently.
+- **FR-018** *(amended 2026-09-14)*: An entry moved out from under a root MUST be
+  removed from that root's book at the next push, and an entry moved in MUST be added;
+  pending removals MUST survive until the push fulfils them (no resurrection by
+  auto-merge). Legacy orphan records remain resolvable but are no longer created.
 - **FR-019**: Renaming a designated root MUST preserve its native book binding; deleting
   a designated root MUST require confirmation and MUST offer the choice to keep or delete
-  its native book.
+  its native book (tree deletion). Deleting a bound book from the Lorebooks panel MUST
+  delete the book and its folder together after a single confirmation that names both.
 - **FR-020**: All native World Info reads and writes MUST go through the app's official
   World Info mechanisms (never side-channel file writes), so app-side caches, lists, and
   events stay consistent for the rest of the app.

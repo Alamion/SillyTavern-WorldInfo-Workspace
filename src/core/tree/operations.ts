@@ -3,6 +3,7 @@ import {
     createFolderNode,
     createImageNode,
     findNode,
+    type EntryNode,
     type TreeNode,
     type WorkspaceState,
 } from '../state/schema';
@@ -199,35 +200,59 @@ export function bulkDeleteNodes(state: WorkspaceState, nodeIds: readonly string[
     return next;
 }
 
+/**
+ * Moves a selection as one block into `targetParentId`, keeping tree order.
+ * Nodes nested inside another moved folder travel with it (never pulled out).
+ * The block starts at `indexInParent` of the resulting child list (same rule as
+ * `moveNode`), or is appended. Rejected (null) when nothing can move or the
+ * target lies inside a moved folder.
+ */
 export function bulkMoveNodes(
     state: WorkspaceState,
     nodeIds: readonly string[],
-    targetParentId: string
-): WorkspaceState {
-    let next = state;
-    const moving = new Set(nodeIds);
-    for (const id of nodeIds) {
-        if (id === next.root.id || !findNode(next, id)) {
-            continue;
-        }
-        // Skip when the target folder lives inside another node being moved.
-        let insideMoved = false;
-        let cursor = findNode(next, targetParentId);
-        while (cursor && cursor.parentId !== null) {
-            if (moving.has(cursor.id)) {
-                insideMoved = true;
-                break;
-            }
-            cursor = findNode(next, cursor.parentId);
-        }
-        if (insideMoved) {
-            continue;
-        }
-        const moved = moveNode(next, id, targetParentId);
-        if (moved) {
-            next = moved;
-        }
+    targetParentId: string,
+    indexInParent?: number
+): WorkspaceState | null {
+    const requested = new Set(nodeIds);
+    requested.delete(state.root.id);
+    if (findNode(state, targetParentId)?.kind !== 'folder') {
+        return null;
     }
+    // Tree-order walk: a node is a block member unless an ancestor already is.
+    const blockIds: string[] = [];
+    let targetInsideBlock = false;
+    const walk = (node: TreeNode, insideBlock: boolean): void => {
+        const member = !insideBlock && requested.has(node.id);
+        if (member) {
+            blockIds.push(node.id);
+        }
+        if ((insideBlock || member) && node.id === targetParentId) {
+            targetInsideBlock = true;
+        }
+        if (node.kind === 'folder') {
+            node.children.forEach((child) => walk(child, insideBlock || member));
+        }
+    };
+    state.root.children.forEach((child) => walk(child, false));
+    if (blockIds.length === 0 || targetInsideBlock) {
+        return null;
+    }
+
+    const next = clone(state);
+    const now = new Date().toISOString();
+    const block = blockIds
+        .map((id) => detachFromParent(next, id))
+        .filter((node): node is TreeNode => node !== null);
+    const target = findNode(next, targetParentId);
+    if (target?.kind !== 'folder') {
+        return null;
+    }
+    for (const node of block) {
+        node.parentId = targetParentId;
+        node.updatedAt = now;
+    }
+    const at = Math.min(Math.max(indexInParent ?? target.children.length, 0), target.children.length);
+    target.children.splice(at, 0, ...block);
     return next;
 }
 
@@ -240,12 +265,22 @@ export function bulkSetDisable(
     const now = new Date().toISOString();
     for (const id of nodeIds) {
         const node = findNode(next, id);
-        if (node?.kind === 'entry') {
+        if (node?.kind === 'entry' && node.native.disable !== disabled) {
             node.native.disable = disabled;
             node.updatedAt = now;
+            markEntryBooksDirty(node);
         }
     }
     return next;
+}
+
+/** Every book copy of the entry must be re-pushed (the engine pushes dirty books). */
+function markEntryBooksDirty(node: EntryNode): void {
+    for (const bookSync of Object.values(node.sync.books)) {
+        if (bookSync.status === 'in-sync') {
+            bookSync.status = 'dirty';
+        }
+    }
 }
 
 /** Field commit (US2): updates the native field, marks dirty under a root. */
@@ -265,11 +300,7 @@ export function commitEntryField(
     if (name === 'comment') {
         node.name = String(value ?? '');
     }
-    for (const bookSync of Object.values(node.sync.books)) {
-        if (bookSync.status === 'in-sync') {
-            bookSync.status = 'dirty';
-        }
-    }
+    markEntryBooksDirty(node);
     return next;
 }
 

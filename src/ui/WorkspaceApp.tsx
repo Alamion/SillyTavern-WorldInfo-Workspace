@@ -4,7 +4,8 @@ import { getAppContext } from '../adapters/appApi';
 import { confirmDialog, inputDialog } from '../adapters/popups';
 import { onSaveEvent } from '../adapters/saveEvents';
 import { openNativeMode } from '../adapters/shell';
-import type { WorkspaceStateServices } from '../adapters/settingsStore';
+import { notifyError, notifySuccess } from '../adapters/logger';
+import { discardRecovered, restoreRecovered, type WorkspaceStateServices } from '../adapters/settingsStore';
 import type { NativeWorldInfoEntry } from '../global';
 import { createDemoState } from '../core/demo/dataset';
 import {
@@ -28,9 +29,8 @@ import {
     type CreateKind,
 } from '../core/tree/operations';
 import { validateNode } from '../core/tree/validation';
-import { ActiveBooksPanel } from './ActiveBooksPanel';
 import { AssistantPanel } from './AssistantPanel';
-import { ImportDialog } from './ImportDialog';
+import { LorebooksPanel } from './LorebooksPanel';
 import { ItemEditor } from './ItemEditor';
 import Sheet from './Sheet';
 import { StructureTree, type TreeMenuAction, type TreeMenuState } from './StructureTree';
@@ -51,10 +51,10 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
     const [menu, setMenu] = useState<TreeMenuState | null>(null);
     const [movePickerFor, setMovePickerFor] = useState<{ ids: string[] } | null>(null);
-    const [booksOpen, setBooksOpen] = useState(false);
-    const [importOpen, setImportOpen] = useState(false);
+    const [lorebooksOpen, setLorebooksOpen] = useState(false);
     const [reportsTick, setReportsTick] = useState(0);
     const [lastFailure, setLastFailure] = useState<{ message: string; bookName?: string } | null>(null);
+    const [retrying, setRetrying] = useState(false);
     const [assistantOpen, setAssistantOpen] = useState(false);
     const [treeWidth, setTreeWidth] = useState(300);
     const [treeCollapsed, setTreeCollapsed] = useState(false);
@@ -77,7 +77,8 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
             if (event.kind === 'failure') {
                 setLastFailure({ message: event.message, bookName: event.bookName });
             } else {
-                setLastFailure(null);
+                // A success clears only the failure of the same book.
+                setLastFailure((prev) => (prev && prev.bookName !== event.bookName ? prev : null));
             }
         });
         return () => {
@@ -105,6 +106,64 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         if (next) {
             store.replace(next);
         }
+    };
+
+    const handleRetry = async (): Promise<void> => {
+        let failed = false;
+        const offSave = onSaveEvent((event) => {
+            if (event.kind === 'failure') {
+                failed = true;
+            }
+        });
+        setRetrying(true);
+        try {
+            await sync.pushPendingNow('retry');
+        } finally {
+            offSave();
+            setRetrying(false);
+        }
+        if (!failed) {
+            setLastFailure(null);
+            notifySuccess('All pending changes are saved to the lorebooks.');
+        }
+    };
+
+    const handleRestoreBackup = (): void => {
+        const outcome = restoreRecovered(store);
+        if (outcome.ok) {
+            setSelectedIds(new Set());
+            notifySuccess('Workspace restored from the backup.');
+        } else {
+            notifyError(`The backup still cannot be loaded: ${outcome.issues.slice(0, 3).join('; ')}`);
+        }
+    };
+
+    const handleDiscardBackup = async (): Promise<void> => {
+        if (await confirmDialog('Permanently delete the workspace backup? This cannot be undone.')) {
+            discardRecovered(store);
+        }
+    };
+
+    const importTarget = (): { id: string; name: string } => {
+        const id = resolveSelectionParent();
+        return { id, name: id === state.root.id ? 'the workspace root' : (index.get(id)?.name ?? 'the workspace root') };
+    };
+
+    const handleDeleteBoundBook = async (folderId: string, bookName: string): Promise<boolean> => {
+        const folder = index.get(folderId);
+        if (folder?.kind !== 'folder') {
+            return false;
+        }
+        const items = buildNodeIndex(folder).size - 1;
+        const confirmed = await confirmDialog(
+            `Delete the lorebook "${bookName}" AND its workspace folder "${folder.name}" (${items} ${items === 1 ? 'item' : 'items'} inside)? ` +
+                'Both the native file and the folder are removed. This cannot be undone.'
+        );
+        if (!confirmed) {
+            return false;
+        }
+        await handleDelete([folderId], { preconfirmed: true, rootBooks: 'delete' });
+        return true;
     };
 
     const resolveSelectionParent = (): string => {
@@ -185,7 +244,15 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     };
 
     const handleMoveNode = (nodeId: string, parentId: string, indexInParent?: number): void => {
-        applyOperation((current) => moveNode(current, nodeId, parentId, indexInParent));
+        // A multi-selection drags as one block, including the grabbed row even
+        // when it was not selected. A single selection is just the open item and
+        // does not follow an unrelated drag.
+        if (selectedIds.size > 1) {
+            const ids = [...selectedIds, nodeId];
+            applyOperation((current) => bulkMoveNodes(current, ids, parentId, indexInParent));
+        } else {
+            applyOperation((current) => moveNode(current, nodeId, parentId, indexInParent));
+        }
         sync.refreshStructure();
     };
 
@@ -229,7 +296,15 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         return message;
     };
 
-    const handleDelete = async (ids: readonly string[]): Promise<void> => {
+    /**
+     * `preconfirmed` skips the generic prompt (the caller already asked);
+     * `rootBooks: 'delete'` removes designated roots' native books without the
+     * keep-or-delete question (Lorebooks panel: delete book + folder).
+     */
+    const handleDelete = async (
+        ids: readonly string[],
+        options: { preconfirmed?: boolean; rootBooks?: 'ask' | 'delete' } = {}
+    ): Promise<void> => {
         const targets = ids
             .map((id) => index.get(id))
             .filter((node): node is TreeNode => Boolean(node) && node!.id !== state.root.id);
@@ -243,7 +318,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                   (targets.some((node) => entityBooks(node).length > 0)
                       ? ' Native book copies of synced items will be removed at the next sync.'
                       : '');
-        const confirmed = await confirmDialog(label);
+        const confirmed = options.preconfirmed === true || (await confirmDialog(label));
         if (!confirmed) {
             return;
         }
@@ -274,9 +349,11 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         // FR-019: designated roots offer keep-or-delete for their native book.
         for (const node of targets) {
             if (node.kind === 'folder' && node.isWiRoot && node.book) {
-                const deleteBook = await confirmDialog(
-                    `Also delete the native book "${node.book.bookName}"? Cancel = keep the book file in the app.`
-                );
+                const deleteBook =
+                    options.rootBooks === 'delete' ||
+                    (await confirmDialog(
+                        `Also delete the native book "${node.book.bookName}"? Cancel = keep the book file in the app.`
+                    ));
                 await sync.deleteRootBook(node.id, deleteBook ? 'delete' : 'keep');
             }
         }
@@ -589,18 +666,10 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                 <button
                     type="button"
                     className="wiw-button wiw-icon-button"
-                    title="Books: all native books and activation"
-                    onClick={() => setBooksOpen(true)}
+                    title="Lorebooks: activation, import and deletion of native books"
+                    onClick={() => setLorebooksOpen(true)}
                 >
                     <i className="fa-solid fa-book-bookmark" />
-                </button>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="Import a native lorebook"
-                    onClick={() => setImportOpen(true)}
-                >
-                    <i className="fa-solid fa-file-import" />
                 </button>
                 <button
                     type="button"
@@ -722,14 +791,28 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     onClose={() => setMovePickerFor(null)}
                 />
             )}
-            {booksOpen && <ActiveBooksPanel services={services} onClose={() => setBooksOpen(false)} />}
-            {importOpen && <ImportDialog services={services} onClose={() => setImportOpen(false)} />}
-            <SaveFailureBanner failure={lastFailure} onRetry={() => void sync.pushPendingNow('retry')} onDismiss={() => setLastFailure(null)} />
+            {lorebooksOpen && (
+                <LorebooksPanel
+                    services={services}
+                    importTarget={importTarget()}
+                    onDeleteBoundBook={handleDeleteBoundBook}
+                    onClose={() => setLorebooksOpen(false)}
+                />
+            )}
+            {state._recovered !== undefined && (
+                <RecoveryBanner onRestore={handleRestoreBackup} onDiscard={() => void handleDiscardBackup()} />
+            )}
+            <SaveFailureBanner
+                failure={lastFailure}
+                retrying={retrying}
+                onRetry={() => void handleRetry()}
+                onDismiss={() => setLastFailure(null)}
+            />
             <DivergenceBanners
                 tick={reportsTick}
                 reports={[...sync.getReports().values()]}
                 onPushAnyway={(book) => void sync.overridePush(book)}
-                onImport={() => setImportOpen(true)}
+                onImport={() => setLorebooksOpen(true)}
                 onDismiss={(book) => sync.dismissReport(book)}
             />
         </div>
@@ -845,12 +928,29 @@ function computeMembershipLine(node: TreeNode | null, index: Map<string, TreeNod
         : 'Not part of any WI book (workspace-only item)';
 }
 
+function RecoveryBanner({ onRestore, onDiscard }: { onRestore(): void; onDiscard(): void }): JSX.Element {
+    return (
+        <div className="wiw-banner wiw-banner-warn wiw-save-banner">
+            <i className="fa-solid fa-life-ring" />
+            <span>A backup of workspace data that could not be loaded is kept.</span>
+            <button type="button" className="wiw-button" onClick={onRestore}>
+                Restore
+            </button>
+            <button type="button" className="wiw-button" onClick={onDiscard}>
+                Discard backup
+            </button>
+        </div>
+    );
+}
+
 function SaveFailureBanner({
     failure,
+    retrying,
     onRetry,
     onDismiss,
 }: {
     failure: { message: string; bookName?: string } | null;
+    retrying: boolean;
     onRetry(): void;
     onDismiss(): void;
 }): JSX.Element | null {
@@ -861,8 +961,9 @@ function SaveFailureBanner({
         <div className="wiw-banner wiw-banner-error wiw-save-banner">
             <i className="fa-solid fa-triangle-exclamation" />
             <span>{failure.message}</span>
-            <button type="button" className="wiw-button" onClick={onRetry}>
-                Retry
+            <button type="button" className="wiw-button" disabled={retrying} onClick={onRetry}>
+                <i className={`fa-solid ${retrying ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} />
+                {retrying ? 'Saving…' : 'Retry'}
             </button>
             <button type="button" className="wiw-button wiw-icon-button" title="Dismiss" onClick={onDismiss}>
                 <i className="fa-solid fa-xmark" />

@@ -473,3 +473,122 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     flex-direction: column;
     gap: $spacing-sm;
 }
+// ---------------------------------------------------------------------------
+// Multi-select — chip field with an inline searchable option list (native
+// select2 multi-select counterpart: triggers, character filter).
+// ---------------------------------------------------------------------------
+
+.wiw-multiselect {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wiw-multiselect-field {
+    cursor: text;
+}
+
+.wiw-chip-unknown {
+    border-style: dashed;
+    opacity: 0.75;
+}
+
+// In flow, not absolute: editor sections clip overflow (.wiw-field-group).
+.wiw-multiselect-list {
+    margin-top: $spacing-xs;
+    display: flex;
+    flex-direction: column;
+    max-height: 16rem;
+    overflow-y: auto;
+    padding: $spacing-xs;
+    background: $surface-blur;
+    backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-sm;
+    box-shadow: 0 8px 24px var(--SmartThemeShadowColor);
+}
+
+.wiw-multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-xs $spacing-sm;
+    border: none;
+    border-radius: $radius-sm;
+    background: none;
+    color: var(--SmartThemeBodyColor);
+    text-align: left;
+    cursor: pointer;
+    transition: $transition-fast;
+
+    &:hover {
+        background: $surface-sunken;
+    }
+
+    &.wiw-multiselect-selected > i:first-child {
+        color: var(--SmartThemeQuoteColor);
+    }
+}
+
+.wiw-multiselect-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wiw-multiselect-hint {
+    margin-left: auto;
+    font-size: 0.8em;
+    color: var(--SmartThemeEmColor);
+    white-space: nowrap;
+}
+
+.wiw-multiselect-empty {
+    padding: $spacing-sm;
+    color: var(--SmartThemeEmColor);
+    font-size: 0.85em;
+}
+
+.wiw-character-filter {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+}
+
+// ---------------------------------------------------------------------------
+// Book lists — Books panel and import dialog (search, filters, pagination).
+// ---------------------------------------------------------------------------
+
+.wiw-books-panel {
+    width: min(560px, 94%);
+    max-height: 86%;
+}
+
+.wiw-book-list {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.wiw-book-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs $spacing-sm;
+}
+
+.wiw-book-row > .wiw-folder-option {
+    padding: 0;
+}
+
+.wiw-book-marker {
+    flex: 0 0 auto;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.wiw-book-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-md;
+}

@@ -87,8 +87,21 @@ ImageNode:
 ## Migration policy
 
 - `migrate(raw: unknown): WorkspaceState` — pure function; unknown/invalid input yields
-  the default empty workspace (v1) plus a user-visible warning (never silent data loss:
-  the raw payload is kept under `WorldInfoWorkspace._recovered` for one session).
+  the default empty workspace (v1) plus a user-visible warning (never silent data loss).
+- Recovery safety (amended 2026-09-14, cross-device wipe): on recovery the raw payload
+  stays untouched in the namespace until the first workspace mutation — the empty
+  fallback is NOT published before that, so an app-wide settings save cannot persist
+  it (settings are shared across devices; a stale bundle on one device must not wipe
+  the others). On the first mutation the fallback is persisted with the raw payload
+  under `WorldInfoWorkspace._recovered`.
+- `_recovered` is a durable backup: a valid payload carrying it keeps it on load. It
+  is removed only by an explicit user action — Restore (replaces the workspace when
+  the backup now validates; kept when still invalid) or Discard backup (confirmed).
+  The load-time warning fires only for a recovery of the current load, never for a
+  carried backup (a persistent banner offers Restore/Discard instead).
+- `parentId` is derived data: on load it is rewritten from the nesting (root → `null`,
+  child → its containing folder's id). A stale link is never a recovery cause
+  (amended 2026-09-14: the demo seed grafted children still pointing at its own root).
 - Version bumps are additive: `v(n) → v(n+1)` steps applied in order.
 - Sync-state v2 (2026-09-08): per-book `sync.books` replaces the single
   bookName/uid/status pair; persisted legacy shapes are normalized on load

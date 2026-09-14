@@ -8,7 +8,10 @@ import {
     deepValidateState,
     findNode,
     migrate,
+    normalizeNativeEntry,
 } from '../../src/core/state/schema';
+import type { NativeWorldInfoEntry } from '../../src/global';
+import { fingerprintEntry } from '../../src/core/sync/fingerprint';
 
 const NOW = '2026-09-08T00:00:00.000Z';
 
@@ -125,6 +128,18 @@ describe('migrate', () => {
         expect(state._recovered).toEqual(raw);
     });
 
+    it('rewrites stale parent links from the nesting instead of recovering', () => {
+        const raw: Record<string, unknown> = JSON.parse(JSON.stringify(createDefaultState()));
+        const folder = createFolderNode({ id: 'f1', parentId: 'stale-root', name: 'A', now: NOW });
+        folder.children.push(createFolderNode({ id: 'f2', parentId: 'also-stale', name: 'B', now: NOW }));
+        (raw.root as Record<string, unknown>).children = [JSON.parse(JSON.stringify(folder))];
+
+        const state = migrate(raw);
+        expect(state._recovered).toBeUndefined();
+        expect(findNode(state, 'f1')?.parentId).toBe('workspace-root');
+        expect(findNode(state, 'f2')?.parentId).toBe('f1');
+    });
+
     it('recovers when an entry native payload is malformed', () => {
         const raw: Record<string, unknown> = JSON.parse(JSON.stringify(createDefaultState()));
         const root = raw.root as Record<string, unknown>;
@@ -196,5 +211,54 @@ describe('deepValidateState', () => {
         expect(findNode(state, 'f1')?.name).toBe('F');
         expect(findNode(state, 'nope')).toBeUndefined();
         expect(createImageNode({ id: 'i1', parentId: 'f1', name: 'M', now: NOW }).kind).toBe('image');
+    });
+});
+describe('native character filter normalization', () => {
+    const asEntry = (extra: Record<string, unknown>): NativeWorldInfoEntry =>
+        ({ uid: 1, key: [], comment: 'x', content: '', ...extra }) as unknown as NativeWorldInfoEntry;
+
+    it('moves legacy flat filter keys into the native object and drops them', () => {
+        const entry = normalizeNativeEntry(
+            asEntry({ characterFilterNames: ['Alice'], characterFilterTags: ['t1'], characterFilterExclude: true })
+        );
+        expect(entry.characterFilter).toEqual({ isExclude: true, names: ['Alice'], tags: ['t1'] });
+        expect(Object.keys(entry).filter((key) => key.startsWith('characterFilter'))).toEqual(['characterFilter']);
+    });
+
+    it('keeps a native filter over leftover legacy keys and stringifies tag ids', () => {
+        const entry = normalizeNativeEntry(
+            asEntry({ characterFilter: { isExclude: false, names: ['Bob'], tags: [42] }, characterFilterNames: ['Old'] })
+        );
+        expect(entry.characterFilter).toEqual({ isExclude: false, names: ['Bob'], tags: ['42'] });
+    });
+
+    it('resets a malformed filter like the app does on load', () => {
+        expect(normalizeNativeEntry(asEntry({ characterFilter: ['bad'] })).characterFilter).toEqual({
+            isExclude: false,
+            names: [],
+            tags: [],
+        });
+    });
+});
+
+describe('legacy filter migration keeps sync hashes consistent', () => {
+    it('carries a hash that matched the pre-normalization entry over to the normalized entry', () => {
+        const raw: Record<string, unknown> = JSON.parse(JSON.stringify(createDefaultState()));
+        const entry = createEntryNode({ id: 'e1', parentId: 'workspace-root', name: 'E', now: NOW, nativeUid: 3 });
+        const native = entry.native as unknown as Record<string, unknown>;
+        delete native['characterFilter'];
+        native['characterFilterNames'] = [];
+        native['characterFilterTags'] = [];
+        native['characterFilterExclude'] = false;
+        const legacyHash = fingerprintEntry(entry.native);
+        entry.sync.books = { Book: { uid: 3, hash: legacyHash, status: 'in-sync' } };
+        (raw.root as Record<string, unknown>).children = [JSON.parse(JSON.stringify(entry))];
+
+        const restored = findNode(migrate(raw), 'e1');
+        if (restored?.kind !== 'entry') {
+            throw new Error('expected entry');
+        }
+        expect(restored.sync.books['Book']?.hash).toBe(fingerprintEntry(restored.native));
+        expect(restored.sync.books['Book']?.hash).not.toBe(legacyHash);
     });
 });

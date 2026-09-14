@@ -1,4 +1,5 @@
 import type { NativeWorldInfoEntry } from '../../global';
+import { fingerprintEntry } from '../sync/fingerprint';
 
 /**
  * Persisted workspace schema (v1) — shape contract in
@@ -131,9 +132,7 @@ export function createDefaultNativeEntry(uid: number): NativeWorldInfoEntry {
         delay: null,
         automationId: '',
         triggers: [],
-        characterFilterNames: [],
-        characterFilterTags: [],
-        characterFilterExclude: false,
+        characterFilter: { isExclude: false, names: [], tags: [] },
         addMemo: true,
         displayIndex: uid,
         extensions: {},
@@ -188,7 +187,41 @@ export function normalizeNativeEntry(entry: NativeWorldInfoEntry): NativeWorldIn
     if (!Array.isArray(target['triggers'])) {
         target['triggers'] = [];
     }
+    normalizeCharacterFilter(target);
     return entry;
+}
+
+const LEGACY_FILTER_KEYS = ['characterFilterNames', 'characterFilterTags', 'characterFilterExclude'] as const;
+
+/**
+ * The native app reads ONLY the `characterFilter` object (world-info.js). Early
+ * workspace builds stored three flat keys instead, which never reached the app:
+ * their values move into the object (when it has none) and the keys are removed.
+ * A malformed object is reset like the app does on load.
+ */
+function normalizeCharacterFilter(target: Record<string, unknown>): void {
+    const stringList = (value: unknown): string[] =>
+        Array.isArray(value)
+            ? value
+                  .filter((item) => typeof item === 'string' || typeof item === 'number')
+                  .map((item) => String(item))
+            : [];
+    const raw = target['characterFilter'];
+    const filter =
+        typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+    const normalized = {
+        isExclude: filter['isExclude'] === true,
+        names: stringList(filter['names']),
+        tags: stringList(filter['tags']),
+    };
+    const hasLegacy = LEGACY_FILTER_KEYS.some((key) => key in target);
+    if (hasLegacy && normalized.names.length === 0 && normalized.tags.length === 0 && !normalized.isExclude) {
+        normalized.names = stringList(target['characterFilterNames']);
+        normalized.tags = stringList(target['characterFilterTags']);
+        normalized.isExclude = target['characterFilterExclude'] === true;
+    }
+    LEGACY_FILTER_KEYS.forEach((key) => delete target[key]);
+    target['characterFilter'] = normalized;
 }
 
 export function createDefaultSyncState(): SyncState {
@@ -417,16 +450,26 @@ export function migrate(raw: unknown): WorkspaceState {
         return recover(fallback, raw);
     }
     const state = raw as unknown as WorkspaceState;
+    relinkParents(state.root);
     repairMissingSync(state.root);
     const issues = deepValidateState(state);
     if (issues.length > 0) {
         return recover(createDefaultState(), raw);
     }
-    // A leftover `_recovered` key from an earlier recovery is stale garbage: it
-    // was surfaced in ITS session (one-session contract). Carrying it forward
-    // would re-trigger the recovery warning on every reload.
-    delete (state as { _recovered?: unknown })._recovered;
+    // A `_recovered` key carried by a VALID payload is the backup of an earlier
+    // recovery. It is kept until the user restores or discards it: stripping it
+    // here silently destroyed the only copy of the lost workspace.
     return state;
+}
+
+/**
+ * True when `migrate` had to recover THIS payload (as opposed to loading a valid
+ * payload that still carries an older backup). A valid payload is returned by
+ * reference; a recovery always returns a fresh fallback. An absent payload
+ * (first run) has nothing to lose and is not a recovery.
+ */
+export function isFreshRecovery(raw: unknown, state: WorkspaceState): boolean {
+    return raw !== undefined && state !== raw;
 }
 
 function subtreeShapeOk(root: Record<string, unknown>): boolean {
@@ -473,6 +516,26 @@ function subtreeShapeOk(root: Record<string, unknown>): boolean {
     return true;
 }
 
+/**
+ * `parentId` is a denormalized copy of the nesting, which is the source of
+ * truth: a stale link is rewritten, never a reason for recovery. (Real bug: the
+ * demo seed grafted children still pointing at the demo's own root id, so every
+ * reload of a seeded workspace failed validation and wiped it.)
+ */
+function relinkParents(root: FolderNode): void {
+    root.parentId = null;
+    const stack: FolderNode[] = [root];
+    while (stack.length > 0) {
+        const folder = stack.pop()!;
+        for (const child of folder.children) {
+            child.parentId = folder.id;
+            if (child.kind === 'folder') {
+                stack.push(child);
+            }
+        }
+    }
+}
+
 function repairMissingSync(node: TreeNode): void {
     if (node.kind === 'folder') {
         node.children.forEach(repairMissingSync);
@@ -514,7 +577,18 @@ function repairMissingSync(node: TreeNode): void {
         }
         // Heal entries persisted before import normalization existed: fill
         // missing native fields additively (same rule as import — research R1).
+        // Hashes that described the pre-normalization entry are carried over,
+        // so a pure shape repair never reads as a native change or a conflict.
+        const before = fingerprintEntry(node.native);
         normalizeNativeEntry(node.native);
+        const after = fingerprintEntry(node.native);
+        if (after !== before) {
+            for (const bookSync of Object.values(node.sync.books)) {
+                if (bookSync.hash === before) {
+                    bookSync.hash = after;
+                }
+            }
+        }
     }
 }
 

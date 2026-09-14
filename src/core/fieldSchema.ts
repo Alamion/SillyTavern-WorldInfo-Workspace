@@ -9,12 +9,19 @@ export type SampleFieldType =
     | 'nullableBoolean'
     | 'nullableNumber'
     | 'stringList'
+    | 'multiSelect'
+    | 'characterFilter'
     | 'enum'
     | 'json'
     | 'longText';
 
 export interface SampleFieldOption {
     value: number;
+    label: string;
+}
+
+export interface SampleFieldChoice {
+    value: string;
     label: string;
 }
 
@@ -25,6 +32,9 @@ export interface SampleFieldMeta {
     info: string;
     docs?: string;
     options?: readonly SampleFieldOption[];
+    /** Fixed choices of a 'multiSelect' field. */
+    choices?: readonly SampleFieldChoice[];
+    placeholder?: string;
 }
 
 export interface SampleLayoutField {
@@ -328,31 +338,28 @@ export const FIELD_SCHEMA: readonly SampleFieldMeta[] = [
     },
     {
         name: 'triggers',
-        type: 'stringList',
+        type: 'multiSelect',
         label: 'Triggers',
         info: 'Generation types this entry may activate for; empty means all.',
         docs: docs('triggers'),
+        // Native select[name="triggers"] (index.html), values = GENERATION_TYPE_TRIGGERS.
+        choices: [
+            { value: 'normal', label: 'Normal' },
+            { value: 'continue', label: 'Continue' },
+            { value: 'impersonate', label: 'Impersonate' },
+            { value: 'swipe', label: 'Swipe' },
+            { value: 'regenerate', label: 'Regenerate' },
+            { value: 'quiet', label: 'Quiet' },
+        ],
+        placeholder: 'All types (default)',
     },
     {
-        name: 'characterFilterNames',
-        type: 'stringList',
-        label: 'Character filter',
-        info: 'Character names the entry can (or cannot) activate for.',
+        name: 'characterFilter',
+        type: 'characterFilter',
+        label: 'Filter to Characters or Tags',
+        info: 'Ties the entry to specific characters or characters with specific tags; Exclude turns the list into a blacklist.',
         docs: docs('character-filter'),
-    },
-    {
-        name: 'characterFilterTags',
-        type: 'stringList',
-        label: 'Character tags',
-        info: 'Character tags the entry can (or cannot) activate for.',
-        docs: docs('character-filter'),
-    },
-    {
-        name: 'characterFilterExclude',
-        type: 'boolean',
-        label: 'Exclude mode',
-        info: 'Inverts the character filter into a blacklist.',
-        docs: docs('character-filter'),
+        placeholder: 'All characters (default)',
     },
     {
         name: 'addMemo',
@@ -392,9 +399,7 @@ export const ADVANCED_LAYOUT: readonly SampleEditorSection[] = [
             { name: 'sticky', span: 3 },
             { name: 'cooldown', span: 3 },
             { name: 'delay', span: 3 },
-            { name: 'characterFilterNames', span: 4 },
-            { name: 'characterFilterTags', span: 4 },
-            { name: 'characterFilterExclude', span: 4 },
+            { name: 'characterFilter', span: 12 },
             { name: 'addMemo', span: 2 },
             { name: 'uid', span: 2 },
             { name: 'displayIndex', span: 2 },

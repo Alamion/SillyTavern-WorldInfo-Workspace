@@ -270,7 +270,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
 ): Promise<void> => {
     const force = options.force === true;
     debugLog(`push ${bookName}: start (force=${String(force)}, merged=${String(options.merged === true)})`);
-    const alreadyMerged = options.merged === true;
+    let alreadyMerged = options.merged === true;
         const state = store.getState();
         const root = rootsWithBooks(state).find((candidate) => candidate.book?.bookName === bookName);
         if (!root?.book) {
@@ -282,6 +282,12 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             emitBookFailure(bookName, `Native book "${bookName}" is missing from the app's book list.`);
             pendingBooks.delete(bookName);
             return;
+        }
+        if (!alreadyMerged && worldInfo.isUnsentOwnWrite(bookName, current)) {
+            // Retry after a failed save: the app cached our unsent payload, so the
+            // "native" book is our own last write — nothing to merge or conflict.
+            debugLog(`push ${bookName}: retrying an unsent write`);
+            alreadyMerged = true;
         }
         const entities = entitiesOfRoot(state, root.id);
         const analysis = analyzeNativeBook({
@@ -725,11 +731,11 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             const now = new Date().toISOString();
             store.update((draft) => {
                 const folderId = ctx.uuidv4();
+                const requestedParent = parentFolderId ? findNode(draft, parentFolderId) : undefined;
+                const parent: FolderNode = requestedParent?.kind === 'folder' ? requestedParent : draft.root;
                 const folder: FolderNode = {
                     id: folderId,
-                    parentId: parentFolderId && findNode(draft, parentFolderId)?.kind === 'folder'
-                        ? parentFolderId
-                        : draft.root.id,
+                    parentId: parent.id,
                     kind: 'folder',
                     name: bookName,
                     createdAt: now,
@@ -754,8 +760,12 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     };
                     folder.children.push(node);
                 }
-                draft.root.children.push(folder);
+                parent.children.push(folder);
+                parent.expanded = true;
             });
+            // Imported under another WI root: the entries also join the
+            // enclosing books, which must be queued for a push.
+            engineRef.current.refreshStructure();
             await worldInfo.refreshBooks();
         },
         importBookFile: async (file: File, parentFolderId: string): Promise<void> => {

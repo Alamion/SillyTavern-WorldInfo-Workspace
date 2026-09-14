@@ -50,9 +50,7 @@ function book(entries: Array<{ uid: number; content: string }>): WorldInfoBook {
             delay: null,
             automationId: '',
             triggers: [],
-            characterFilterNames: [],
-            characterFilterTags: [],
-            characterFilterExclude: false,
+            characterFilter: { isExclude: false, names: [], tags: [] },
             addMemo: true,
         };
     }

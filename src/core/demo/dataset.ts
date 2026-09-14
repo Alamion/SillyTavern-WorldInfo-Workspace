@@ -14,7 +14,9 @@ import { SAMPLE_DATASET, type SampleNode } from './sampleDataset';
  * or sync bindings (the user opts into sync by designating a root themselves).
  */
 export function createDemoState(newId: () => string): WorkspaceState {
-    const state = createDefaultState(newId());
+    // The fixed root id: the seed is grafted into the live workspace root, and
+    // its top-level children must already point at it.
+    const state = createDefaultState();
     state.root.name = SAMPLE_DATASET.meta.title;
     let uidSeed = 400;
     const convert = (node: SampleNode, parentId: string): TreeNode => {

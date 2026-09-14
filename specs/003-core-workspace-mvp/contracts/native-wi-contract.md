@@ -21,6 +21,19 @@ calls/payloads MUST update the contract tests in the same change (constitution V
 | `substituteParams(content)` | `string` | Preview placeholder resolution |
 | `getRequestHeaders()` | `Record<string, string>` | Headers (incl. CSRF token) for the composed endpoint calls below |
 | `uuidv4()` | `string` | Node ids |
+| `characters` / `tags` / `characterId` | data snapshots copied into each context object | Character-filter options; read through a FRESH `getContext()` (`getLiveAppContext`), never the memoized one |
+
+### Entry fields with a native shape (amended 2026-09-14)
+
+- `triggers`: `string[]` ⊆ `GENERATION_TYPE_TRIGGERS` (`normal, continue, impersonate,
+  swipe, regenerate, quiet`); empty = all types. Edited as a multi-select.
+- `characterFilter`: `{ isExclude: boolean, names: string[], tags: string[] }` — the
+  ONLY shape the app reads. `names` = character avatar file names without extension
+  (native `getCharaFilename`), `tags` = tag ids. Edited as ONE multi-select over
+  characters + tags plus an Exclude toggle (native `select[name="characterFilter"]`).
+  Legacy flat keys (`characterFilterNames/Tags/Exclude`) from early builds are moved
+  into the object on load and removed; sync hashes that described the legacy entry
+  are carried over so the repair never reads as drift.
 
 ## Events
 
@@ -31,7 +44,7 @@ calls/payloads MUST update the contract tests in the same change (constitution V
 | `WORLDINFO_SETTINGS_UPDATED` | subscribe | none | Re-render the active-books panel (external activation changes) |
 | `SETTINGS_UPDATED` | subscribe | none | Refresh book list snapshot |
 | `SETTINGS_LOADED` / `EXTENSION_SETTINGS_LOADED` | subscribe | none | Load/migrate workspace state at startup |
-| `CHAT_CHANGED` | not used | — | Workspace is chat-independent (deliberate) |
+| `CHAT_CHANGED` | subscribe (book lists only) | — | Refresh character/chat book markers; the workspace tree itself stays chat-independent |
 | `wi-workspace:*` | none this phase | — | Interop events are Phase 4 (spec out-of-scope) |
 
 ## Book create / delete / rename (composed — context lacks these APIs)
@@ -48,17 +61,30 @@ calls/payloads MUST update the contract tests in the same change (constitution V
   exact endpoint the app's `deleteWorldInfo` calls) → `updateWorldInfoList()`; if the
   book was active, remove it from the active-list drive; if `#character_world` (native
   editor select) references it, clear that select and note it in the confirmation.
+- **Lorebooks panel** (amended 2026-09-14): one surface lists every native book with
+  activation, import/update and delete. Deleting an UNBOUND book deletes the file;
+  deleting a book BOUND to a workspace folder deletes the file AND the folder with its
+  subtree after one confirmation (same path as tree deletion with the root's book set
+  to delete: tombstones for copies in parent books, then the folder). New imports land
+  in the folder next to the tree selection.
 - **Rename**: create-with-copy (`saveWorldInfo(newName, {…old, name: newName}, true)`,
   preserving unknown top-level keys) → rebind → delete old. Never rename in place.
 
 ## Active-books drive (FR-017 — context lacks `selected_world_info`)
 
-- Read: `$('#world_info').val()` (host-stable id; the native editor DOM persists under
-  the hidden `#wi-holder`).
-- Write: set the select's values to the desired name list and trigger `change` — the
+- Options are `new Option(name, index)` (amended 2026-09-14): the VALUE is an index
+  into `world_names`, the book NAME is the option text. Matching by value never matches
+  a name.
+- Read: the TEXT of the selected options of `#world_info` (host-stable id; the native
+  editor DOM persists under the hidden `#wi-holder`).
+- Write: select the options whose text is in the desired name list and trigger `change` — the
   host handler (`onWorldInfoChange`) rebuilds `selected_world_info`, persists
   `world_info.globalSelect`, and emits `WORLDINFO_SETTINGS_UPDATED`. The adapter MUST
   re-read state after the host handler runs (single source of truth stays native).
+- Character/chat markers: the current character's primary book is
+  `characters[characterId].data.extensions.world`; the chat book is the string
+  `chatMetadata.world_info`. Both are snapshots — read from a fresh context. Additional
+  character books (`world_info.charLore`) are not exposed by the context (not shown).
 - Isolation: all of this lives in `adapters/activeBooksAdapter.ts` (constitution II
   last-resort DOM composition, Complexity Tracking row 2 in plan.md).
 
@@ -85,6 +111,13 @@ calls/payloads MUST update the contract tests in the same change (constitution V
    is ignored — the adapter tracks the outbound payload reference PER BOOK NAME (the
    cache stores the caller's reference uncloned; a single global slot would
    misclassify the earlier of two consecutive saves as external).
+   **Failed saves** (amended 2026-09-14, S10): the app's `_save` caches the payload
+   BEFORE its fetch, and a network failure rejects without `WORLDINFO_UPDATED`. The
+   adapter records a fingerprint of the unsent payload; a later push whose loaded book
+   matches it treats the book as the workspace's own write (no merge, no conflict).
+   Every successful save emits a `success` save event, which clears that book's failure
+   banner; Retry reports the outcome (toast on success, banner stays on failure). An
+   HTTP error status is NOT detectable: the app's `_save` ignores the response.
 9. **Validation-blocked pushes never write** (FR-010 publish-block): when flatten skips
    invalid entities, the push aborts entirely — the book is never partially emptied.
    Divergence force ("push anyway") bypasses only the divergence guard, never the

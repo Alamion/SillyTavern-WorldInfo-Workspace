@@ -67,12 +67,30 @@ export interface NativeWorldInfoEntry {
     delay: number | null;
     automationId: string;
     triggers: string[];
-    characterFilterNames: string[];
-    characterFilterTags: string[];
-    characterFilterExclude: boolean;
+    /** Native shape (world-info.js): absent or `{ isExclude, names, tags }`. */
+    characterFilter?: WorldInfoCharacterFilter;
     addMemo: boolean;
     displayIndex?: number;
     extensions?: Record<string, unknown>;
+}
+
+export interface WorldInfoCharacterFilter {
+    isExclude: boolean;
+    /** Character avatar file names without extension (native getCharaFilename). */
+    names: string[];
+    /** Tag ids from the app tag list. */
+    tags: string[];
+}
+
+export interface SillyTavernCharacter {
+    name: string;
+    avatar: string;
+    data?: { extensions?: { world?: string } };
+}
+
+export interface SillyTavernTag {
+    id: string;
+    name: string;
 }
 
 export interface WorldInfoBook {
@@ -138,6 +156,11 @@ export interface SillyTavernContext {
         options?: SillyTavernSubstituteParamsOptions
     ): string;
     powerUserSettings: Record<string, unknown>;
+    /** Data snapshots: read through getLiveAppContext(), never the memoized context. */
+    characters: SillyTavernCharacter[];
+    characterId: string | number | undefined;
+    tags: SillyTavernTag[];
+    chatMetadata?: Record<string, unknown>;
 }
 
 declare global {
