@@ -1,4 +1,4 @@
-import type { NativeWorldInfoEntry } from '../../global';
+import type { NativeWorldInfoEntry } from '../global';
 
 export type SampleFieldName = keyof NativeWorldInfoEntry;
 

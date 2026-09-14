@@ -1,3 +1,6 @@
+// Shared style system MUST stay first (constitution amendment 1.2.0):
+@use './wiw-theme';
+
 body.wiw-active {
     #WorldInfo {
         width: 100vw;
@@ -1041,4 +1044,5 @@ body.wiw-active #WorldInfo > .wiw-root {
         opacity: 1;
     }
 }
+
 

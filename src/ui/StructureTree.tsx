@@ -1,68 +1,112 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent } from 'react';
-import type { SampleFolderNode, SampleNode } from '../core/sample/dataset';
+import type { CreateKind } from '../core/tree/operations';
 import {
-    matchesFilter,
-    sortedChildren,
-    type FilterKind,
-    type FilterSearchScope,
+    kindOfFilter,
+    matchesSearch,
+    sortChildrenView,
+    type BrowseFilter,
+    type SearchScope,
     type SortMode,
-} from '../core/sample/tree';
+} from '../core/tree/browse';
+import type { FolderNode, TreeNode } from '../core/state/schema';
 
-interface StructureTreeProps {
-    root: SampleFolderNode;
-    selectedId: string | null;
-    onSelect: (id: string) => void;
-    onSort: (mode: SortMode) => void;
-    onMoveNode: (nodeId: string, newParentId: string, indexInParent?: number) => void;
-    onCreate: (kind: 'folder' | 'entry' | 'image') => void;
-    allowReorder: boolean;
+export type TreeMenuAction =
+    | 'rename'
+    | 'move-to'
+    | 'move-up'
+    | 'move-down'
+    | 'duplicate'
+    | 'delete';
+
+export interface TreeMenuState {
+    id: string;
+    x: number;
+    y: number;
+}
+
+export interface StructureTreeProps {
+    root: FolderNode;
+    sortMode: SortMode;
+    onSort(mode: SortMode): void;
+    selectedIds: ReadonlySet<string>;
+    onSelect(id: string, additive: 'none' | 'toggle' | 'range'): void;
+    onExpand(folderId: string, expanded: boolean): void;
+    onCreate(kind: CreateKind): void;
+    onMoveNode(nodeId: string, parentId: string, indexInParent?: number): void;
+    onReorder(parentId: string, fromIndex: number, toIndex: number): void;
+    menu: TreeMenuState | null;
+    onOpenMenu(menu: TreeMenuState): void;
+    onCloseMenu(): void;
+    onMenuAction(action: TreeMenuAction, id: string): void;
+    onImportFile(file: File): void;
 }
 
 interface RowProps {
-    siblingIndex: number;
-    visible: ReadonlySet<string>;
-    node: SampleNode;
+    node: TreeNode;
     depth: number;
-    expandedIds: ReadonlySet<string>;
-    onToggle: (id: string) => void;
-    selectedId: string | null;
-    onSelect: (id: string) => void;
-    onMoveNode: StructureTreeProps['onMoveNode'];
+    siblingIndex: number;
+    visibleIds: ReadonlySet<string>;
+    selectedIds: ReadonlySet<string>;
+    sortMode: SortMode;
     allowReorder: boolean;
     dragOverId: string | null;
-    setDragOverId: (id: string | null) => void;
+    setDragOverId(id: string | null): void;
+    onSelect: StructureTreeProps['onSelect'];
+    onExpand: StructureTreeProps['onExpand'];
+    onMoveNode: StructureTreeProps['onMoveNode'];
+    onOpenMenu: StructureTreeProps['onOpenMenu'];
 }
 
-const ALL_KINDS: ReadonlySet<FilterKind> = new Set<FilterKind>([
-    'folders',
-    'wiFolders',
-    'entries',
-    'images',
-]);
+const LONG_PRESS_MS = 500;
+
+const KIND_ICONS: Record<BrowseFilter, string> = {
+    folders: 'fa-folder',
+    wiFolders: 'fa-folder-tree',
+    entries: 'fa-book',
+    images: 'fa-image',
+};
+
+const KIND_TITLES: Record<BrowseFilter, string> = {
+    folders: 'Folders',
+    wiFolders: 'World Info folders',
+    entries: 'Entries',
+    images: 'Images',
+};
+
+const MENU_ITEMS: ReadonlyArray<{ action: TreeMenuAction; icon: string; label: string }> = [
+    { action: 'rename', icon: 'fa-pen', label: 'Rename' },
+    { action: 'move-to', icon: 'fa-folder-open', label: 'Move to…' },
+    { action: 'move-up', icon: 'fa-arrow-up', label: 'Move up' },
+    { action: 'move-down', icon: 'fa-arrow-down', label: 'Move down' },
+    { action: 'duplicate', icon: 'fa-clone', label: 'Duplicate' },
+    { action: 'delete', icon: 'fa-trash-can', label: 'Delete' },
+];
 
 function Row({
-    siblingIndex,
-    visible,
     node,
     depth,
-    expandedIds,
-    onToggle,
-    selectedId,
-    onSelect,
-    onMoveNode,
+    siblingIndex,
+    visibleIds,
+    selectedIds,
+    sortMode,
     allowReorder,
     dragOverId,
     setDragOverId,
+    onSelect,
+    onExpand,
+    onMoveNode,
+    onOpenMenu,
 }: RowProps): JSX.Element | null {
-    if (!visible.has(node.id)) {
+    if (!visibleIds.has(node.id)) {
         return null;
     }
     const isFolder = node.kind === 'folder';
-    const expanded = isFolder && expandedIds.has(node.id);
+    const expanded = isFolder && node.expanded;
     const indentStyle: CSSProperties = { paddingLeft: `${depth * 12 + 4}px` };
-    const selected = selectedId === node.id;
+    const selected = selectedIds.has(node.id);
     const isDragOver = dragOverId === node.id;
+    let pressTimer: number | null = null;
     const kindIcon =
         node.kind === 'folder'
             ? expanded
@@ -71,14 +115,6 @@ function Row({
             : node.kind === 'entry'
               ? 'fa-book'
               : 'fa-image';
-    const handleSelect = (): void => {
-        onSelect(node.id);
-    };
-    const handleToggle = (): void => {
-        if (node.kind === 'folder') {
-            onToggle(node.id);
-        }
-    };
     const handleDrop = (event: ReactDragEvent): void => {
         event.preventDefault();
         event.stopPropagation();
@@ -112,6 +148,36 @@ function Row({
                 }}
                 onDragLeave={() => setDragOverId(null)}
                 onDrop={handleDrop}
+                onPointerDown={(event) => {
+                    if (event.pointerType === 'mouse') {
+                        return;
+                    }
+                    const startX = event.clientX;
+                    const startY = event.clientY;
+                    pressTimer = window.setTimeout(() => {
+                        pressTimer = null;
+                        onOpenMenu({ id: node.id, x: event.clientX, y: event.clientY });
+                    }, LONG_PRESS_MS);
+                    const cancel = (moveEvent: PointerEvent): void => {
+                        if (Math.abs(moveEvent.clientX - startX) > 10 || Math.abs(moveEvent.clientY - startY) > 10) {
+                            cancelLongPress();
+                        }
+                    };
+                    const cancelLongPress = (): void => {
+                        if (pressTimer !== null) {
+                            window.clearTimeout(pressTimer);
+                            pressTimer = null;
+                            window.removeEventListener('pointermove', cancel);
+                            window.removeEventListener('pointerup', cancelLongPress);
+                        }
+                    };
+                    window.addEventListener('pointermove', cancel);
+                    window.addEventListener('pointerup', cancelLongPress, { once: true });
+                }}
+                onContextMenu={(event) => {
+                    event.preventDefault();
+                    onOpenMenu({ id: node.id, x: event.clientX, y: event.clientY });
+                }}
             >
                 {isFolder ? (
                     <span
@@ -119,10 +185,10 @@ function Row({
                         role="button"
                         tabIndex={0}
                         title="Collapse / expand"
-                        onClick={handleToggle}
+                        onClick={() => onExpand(node.id, !expanded)}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
-                                handleToggle();
+                                onExpand(node.id, !expanded);
                             }
                         }}
                     >
@@ -133,88 +199,106 @@ function Row({
                     </span>
                 ) : (
                     <span className="wiw-tree-leaf-icon">
-                        <i className={`fa-solid ${kindIcon}`} />
+                        <i className={`fa-solid ${kindIcon}${node.kind === 'entry' && node.native.disable ? ' wiw-entry-off' : ''}`} />
                     </span>
                 )}
                 <span
                     className="wiw-tree-name"
                     role="button"
                     tabIndex={0}
-                    onClick={handleSelect}
+                    onClick={(event) => {
+                        if (event.shiftKey) {
+                            onSelect(node.id, 'range');
+                        } else if (event.ctrlKey || event.metaKey) {
+                            onSelect(node.id, 'toggle');
+                        } else {
+                            onSelect(node.id, 'none');
+                        }
+                    }}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
-                            handleSelect();
+                            onSelect(node.id, 'none');
                         }
                     }}
                 >
                     {node.name}
                 </span>
-                {node.kind === 'folder' && node.isWiRoot && (
+                {node.kind === 'entry' && node.native.disable && (
+                    <span className="wiw-badge wiw-badge-off" title="Disabled">
+                        off
+                    </span>
+                )}
+                {isFolder && (node as FolderNode).isWiRoot && (
                     <span className="wiw-badge wiw-badge-book">WI</span>
                 )}
             </div>
             {isFolder &&
                 expanded &&
-                sortedChildren(node as SampleFolderNode).map((child, childIndex) => (
+                sortChildrenView((node as FolderNode).children, sortMode).map((child, childIndex) => (
                     <Row
                         key={child.id}
-                        siblingIndex={childIndex}
-                        visible={visible}
                         node={child}
                         depth={depth + 1}
-                        expandedIds={expandedIds}
-                        onToggle={onToggle}
-                        selectedId={selectedId}
-                        onSelect={onSelect}
-                        onMoveNode={onMoveNode}
+                        siblingIndex={childIndex}
+                        visibleIds={visibleIds}
+                        selectedIds={selectedIds}
+                        sortMode={sortMode}
                         allowReorder={allowReorder}
                         dragOverId={dragOverId}
                         setDragOverId={setDragOverId}
+                        onSelect={onSelect}
+                        onExpand={onExpand}
+                        onMoveNode={onMoveNode}
+                        onOpenMenu={onOpenMenu}
                     />
                 ))}
         </>
     );
 }
 
-export function StructureTree({
-    root,
-    selectedId,
-    onSelect,
-    onSort,
-    onMoveNode,
-    onCreate,
-    allowReorder,
-}: StructureTreeProps): JSX.Element {
-    const [sortMode, setSortMode] = useState<SortMode>('custom');
-    const [kinds, setKinds] = useState<ReadonlySet<FilterKind>>(ALL_KINDS);
-    const [query, setQuery] = useState('');
-    const [scope, setScope] = useState<FilterSearchScope>('title+prompt');
-    const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => {
-        const initial = new Set<string>();
-        const walk = (node: SampleNode): void => {
-            if (node.kind === 'folder') {
-                if (node.expanded) {
-                    initial.add(node.id);
+function collectVisible(
+    root: FolderNode,
+    kinds: ReadonlySet<BrowseFilter>,
+    query: string,
+    scope: SearchScope,
+    sortMode: SortMode
+): Set<string> {
+    const result = new Set<string>();
+    const walk = (node: TreeNode): boolean => {
+        let childVisible = false;
+        if (node.kind === 'folder') {
+            for (const child of sortChildrenView(node.children, sortMode)) {
+                if (walk(child)) {
+                    childVisible = true;
                 }
-                node.children.forEach(walk);
             }
-        };
-        walk(root);
-        return initial;
-    });
-    const [dragOverId, setDragOverId] = useState<string | null>(null);
-    const toggle = (id: string): void => {
-        setExpandedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
-            return next;
-        });
+        }
+        const self =
+            node === root ||
+            (matchesSearch(node, query, scope) &&
+                (kinds.size === 0 || kinds.has(kindOfFilter(node))));
+        if (self || childVisible) {
+            result.add(node.id);
+        }
+        return self || childVisible;
     };
-    const toggleKind = (kind: FilterKind): void => {
+    walk(root);
+    return result;
+}
+
+export function StructureTree(props: StructureTreeProps): JSX.Element {
+    const { root, sortMode, onSort, selectedIds, onCreate, menu, onImportFile } = props;
+    const [kinds, setKinds] = useState<ReadonlySet<BrowseFilter>>(
+        new Set<BrowseFilter>(['folders', 'wiFolders', 'entries', 'images'])
+    );
+    const [query, setQuery] = useState('');
+    const [scope, setScope] = useState<SearchScope>('title+prompt');
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+    const visibleIds = useMemo(
+        () => collectVisible(root, kinds, query.trim(), scope, sortMode),
+        [root, kinds, query, scope, sortMode]
+    );
+    const toggleKind = (kind: BrowseFilter): void => {
         setKinds((prev) => {
             const next = new Set(prev);
             if (next.has(kind)) {
@@ -225,38 +309,14 @@ export function StructureTree({
             return next;
         });
     };
-    const visible = useMemo(() => {
-        const result = new Set<string>();
-        const walk = (node: SampleNode): boolean => {
-            let childVisible = false;
-            if (node.kind === 'folder') {
-                for (const child of node.children) {
-                    if (walk(child)) {
-                        childVisible = true;
-                    }
-                }
-            }
-            const self = matchesFilter(node, kinds, query.trim(), scope);
-            if (self || childVisible) {
-                result.add(node.id);
-            }
-            return self || childVisible;
-        };
-        walk(root);
-        return result;
-    }, [root, kinds, query, scope]);
     return (
-        <div className="wiw-tree">
+        <div className="wiw-tree" onClick={menu ? props.onCloseMenu : undefined}>
             <div className="wiw-tree-toolbar">
                 <select
                     className="wiw-tree-sort"
                     title="Sort entries"
                     value={sortMode}
-                    onChange={(event) => {
-                        const mode = event.target.value as SortMode;
-                        setSortMode(mode);
-                        onSort(mode);
-                    }}
+                    onChange={(event) => onSort(event.target.value as SortMode)}
                 >
                     <option value="custom">Custom order</option>
                     <option value="title">Title (A-Z)</option>
@@ -266,43 +326,22 @@ export function StructureTree({
                     <option value="trigger">Trigger %</option>
                 </select>
                 <div className="wiw-tree-filters">
-                    <button
-                        type="button"
-                        className={`wiw-filter-chip${kinds.has('folders') ? ' wiw-filter-on' : ''}`}
-                        title="Folders"
-                        onClick={() => toggleKind('folders')}
-                    >
-                        <i className="fa-solid fa-folder" />
-                    </button>
-                    <button
-                        type="button"
-                        className={`wiw-filter-chip${kinds.has('wiFolders') ? ' wiw-filter-on' : ''}`}
-                        title="World Info folders"
-                        onClick={() => toggleKind('wiFolders')}
-                    >
-                        <i className="fa-solid fa-folder-tree" />
-                    </button>
-                    <button
-                        type="button"
-                        className={`wiw-filter-chip${kinds.has('entries') ? ' wiw-filter-on' : ''}`}
-                        title="Entries"
-                        onClick={() => toggleKind('entries')}
-                    >
-                        <i className="fa-solid fa-book" />
-                    </button>
-                    <button
-                        type="button"
-                        className={`wiw-filter-chip${kinds.has('images') ? ' wiw-filter-on' : ''}`}
-                        title="Images"
-                        onClick={() => toggleKind('images')}
-                    >
-                        <i className="fa-solid fa-image" />
-                    </button>
+                    {(['folders', 'wiFolders', 'entries', 'images'] as const).map((kind) => (
+                        <button
+                            key={kind}
+                            type="button"
+                            className={`wiw-filter-chip${kinds.has(kind) ? ' wiw-filter-on' : ''}`}
+                            title={KIND_TITLES[kind]}
+                            onClick={() => toggleKind(kind)}
+                        >
+                            <i className={`fa-solid ${KIND_ICONS[kind]}`} />
+                        </button>
+                    ))}
                     <select
                         className="wiw-tree-scope"
                         title="Search in"
                         value={scope}
-                        onChange={(event) => setScope(event.target.value as FilterSearchScope)}
+                        onChange={(event) => setScope(event.target.value as SearchScope)}
                     >
                         <option value="title">Title</option>
                         <option value="prompt">Prompt</option>
@@ -342,22 +381,62 @@ export function StructureTree({
                     >
                         <i className="fa-solid fa-image" />
                     </button>
+                    <label
+                        className="wiw-filter-chip"
+                        title="Import a world file (.json / .lorebook) into the selected folder"
+                    >
+                        <i className="fa-solid fa-file-import" />
+                        <input
+                            type="file"
+                            accept=".json,.lorebook"
+                            hidden
+                            onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                event.target.value = '';
+                                if (file) {
+                                    onImportFile(file);
+                                }
+                            }}
+                        />
+                    </label>
                 </div>
             </div>
             <Row
-                siblingIndex={0}
-                visible={visible}
                 node={root}
                 depth={0}
-                expandedIds={expandedIds}
-                onToggle={toggle}
-                selectedId={selectedId}
-                onSelect={onSelect}
-                onMoveNode={onMoveNode}
-                allowReorder={allowReorder && sortMode === 'custom'}
+                siblingIndex={0}
+                visibleIds={visibleIds}
+                selectedIds={selectedIds}
+                sortMode={sortMode}
+                allowReorder={sortMode === 'custom'}
                 dragOverId={dragOverId}
                 setDragOverId={setDragOverId}
+                onSelect={props.onSelect}
+                onExpand={props.onExpand}
+                onMoveNode={props.onMoveNode}
+                onOpenMenu={props.onOpenMenu}
             />
+            {menu && (
+                <div
+                    className="wiw-tree-menu"
+                    style={{ left: menu.x, top: menu.y }}
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {MENU_ITEMS.map((item) => (
+                        <button
+                            key={item.action}
+                            type="button"
+                            className="wiw-tree-menu-item"
+                            onClick={() => {
+                                props.onCloseMenu();
+                                props.onMenuAction(item.action, menu.id);
+                            }}
+                        >
+                            <i className={`fa-solid ${item.icon}`} /> {item.label}
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

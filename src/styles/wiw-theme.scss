@@ -1,0 +1,475 @@
+// wiw-theme.scss — the SHARED style system of the plugin.
+//
+// Constitution (amendment 1.2.0): every component surface MUST style itself
+// through these primitives and the app's `--SmartTheme*` variables. When a
+// surface needs something new, extend THIS file — never add one-off styles.
+// Colors/blurs/radii always come from the theme; fixed colors are forbidden.
+
+$transition-fast: all 0.15s ease;
+$transition-normal: all 0.2s ease;
+
+$spacing-xs: 2px;
+$spacing-sm: 6px;
+$spacing-md: 8px;
+$spacing-lg: 10px;
+$spacing-xl: 12px;
+$spacing-2xl: 16px;
+
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 14px;
+
+$surface-blur: color-mix(in srgb, var(--SmartThemeBlurTintColor), transparent 12%);
+$surface-raised: color-mix(in srgb, var(--SmartThemeBlurTintColor), transparent 30%);
+$surface-sunken: color-mix(in srgb, var(--SmartThemeChatTintColor), transparent 20%);
+$overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%);
+
+// ---------------------------------------------------------------------------
+// Buttons — the only button primitives; every action uses one of these.
+// ---------------------------------------------------------------------------
+
+.wiw-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-sm;
+    background: $surface-sunken;
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    transition: $transition-fast;
+
+    &:hover {
+        background: color-mix(in srgb, var(--SmartThemeChatTintColor), transparent 35%);
+        border-color: var(--SmartThemeEmColor);
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    i {
+        pointer-events: none;
+    }
+}
+
+.wiw-icon-button {
+    padding: $spacing-sm;
+    min-width: 28px;
+    min-height: 28px;
+}
+
+.wiw-danger-button {
+    border-color: var(--SmartThemeBadColor);
+    color: var(--SmartThemeBadColor);
+
+    &:hover {
+        background: color-mix(in srgb, var(--SmartThemeBadColor), transparent 80%);
+        border-color: var(--SmartThemeBadColor);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Overlays — the only modal primitive (backdrop + centered panel).
+// ---------------------------------------------------------------------------
+
+.wiw-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-2xl;
+    background: $overlay-scrim;
+    backdrop-filter: blur(calc(var(--SmartThemeBlurStrength) * 0.5));
+}
+
+.wiw-panel {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    width: min(460px, 92%);
+    max-height: 78%;
+    padding: $spacing-2xl;
+    background: $surface-blur;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-lg;
+    box-shadow: 0 12px 32px var(--SmartThemeShadowColor);
+    color: var(--SmartThemeBodyColor);
+
+    h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    p {
+        margin: 0;
+        font-size: 0.86rem;
+        opacity: 0.85;
+    }
+}
+
+.wiw-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor), transparent 55%);
+    border-radius: $radius-md;
+    padding: $spacing-sm;
+}
+
+.wiw-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    flex: 0 0 auto;
+}
+
+// Alias kept for the folder picker only; the assistant diff modal keeps its
+// own legacy `.wiw-modal` classes (renaming it is a Phase 2 cleanup).
+.wiw-folder-picker {
+    @extend .wiw-panel-body;
+}
+
+// ---------------------------------------------------------------------------
+// Rows — list rows inside panels (books, folders, orphan/import entries).
+// ---------------------------------------------------------------------------
+
+.wiw-row {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-sm;
+    color: var(--SmartThemeBodyColor);
+    transition: $transition-fast;
+
+    &:hover {
+        background: $surface-sunken;
+    }
+
+    > span:first-of-type {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    button {
+        flex: 0 0 auto;
+    }
+}
+
+.wiw-folder-option {
+    @extend .wiw-row;
+
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+
+    &:hover {
+        background: $surface-sunken;
+    }
+}
+
+.wiw-book-row {
+    @extend .wiw-row;
+}
+
+.wiw-orphan-row {
+    @extend .wiw-row;
+}
+
+.wiw-book-check {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex: 1 1 auto;
+    min-width: 0;
+    cursor: pointer;
+
+    span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    input[type='checkbox'] {
+        flex: 0 0 auto;
+        accent-color: var(--SmartThemeEmColor);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Banners — save failures, divergence warnings (FR-009/FR-015).
+// ---------------------------------------------------------------------------
+
+.wiw-banner {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    padding: $spacing-sm $spacing-lg;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-md;
+    font-size: 0.86rem;
+    background: $surface-raised;
+
+    span {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.wiw-banner-error {
+    border-color: var(--SmartThemeBadColor);
+
+    i {
+        color: var(--SmartThemeBadColor);
+    }
+}
+
+.wiw-banner-warn {
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 35%);
+
+    i {
+        color: var(--SmartThemeQuoteColor);
+    }
+}
+
+.wiw-divergence-list {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    padding: 0 $spacing-md $spacing-sm;
+}
+
+.wiw-divergence-banner {
+    @extend .wiw-banner;
+
+    i {
+        color: var(--SmartThemeQuoteColor);
+    }
+
+    strong {
+        color: var(--SmartThemeEmColor);
+    }
+}
+
+.wiw-save-banner {
+    margin: 0 $spacing-md $spacing-sm;
+}
+
+// ---------------------------------------------------------------------------
+// Menus — the tree context menu (long-press / right-click).
+// ---------------------------------------------------------------------------
+
+.wiw-tree-menu {
+    position: fixed;
+    z-index: 10030;
+    display: flex;
+    flex-direction: column;
+    min-width: 170px;
+    padding: $spacing-xs;
+    background: $surface-blur;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-md;
+    box-shadow: 0 8px 24px var(--SmartThemeShadowColor);
+    overflow: hidden;
+}
+
+.wiw-tree-menu-item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    background: transparent;
+    border: none;
+    border-radius: $radius-sm;
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    text-align: left;
+    transition: $transition-fast;
+
+    &:hover {
+        background: $surface-sunken;
+    }
+
+    i {
+        width: 14px;
+        text-align: center;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk bar (multi-select actions) and empty state.
+// ---------------------------------------------------------------------------
+
+.wiw-bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    font-size: 0.85rem;
+
+    span {
+        opacity: 0.8;
+        margin-right: auto;
+    }
+}
+
+.wiw-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-md;
+    height: 100%;
+    text-align: center;
+    padding: $spacing-2xl;
+
+    h2 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    p {
+        max-width: 46ch;
+        margin: 0;
+        opacity: 0.85;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Node header — the ONE header-row pattern for every editor surface.
+// ---------------------------------------------------------------------------
+
+.wiw-node-header {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+}
+
+.wiw-node-kind-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    min-height: 28px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-sm;
+    background: $surface-sunken;
+    color: var(--SmartThemeEmColor);
+}
+
+.wiw-node-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-sm;
+    background: $surface-sunken;
+    color: var(--SmartThemeBodyColor);
+    font-weight: 600;
+
+    &:hover,
+    &:focus {
+        border-color: var(--SmartThemeEmColor);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Image editor — everything fits without horizontal scroll.
+// ---------------------------------------------------------------------------
+
+.wiw-image-view .wiw-image-preview {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto $spacing-md;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-md;
+}
+
+.wiw-svg-editor {
+    min-height: 140px;
+    resize: vertical;
+    font-family: monospace;
+    font-size: 0.82rem;
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: $radius-sm;
+    background: $surface-sunken;
+    color: var(--SmartThemeBodyColor);
+}
+
+.wiw-file-button {
+    cursor: pointer;
+}
+
+// ---------------------------------------------------------------------------
+// Badges and small annotations.
+// ---------------------------------------------------------------------------
+
+.wiw-badge {
+    padding: 0 $spacing-sm;
+    border-radius: $radius-sm;
+    font-size: 0.68rem;
+}
+
+.wiw-badge-book {
+    border: 1px solid var(--SmartThemeQuoteColor);
+    color: var(--SmartThemeQuoteColor);
+    margin-left: $spacing-sm;
+}
+
+.wiw-badge-off {
+    opacity: 0.75;
+    background: $surface-sunken;
+    margin-left: $spacing-sm;
+}
+
+.wiw-entry-off {
+    opacity: 0.45;
+}
+
+.wiw-field-error {
+    color: var(--SmartThemeBadColor);
+    font-size: 0.78rem;
+    margin-top: $spacing-xs;
+    display: block;
+}
+
+.wiw-confirm {
+    max-width: 52ch;
+}
+
+.wiw-root-settings {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+    padding: $spacing-md;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor), transparent 45%);
+    border-radius: $radius-md;
+    background: $surface-sunken;
+}
+
+.wiw-orphan-list {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+}

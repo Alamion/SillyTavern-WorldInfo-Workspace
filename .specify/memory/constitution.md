@@ -11,6 +11,19 @@ Previous change: 1.0.0 initial ratification (Principles I–VIII, Additional Con
 === END REPORT ===
 -->
 
+<!--
+=== SYNC IMPACT REPORT (2026-09-08) ===
+Version change: 1.1.0 → 1.2.0 (MINOR: expanded guidance in Additional Constraints)
+Modified principles: None renamed
+Added sections:
+  - Additional Constraints → "Shared UI style system" (owner decision 2026-09-08:
+    one shared SCSS system; extend it, never add one-off component styles)
+Removed sections: None
+Follow-up TODOs: None
+Previous change: 1.1.0 (Core Principle IX. Language Policy)
+=== END REPORT ===
+-->
+
 # SillyTavern-WorldInfo-Workspace Constitution
 
 ## Core Principles
@@ -111,6 +124,12 @@ Technology stack and environment requirements:
   arguments; macros via `macros.register` with a plugin-owned namespace.
 - UI is injected at documented mount points via manual React roots and styled to match
   the active app theme.
+- Shared UI style system (amendment 1.2.0): ALL component styling MUST use the shared
+  SCSS system in `src/styles/` (`wiw-theme.scss` primitives + theme variables; partials
+  composed through `prototype.scss`), styled only through the app's `--SmartTheme*`
+  custom properties. One-off component styles are forbidden: when a surface needs
+  something new, EXTEND the shared system so every surface stays consistent and easy
+  to adjust; rework the system, never the individual element.
 
 ## Development Workflow & Quality Gates
 
@@ -137,4 +156,4 @@ Technology stack and environment requirements:
 - Runtime development guidance lives in `AGENTS.md`; `.specify/templates` defines the
   spec/plan/task document structure.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-05
+**Version**: 1.2.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-08

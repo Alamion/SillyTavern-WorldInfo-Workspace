@@ -1,10 +1,12 @@
-import type { SillyTavernContext } from './global';
+import { getAppContext } from './adapters/appApi';
+import { debugLog } from './adapters/logger';
+import { initWorkspaceState, type WorkspaceStateServices } from './adapters/settingsStore';
 import { mountWorkspaceShell } from './adapters/shell';
-import { mountWorkspacePrototype } from './ui/mount';
+import { mountWorkspaceSurface } from './ui/mount';
 
 const INIT_FLAG = '__worldInfoWorkspaceInitialized';
 
-function initPrototypeSurface(): void {
+function initSurface(services: WorkspaceStateServices): void {
     const shell = mountWorkspaceShell();
     if (!shell) {
         return;
@@ -12,7 +14,7 @@ function initPrototypeSurface(): void {
     let mounted = false;
     const ensureMounted = (): void => {
         if (!mounted) {
-            mountWorkspacePrototype(shell.root);
+            mountWorkspaceSurface(shell.root, services);
             mounted = true;
         }
     };
@@ -20,6 +22,10 @@ function initPrototypeSurface(): void {
     if (shell.isOpen()) {
         ensureMounted();
     }
+    // FR-009 flush point: pending book pushes complete before the panel closes.
+    shell.onClose(() => {
+        void services.sync.pushPendingNow('panel-close');
+    });
 }
 
 export function initWorkspace(): void {
@@ -34,10 +40,11 @@ export function initWorkspace(): void {
         throw new Error('[WorldInfoWorkspace] globalThis.SillyTavern is not available');
     }
 
-    const ctx: SillyTavernContext = st.getContext();
+    const ctx = getAppContext();
     ctx.eventSource.on(ctx.eventTypes.APP_READY, () => {
-        console.debug('[WorldInfoWorkspace] initialized');
-        initPrototypeSurface();
+        debugLog(`workspace v${'0.2.0'} ready`);
+        const services = initWorkspaceState();
+        initSurface(services);
     });
 }
 

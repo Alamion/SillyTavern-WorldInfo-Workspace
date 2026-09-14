@@ -1,44 +1,32 @@
 import { useMemo, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import type { SampleEntryNode } from '../../core/sample/dataset';
-import type { SampleFieldMeta, SampleFieldName } from '../../core/sample/fieldGroups';
-import {
-    ADVANCED_LAYOUT,
-    FIELD_SCHEMA,
-} from '../../core/sample/fieldGroups';
-import { renderMarkdown, type ImageResolver } from '../../core/sample/markdown';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { NativeWorldInfoEntry } from '../../global';
+import type { SampleFieldMeta, SampleFieldName } from '../../core/fieldSchema';
+import { ADVANCED_LAYOUT, FIELD_SCHEMA } from '../../core/fieldSchema';
+import { renderMarkdown, type ImageResolver } from '../../core/preview';
+import { NodeHeader } from '../NodeHeader';
 
 type Values = Record<string, unknown>;
 type Strategy = 'constant' | 'normal' | 'vectorized';
 
 const FIELD_MAP = new Map<string, SampleFieldMeta>(
-    FIELD_SCHEMA.map((meta) => [meta.name, meta])
+    FIELD_SCHEMA.map((meta) => [meta.name as string, meta])
 );
 
 function fieldMeta(name: SampleFieldName): SampleFieldMeta {
-    const meta = FIELD_MAP.get(name);
+    const meta = FIELD_MAP.get(name as string);
     if (!meta) {
         throw new Error(`unmapped field: ${String(name)}`);
     }
     return meta;
 }
 
-function initialValues(card: SampleEntryNode): Values {
-    const values: Values = {};
-    for (const [key, value] of Object.entries(card.fields)) {
-        values[key] = Array.isArray(value) ? [...value] : value;
-    }
-    return values;
-}
+export type CommitField = (name: keyof NativeWorldInfoEntry, value: unknown) => void;
 
 function InfoIcon({ info, docs }: { info: string; docs?: string }): JSX.Element {
     return (
         <span className="wiw-field-icons">
-            <i
-                className="fa-solid fa-circle-info"
-                title={info}
-                aria-label={info}
-            />
+            <i className="fa-solid fa-circle-info" title={info} aria-label={info} />
             {docs && (
                 <a
                     className="wiw-field-docs"
@@ -135,10 +123,10 @@ function StrategyControl({
     value: Strategy;
     onChange: (next: Strategy) => void;
 }): JSX.Element {
-    const options: ReadonlyArray<{ id: Strategy; icon: string; label: string; info: string }> = [
-        { id: 'constant', icon: 'fa-circle', label: '🔵', info: 'Constant: inserts on every generation without keys' },
-        { id: 'normal', icon: 'fa-circle-dot', label: '🟢', info: 'Normal: triggered by keys' },
-        { id: 'vectorized', icon: 'fa-link', label: '🔗', info: 'Vectorized: can be inserted by embedding similarity' },
+    const options: ReadonlyArray<{ id: Strategy; icon: string; info: string }> = [
+        { id: 'constant', icon: 'fa-circle', info: 'Constant: inserts on every generation without keys' },
+        { id: 'normal', icon: 'fa-circle-dot', info: 'Normal: triggered by keys' },
+        { id: 'vectorized', icon: 'fa-link', info: 'Vectorized: can be inserted by embedding similarity' },
     ];
     return (
         <div className="wiw-strategy">
@@ -247,7 +235,7 @@ export function FieldControl({
                     type="text"
                     readOnly
                     value={JSON.stringify(value ?? {})}
-                    title="Passthrough object (read-only in the prototype)"
+                    title="Passthrough object (managed by the workspace)"
                 />
             );
             break;
@@ -263,7 +251,10 @@ export function FieldControl({
     if (meta.type === 'boolean') {
         return (
             <div className="wiw-field wiw-field-chip" style={style}>
-                <InfoIcon info={meta.info} docs={meta.docs} />
+                <span className="wiw-field-label">
+                    <InfoIcon info={meta.info} docs={meta.docs} />
+                    {meta.label}
+                </span>
                 {control}
             </div>
         );
@@ -283,18 +274,25 @@ function ContentSection({
     content,
     onContentChange,
     resolveImage,
+    substitute,
 }: {
     content: string;
     onContentChange: (next: string) => void;
     resolveImage?: ImageResolver;
+    substitute: (text: string) => string;
 }): JSX.Element {
     const isMobile = window.matchMedia('(max-width: 900px)').matches;
     const [previewVisible, setPreviewVisible] = useState(!isMobile);
     const [previewWidth, setPreviewWidth] = useState(40);
-    const [dragging, setDragging] = useState<{ startX: number; startWidth: number } | null>(
-        null
+    const [dragging, setDragging] = useState<{ startX: number; startWidth: number } | null>(null);
+    const html = useMemo(
+        () =>
+            renderMarkdown(content, {
+                resolveImage,
+                resolvePlaceholder: substitute,
+            }),
+        [content, resolveImage, substitute]
     );
-    const html = useMemo(() => renderMarkdown(content, resolveImage), [content, resolveImage]);
     const onSplitterDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
         setDragging({ startX: event.clientX, startWidth: previewWidth });
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -354,105 +352,75 @@ function ContentSection({
 }
 
 export function CardEditor({
-    card,
+    entry,
+    banner,
+    membershipLine,
     resolveImage,
+    substitute,
+    onCommitField,
+    onCommitName,
+    onToggleDisable,
     onDuplicate,
     onDelete,
 }: {
-    card: SampleEntryNode;
+    entry: { id: string; native: NativeWorldInfoEntry };
+    banner?: ReactNode;
+    membershipLine: string;
     resolveImage?: ImageResolver;
-    onDuplicate: () => void;
-    onDelete: () => void;
+    substitute: (text: string) => string;
+    onCommitField: CommitField;
+    onCommitName(name: string): void;
+    onToggleDisable(): void;
+    onDuplicate(): void;
+    onDelete(): void;
 }): JSX.Element {
-    const [values, setValues] = useState<Values>(() => initialValues(card));
+    const native = entry.native;
     const [advancedOpen, setAdvancedOpen] = useState(false);
-    const set = (name: string, value: unknown): void => {
-        setValues((prev) => ({ ...prev, [name]: value }));
-    };
-    const content = typeof values['content'] === 'string' ? (values['content'] as string) : '';
-    const membershipLine =
-        card.bookMemberships.length > 0
-            ? `Appears in WI books: ${card.bookMemberships.join(', ')}`
-            : 'Not part of any WI book (workspace-only entry)';
+    const set = onCommitField;
+    const values: Values = native as unknown as Values;
     const strategy: Strategy =
-        values['constant'] === true
-            ? 'constant'
-            : values['vectorized'] === true
-              ? 'vectorized'
-              : 'normal';
+        native.constant === true ? 'constant' : native.vectorized === true ? 'vectorized' : 'normal';
     const setStrategy = (next: Strategy): void => {
         set('constant', next === 'constant');
         set('vectorized', next === 'vectorized');
     };
     return (
         <div className="wiw-editor-card">
-            <div className="wiw-entry-header">
-                <button
-                    type="button"
-                    className={`wiw-entry-state${values['disable'] === true ? ' wiw-entry-state-disabled' : ''}`}
-                    title={
-                        values['disable'] === true
-                            ? 'Entry is disabled - click to enable'
-                            : 'Entry is enabled - click to disable'
-                    }
-                    onClick={() => set('disable', !(values['disable'] === true))}
-                >
-                    <i className={`fa-solid ${values['disable'] === true ? 'fa-toggle-off' : 'fa-toggle-on'}`} />
-                </button>
-                <div className="wiw-entry-title">
-                    <span className="wiw-field-label">
-                        Title / Memo
-                        <InfoIcon info={fieldMeta('comment').info} docs={fieldMeta('comment').docs} />
-                    </span>
-                    <input
-                        type="text"
-                        value={String(values['comment'] ?? '')}
-                        onChange={(event) => set('comment', event.target.value)}
-                    />
-                </div>
-                <div className="wiw-editor-actions">
-                    <button
-                        type="button"
-                        className="wiw-button wiw-icon-button"
-                        title="Duplicate this entry"
-                        onClick={onDuplicate}
-                    >
-                        <i className="fa-solid fa-clone" />
-                    </button>
-                    <button
-                        type="button"
-                        className="wiw-button wiw-icon-button"
-                        title="Delete this entry"
-                        onClick={onDelete}
-                    >
-                        <i className="fa-solid fa-trash-can" />
-                    </button>
-                </div>
-            </div>
+                <NodeHeader
+                kind="entry"
+                icon="fa-book"
+                name={native.comment}
+                disabled={native.disable}
+                onCommitName={onCommitName}
+                onToggleDisable={onToggleDisable}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+            />
+            {banner}
             <p className="wiw-membership-line">{membershipLine}</p>
             <div className="wiw-field-grid">
                 <FieldControl
                     meta={fieldMeta('key')}
                     span={4}
-                    value={values['key']}
+                    value={native.key}
                     onChange={(next) => set('key', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('selectiveLogic')}
                     span={2}
-                    value={values['selectiveLogic']}
+                    value={native.selectiveLogic}
                     onChange={(next) => set('selectiveLogic', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('keysecondary')}
                     span={4}
-                    value={values['keysecondary']}
+                    value={native.keysecondary}
                     onChange={(next) => set('keysecondary', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('selective')}
                     span={2}
-                    value={values['selective']}
+                    value={native.selective}
                     onChange={(next) => set('selective', next)}
                 />
             </div>
@@ -470,25 +438,25 @@ export function CardEditor({
                 <FieldControl
                     meta={fieldMeta('order')}
                     span={2}
-                    value={values['order']}
+                    value={native.order}
                     onChange={(next) => set('order', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('position')}
                     span={3}
-                    value={values['position']}
+                    value={native.position}
                     onChange={(next) => set('position', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('depth')}
                     span={1}
-                    value={values['depth']}
+                    value={native.depth}
                     onChange={(next) => set('depth', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('role')}
                     span={3}
-                    value={values['role']}
+                    value={native.role}
                     onChange={(next) => set('role', next)}
                 />
             </div>
@@ -496,7 +464,7 @@ export function CardEditor({
                 <FieldControl
                     meta={fieldMeta('probability')}
                     span={3}
-                    value={values['probability']}
+                    value={native.probability}
                     onChange={(next) => {
                         set('probability', next);
                         set('useProbability', Number(next) !== 100);
@@ -505,26 +473,27 @@ export function CardEditor({
                 <FieldControl
                     meta={fieldMeta('group')}
                     span={4}
-                    value={values['group']}
+                    value={native.group}
                     onChange={(next) => set('group', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('groupOverride')}
                     span={2}
-                    value={values['groupOverride']}
+                    value={native.groupOverride}
                     onChange={(next) => set('groupOverride', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('groupWeight')}
                     span={3}
-                    value={values['groupWeight']}
+                    value={native.groupWeight}
                     onChange={(next) => set('groupWeight', next)}
                 />
             </div>
             <ContentSection
-                content={content}
+                content={native.content}
                 onContentChange={(next) => set('content', next)}
                 resolveImage={resolveImage}
+                substitute={substitute}
             />
             <section className="wiw-field-group">
                 <button
@@ -532,9 +501,7 @@ export function CardEditor({
                     className="wiw-group-header"
                     onClick={() => setAdvancedOpen((prev) => !prev)}
                 >
-                    <i
-                        className={`fa-solid ${advancedOpen ? 'fa-chevron-down' : 'fa-chevron-right'}`}
-                    />
+                    <i className={`fa-solid ${advancedOpen ? 'fa-chevron-down' : 'fa-chevron-right'}`} />
                     <span>Advanced</span>
                 </button>
                 {advancedOpen && (
@@ -543,11 +510,11 @@ export function CardEditor({
                         <div className="wiw-field-grid">
                             {ADVANCED_LAYOUT[0]!.fields.map(({ name, span }) => (
                                 <FieldControl
-                                    key={name}
+                                    key={name as string}
                                     meta={fieldMeta(name)}
                                     span={span}
                                     value={values[name as string]}
-                                    onChange={(next) => set(name as string, next)}
+                                    onChange={(next) => set(name as keyof NativeWorldInfoEntry, next)}
                                 />
                             ))}
                         </div>

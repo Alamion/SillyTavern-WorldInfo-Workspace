@@ -1,190 +1,301 @@
-import { useState } from 'react';
-import type { SampleFolderNode, SampleNode } from '../core/sample/dataset';
-import type { ImageResolver } from '../core/sample/markdown';
-import { CardEditor, FieldControl } from './fieldGroups/FieldGroups';
-import { FIELD_SCHEMA } from '../core/sample/fieldGroups';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { NativeWorldInfoEntry } from '../global';
+import type { ImageResolver } from '../core/preview';
+import type { FieldViolation } from '../core/tree/validation';
+import type { ImageNode, TreeNode } from '../core/state/schema';
+import { NodeHeader } from './NodeHeader';
+import { CardEditor } from './fieldGroups/FieldGroups';
 
-const FIELD_MAP = new Map(FIELD_SCHEMA.map((meta) => [meta.name as string, meta]));
-
-function meta(name: string) {
-    const found = FIELD_MAP.get(name);
-    if (!found) {
-        throw new Error(`unmapped field: ${name}`);
-    }
-    return found;
-}
-
-function FolderSettingsView({
-    folder,
-    onToggleWiRoot,
-}: {
-    folder: SampleFolderNode;
-    onToggleWiRoot: (id: string) => void;
-}): JSX.Element {
-    const [settings, setSettings] = useState(folder.wiSettings);
-    if (!settings) {
-        return <div className="wiw-editor-empty">This folder is not a World Info root.</div>;
-    }
-    const set = (name: string, value: unknown): void => {
-        setSettings((prev) => (prev ? { ...prev, [name]: value } : prev));
-    };
-    const value = (name: string): unknown => {
-        const current = folder.wiSettings;
-        if (current && settings === folder.wiSettings) {
-            return current[name as keyof typeof current];
-        }
-        return settings[name as keyof typeof settings];
-    };
-    return (
-        <div className="wiw-editor-card">
-            <h3 className="wiw-editor-title">{folder.name}</h3>
-            <p className="wiw-editor-subtitle">
-                World Info root - collects every entry beneath it into its own book
-            </p>
-            <div className="wiw-field-group">
-                <div className="wiw-field-grid">
-                    <FieldControl
-                        meta={meta('outletName')}
-                        span={6}
-                        value={value('bookName')}
-                        onChange={(next) => set('bookName', next)}
-                    />
-                    <FieldControl
-                        meta={meta('scanDepth')}
-                        span={3}
-                        value={value('scanDepthOverride')}
-                        onChange={(next) => set('scanDepthOverride', next)}
-                    />
-                    <FieldControl
-                        meta={meta('caseSensitive')}
-                        span={3}
-                        value={value('caseSensitiveOverride')}
-                        onChange={(next) => set('caseSensitiveOverride', next)}
-                    />
-                    <div className="wiw-field" style={{ gridColumn: 'span 3' }}>
-                        <span className="wiw-field-label">Recursive scanning</span>
-                        <input
-                            type="checkbox"
-                            checked={Boolean(value('recursiveScanning'))}
-                            onChange={(event) => set('recursiveScanning', event.target.checked)}
-                        />
-                    </div>
-                </div>
-            </div>
-            <div className="wiw-field-group">
-                <div className="wiw-field-grid">
-                    <FieldControl
-                        meta={meta('comment')}
-                        span={12}
-                        value={value('notes')}
-                        onChange={(next) => set('notes', next)}
-                    />
-                </div>
-            </div>
-            <button
-                type="button"
-                className="wiw-button wiw-danger-button"
-                onClick={() => onToggleWiRoot(folder.id)}
-            >
-                <i className="fa-solid fa-toggle-on" /> Disable World Info root
-            </button>
-        </div>
-    );
-}
-
-function PlainFolderView({
-    folder,
-    onToggleWiRoot,
-    onDuplicate,
-    onDelete,
-}: {
-    folder: SampleFolderNode;
-    onToggleWiRoot: (id: string) => void;
+export interface ItemEditorProps {
+    node: TreeNode | null;
+    violations: FieldViolation[];
+    membershipLine: string;
+    resolveImage?: ImageResolver;
+    substitute: (text: string) => string;
+    onCommitEntryField: (entryId: string, name: keyof NativeWorldInfoEntry, value: unknown) => void;
+    onCommitImage: (imageId: string, patch: { src?: string; caption?: string }) => void;
+    /** Uniform name commit for EVERY node kind (entity keeps comment synced). */
+    onCommitName: (nodeId: string, name: string) => void;
     onDuplicate: (id: string) => void;
     onDelete: (id: string) => void;
-}): JSX.Element {
-    return (
-        <div className="wiw-editor-card">
-            <h3 className="wiw-editor-title">{folder.name}</h3>
-            <p className="wiw-editor-subtitle">
-                Plain folder - collects entries beneath it, holds no own content
-            </p>
-            <div className="wiw-editor-actions">
-                <button type="button" className="wiw-button" onClick={() => onToggleWiRoot(folder.id)}>
-                    <i className="fa-solid fa-toggle-off" /> Make World Info root
-                </button>
-                <button type="button" className="wiw-button wiw-icon-button" title="Duplicate this folder" onClick={() => onDuplicate(folder.id)}>
-                    <i className="fa-solid fa-clone" />
-                </button>
-                <button type="button" className="wiw-button wiw-icon-button" title="Delete this folder" onClick={() => onDelete(folder.id)}>
-                    <i className="fa-solid fa-trash-can" />
-                </button>
-            </div>
-        </div>
-    );
+    onToggleWiRoot: (id: string) => void;
+    folderExtras?: (folder: Extract<TreeNode, { kind: 'folder' }>) => ReactNode;
 }
 
 export function ItemEditor({
-    selected,
+    node,
+    violations,
+    membershipLine,
     resolveImage,
-    onToggleWiRoot,
+    substitute,
+    onCommitEntryField,
+    onCommitImage,
+    onCommitName,
     onDuplicate,
     onDelete,
-}: {
-    selected: SampleNode | null;
-    resolveImage?: ImageResolver;
-    onToggleWiRoot: (id: string) => void;
-    onDuplicate: (id: string) => void;
-    onDelete: (id: string) => void;
-}): JSX.Element {
-    if (!selected) {
-        return (
-            <div className="wiw-editor-empty">Select an item in the tree to inspect it.</div>
-        );
+    onToggleWiRoot,
+    folderExtras,
+}: ItemEditorProps): JSX.Element {
+    if (!node) {
+        return <div className="wiw-editor-empty">Select an item in the tree to inspect it.</div>;
     }
-    if (selected.kind === 'entry') {
+    const banner =
+        violations.length > 0 ? (
+            <div className="wiw-banner wiw-banner-warn wiw-save-banner">
+                <i className="fa-solid fa-triangle-exclamation" />
+                <span>
+                    {violations.map((violation) => violation.message).join(' ')} Fix it to
+                    unblock the sync.
+                </span>
+            </div>
+        ) : null;
+    if (node.kind === 'entry') {
         return (
             <CardEditor
-                key={selected.id}
-                card={selected}
+                key={node.id}
+                entry={node}
+                banner={banner}
+                membershipLine={membershipLine}
                 resolveImage={resolveImage}
-                onDuplicate={() => onDuplicate(selected.id)}
-                onDelete={() => onDelete(selected.id)}
+                substitute={substitute}
+                onCommitField={(name, value) => onCommitEntryField(node.id, name, value)}
+                onCommitName={(value: string) => onCommitName(node.id, value)}
+                onToggleDisable={() => onCommitEntryField(node.id, 'disable', !node.native.disable)}
+                onDuplicate={() => onDuplicate(node.id)}
+                onDelete={() => onDelete(node.id)}
             />
         );
     }
-    if (selected.kind === 'image') {
+    if (node.kind === 'image') {
         return (
-            <figure className="wiw-editor-card wiw-image-view">
-                <h3 className="wiw-editor-title">{selected.name}</h3>
-                {selected.source === '' ? (
-                    <div className="wiw-editor-empty">
-                        No image data yet (prototype placeholder).
-                    </div>
-                ) : (
-                    <img src={selected.source} alt={selected.name} />
-                )}
-                <figcaption>{selected.caption}</figcaption>
-                <div className="wiw-editor-actions">
-                    <button type="button" className="wiw-button wiw-icon-button" title="Duplicate this image" onClick={() => onDuplicate(selected.id)}>
-                        <i className="fa-solid fa-clone" />
-                    </button>
-                    <button type="button" className="wiw-button wiw-icon-button" title="Delete this image" onClick={() => onDelete(selected.id)}>
-                        <i className="fa-solid fa-trash-can" />
-                    </button>
-                </div>
-            </figure>
+            <ImageEditor
+                key={node.id}
+                image={node}
+                banner={banner}
+                onCommitName={(value) => onCommitName(node.id, value)}
+                onCommitImage={onCommitImage}
+                onDuplicate={() => onDuplicate(node.id)}
+                onDelete={() => onDelete(node.id)}
+            />
         );
     }
-    if (selected.isWiRoot) {
-        return <FolderSettingsView key={selected.id} folder={selected} onToggleWiRoot={onToggleWiRoot} />;
-    }
     return (
-        <PlainFolderView
-            folder={selected}
+        <FolderView
+            key={node.id}
+            folder={node}
+            banner={banner}
+            onCommitName={(value) => onCommitName(node.id, value)}
+            onDuplicate={() => onDuplicate(node.id)}
+            onDelete={() => onDelete(node.id)}
             onToggleWiRoot={onToggleWiRoot}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
+            extras={folderExtras}
         />
+    );
+}
+
+type ImageSourceMode = 'url' | 'svg' | 'file';
+
+const SVG_DATA_PREFIX = 'data:image/svg+xml,';
+
+function svgToDataUri(svg: string): string {
+    return `${SVG_DATA_PREFIX}${encodeURIComponent(svg)}`;
+}
+
+function dataUriToSvg(src: string): string {
+    try {
+        return decodeURIComponent(src.slice(SVG_DATA_PREFIX.length));
+    } catch {
+        return '';
+    }
+}
+
+function detectImageMode(src: string): ImageSourceMode {
+    if (src.startsWith(SVG_DATA_PREFIX)) {
+        return 'svg';
+    }
+    if (src.startsWith('data:')) {
+        return 'file';
+    }
+    return 'url';
+}
+
+function ImageEditor({
+    image,
+    banner,
+    onCommitName,
+    onCommitImage,
+    onDuplicate,
+    onDelete,
+}: {
+    image: ImageNode;
+    banner?: ReactNode;
+    onCommitName(name: string): void;
+    onCommitImage: ItemEditorProps['onCommitImage'];
+    onDuplicate(): void;
+    onDelete(): void;
+}): JSX.Element {
+    const [mode, setMode] = useState<ImageSourceMode>(() => detectImageMode(image.src));
+    const [svgDraft, setSvgDraft] = useState<string>(() =>
+        detectImageMode(image.src) === 'svg' ? dataUriToSvg(image.src) : ''
+    );
+
+    // Keep the textarea in sync when the source changes from elsewhere (demo
+    // seed, import, undo).
+    useEffect(() => {
+        if (detectImageMode(image.src) === 'svg') {
+            setMode('svg');
+            setSvgDraft(dataUriToSvg(image.src));
+        }
+    }, [image.src]);
+
+    const switchMode = (next: ImageSourceMode): void => {
+        setMode(next);
+        if (next === 'svg' && detectImageMode(image.src) !== 'svg') {
+            setSvgDraft('');
+        }
+    };
+
+    const pickFile = (file: File): void => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                onCommitImage(image.id, { src: reader.result });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    return (
+        <div className="wiw-editor-card wiw-image-view">
+            {banner}
+            <NodeHeader
+                kind="image"
+                icon="fa-image"
+                name={image.name}
+                onCommitName={onCommitName}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+            />
+            {image.src === '' ? (
+                <div className="wiw-editor-empty">No image source yet — pick one below.</div>
+            ) : (
+                <img className="wiw-image-preview" src={image.src} alt={image.name} />
+            )}
+            <div className="wiw-field-grid">
+                <div className="wiw-field" style={{ gridColumn: 'span 4' }}>
+                    <span className="wiw-field-label">Source type</span>
+                    <select
+                        value={mode}
+                        onChange={(event) => switchMode(event.target.value as ImageSourceMode)}
+                    >
+                        <option value="url">Resource URL</option>
+                        <option value="svg">Plain SVG</option>
+                        <option value="file">File (jpg/png/…)</option>
+                    </select>
+                </div>
+                {mode === 'url' && (
+                    <div className="wiw-field wiw-field-wide" style={{ gridColumn: 'span 12' }}>
+                        <span className="wiw-field-label">Image URL</span>
+                        <input
+                            type="text"
+                            placeholder="https://example.com/image.png"
+                            value={image.src.startsWith('data:') ? '' : image.src}
+                            onChange={(event) => onCommitImage(image.id, { src: event.target.value })}
+                        />
+                    </div>
+                )}
+                {mode === 'svg' && (
+                    <div className="wiw-field wiw-field-wide" style={{ gridColumn: 'span 12' }}>
+                        <span className="wiw-field-label">SVG markup (stored as a data URI)</span>
+                        <textarea
+                            className="wiw-svg-editor"
+                            spellCheck={false}
+                            value={svgDraft}
+                            onChange={(event) => {
+                                setSvgDraft(event.target.value);
+                                onCommitImage(image.id, { src: svgToDataUri(event.target.value) });
+                            }}
+                        />
+                    </div>
+                )}
+                {mode === 'file' && (
+                    <div className="wiw-field wiw-field-wide" style={{ gridColumn: 'span 12' }}>
+                        <span className="wiw-field-label">Pick an image file (stored as a data URI)</span>
+                        <label className="wiw-button wiw-file-button">
+                            <i className="fa-solid fa-folder-open" /> Choose file…
+                            <input
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = '';
+                                    if (file) {
+                                        pickFile(file);
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+                )}
+                <div className="wiw-field wiw-field-wide" style={{ gridColumn: 'span 12' }}>
+                    <span className="wiw-field-label">Caption</span>
+                    <input
+                        type="text"
+                        value={image.caption}
+                        onChange={(event) => onCommitImage(image.id, { caption: event.target.value })}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FolderView({
+    folder,
+    banner,
+    onCommitName,
+    onToggleWiRoot,
+    onDuplicate,
+    onDelete,
+    extras,
+}: {
+    folder: Extract<TreeNode, { kind: 'folder' }>;
+    banner?: ReactNode;
+    onCommitName(name: string): void;
+    onDuplicate(): void;
+    onDelete(): void;
+    onToggleWiRoot: (id: string) => void;
+    extras?: (folder: Extract<TreeNode, { kind: 'folder' }>) => ReactNode;
+}): JSX.Element {
+    return (
+        <div className="wiw-editor-card">
+            {banner}
+            <NodeHeader
+                kind="folder"
+                icon="fa-folder"
+                name={folder.name}
+                onCommitName={onCommitName}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+            />
+            <p className="wiw-editor-subtitle">
+                {folder.isWiRoot
+                    ? 'World Info root - collects every entry beneath it into its own book'
+                    : 'Plain folder - organizes items; holds no own content'}
+            </p>
+            {extras?.(folder)}
+            <div className="wiw-editor-actions">
+                <button
+                    type="button"
+                    className="wiw-button"
+                    onClick={() => onToggleWiRoot(folder.id)}
+                >
+                    <i className={`fa-solid ${folder.isWiRoot ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
+                    {folder.isWiRoot ? 'Disable World Info root' : 'Make World Info root'}
+                </button>
+            </div>
+        </div>
     );
 }

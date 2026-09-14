@@ -1,3 +1,16 @@
+/**
+ * Live content preview (FR-010): the Phase 0 renderer promoted to production,
+ * extended with a placeholder-resolution hook. Pure module — the adapter injects
+ * app `substituteParams`; without it, placeholders stay as visible text.
+ */
+
+export interface PreviewOptions {
+    /** Resolve a workspace image reference to a concrete source URL. */
+    resolveImage?: (ref: string) => string | undefined;
+    /** Resolve app-wide placeholders ({{user}}, {{char}}, …) to real values. */
+    resolvePlaceholder?: (text: string) => string;
+}
+
 export type ImageResolver = (ref: string) => string | undefined;
 
 function escapeHtml(text: string): string {
@@ -8,12 +21,19 @@ function escapeHtml(text: string): string {
         .replace(/"/g, '&quot;');
 }
 
-function renderInline(text: string, resolveImage?: ImageResolver): string {
-    let out = escapeHtml(text);
+function applyPlaceholder(text: string, options: PreviewOptions): string {
+    if (!options.resolvePlaceholder) {
+        return text;
+    }
+    return options.resolvePlaceholder(text);
+}
+
+function renderInline(text: string, options: PreviewOptions): string {
+    let out = escapeHtml(applyPlaceholder(text, options));
     out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
     out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt: string, ref: string) => {
         const decoded = (alt ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
-        const source = resolveImage?.(decoded.length > 0 ? ref : ref) ?? undefined;
+        const source = options.resolveImage?.(ref) ?? undefined;
         if (source) {
             return `<img src="${escapeHtml(source)}" alt="${decoded}" />`;
         }
@@ -28,7 +48,7 @@ function renderInline(text: string, resolveImage?: ImageResolver): string {
     return out;
 }
 
-function renderBlock(block: string, resolveImage?: ImageResolver): string {
+function renderBlock(block: string, options: PreviewOptions): string {
     const lines = block.split('\n');
     const html: string[] = [];
     let listOpen = false;
@@ -45,35 +65,35 @@ function renderBlock(block: string, resolveImage?: ImageResolver): string {
         if (heading) {
             closeList();
             const level = (heading[1] ?? '#').length;
-            html.push(`<h${level + 2}>${renderInline(heading[2] ?? '', resolveImage)}</h${level + 2}>`);
+            html.push(`<h${level + 2}>${renderInline(heading[2] ?? '', options)}</h${level + 2}>`);
         } else if (quote) {
             closeList();
-            html.push(`<blockquote>${renderInline(quote[1] ?? '', resolveImage)}</blockquote>`);
+            html.push(`<blockquote>${renderInline(quote[1] ?? '', options)}</blockquote>`);
         } else if (list) {
             if (!listOpen) {
                 html.push('<ul>');
                 listOpen = true;
             }
-            html.push(`<li>${renderInline(list[1] ?? '', resolveImage)}</li>`);
+            html.push(`<li>${renderInline(list[1] ?? '', options)}</li>`);
         } else if (line.trim() === '') {
             closeList();
         } else {
             closeList();
-            html.push(`<p>${renderInline(line, resolveImage)}</p>`);
+            html.push(`<p>${renderInline(line, options)}</p>`);
         }
     }
     closeList();
     return html.join('\n');
 }
 
-export function renderMarkdown(source: string, resolveImage?: ImageResolver): string {
+export function renderMarkdown(source: string, options: PreviewOptions = {}): string {
     const fenced = source.split(/```/);
     const html: string[] = [];
     fenced.forEach((chunk, i) => {
         if (i % 2 === 1) {
             html.push(`<pre><code>${escapeHtml(chunk.replace(/^\n|\n$/g, ''))}</code></pre>`);
         } else if (chunk.length > 0) {
-            html.push(renderBlock(chunk, resolveImage));
+            html.push(renderBlock(chunk, options));
         }
     });
     return html.join('\n');
