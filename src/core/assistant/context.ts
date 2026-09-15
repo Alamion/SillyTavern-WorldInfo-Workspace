@@ -1,7 +1,7 @@
 import { createDefaultNativeEntry, findNode, type EntryNode, type FolderNode, type TreeNode, type WorkspaceState } from '../state/schema';
 import { FIELD_SPECS, OWNED_PREFIX } from '../md/convention';
 import { buildHandleMap, type HandleMap } from './handles';
-import { systemPrompt } from './prompts';
+import { decisionNote, systemPrompt } from './prompts';
 import { resolveScope } from './scope';
 import type {
     ActivatedEntryRef,
@@ -208,12 +208,17 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             continue;
         }
         const role = message.role === 'assistant' ? 'assistant' : message.role === 'note' ? 'system' : 'user';
-        const cost = estimateTokens(message.text);
+        const note = message.role === 'assistant' ? decisionNote(message.batch) : null;
+        const cost = estimateTokens(message.text) + (note !== null ? estimateTokens(note) : 0);
         if (used + cost > budgetTokens * 0.5) {
             historyDropped += 1;
             continue;
         }
         used += cost;
+        // Decision notes follow the reply they are about (FR-033).
+        if (note !== null) {
+            historyMessages.unshift({ role: 'system', content: note });
+        }
         historyMessages.unshift({ role, content: message.text });
     }
     if (historyDropped > 0) {

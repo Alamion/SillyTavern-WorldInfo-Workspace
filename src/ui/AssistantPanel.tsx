@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
 import { notifyWarning } from '../adapters/logger';
-import { inputDialog } from '../adapters/popups';
-import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
 import { BatchBar } from './assistant/BatchBar';
+import { ConversationSwitcher } from './assistant/ConversationSwitcher';
 import { ConversationView, type MessageActions } from './assistant/ConversationView';
 import { ProposalCard, type ProposalActions } from './assistant/ProposalCard';
 import { ReplyNotices } from './assistant/ReplyNotices';
@@ -66,77 +65,11 @@ export function AssistantPanel({
 
     return (
         <div className="wiw-assistant">
-            <header className="wiw-assistant-header">
-                <select
-                    className="wiw-assistant-title"
-                    value={snapshot.activeConversationId ?? ''}
-                    onChange={(event) => void assistant.selectConversation(event.target.value)}
-                    title="Conversations"
-                >
-                    {snapshot.conversations.length === 0 && <option value="">No conversation</option>}
-                    {snapshot.conversations.map((conversation) => (
-                        <option key={conversation.id} value={conversation.id}>
-                            {conversation.title}
-                        </option>
-                    ))}
-                </select>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="New conversation"
-                    onClick={() => void assistant.createConversation()}
-                >
-                    <i className="fa-solid fa-plus" />
-                </button>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="Rename conversation"
-                    disabled={snapshot.activeConversationId === null}
-                    onClick={() => {
-                        const conversation = snapshot.activeConversation;
-                        if (!conversation) {
-                            return;
-                        }
-                        void inputDialog('Conversation name', conversation.title).then((title) => {
-                            if (title !== null) {
-                                void assistant.renameConversation(conversation.id, title);
-                            }
-                        });
-                    }}
-                >
-                    <i className="fa-solid fa-tag" />
-                </button>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="Delete conversation"
-                    disabled={snapshot.activeConversationId === null}
-                    onClick={() => {
-                        const conversation = snapshot.activeConversation;
-                        if (!conversation) {
-                            return;
-                        }
-                        void confirmDialog(`Delete the conversation "${conversation.title}"?`).then(
-                            (confirmed) => {
-                                if (confirmed) {
-                                    void assistant.deleteConversation(conversation.id);
-                                }
-                            }
-                        );
-                    }}
-                >
-                    <i className="fa-solid fa-trash-can" />
-                </button>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="AI settings"
-                    onClick={() => setSettingsOpen(true)}
-                >
-                    <i className="fa-solid fa-gear" />
-                </button>
-            </header>
+            <ConversationSwitcher
+                snapshot={snapshot}
+                assistant={assistant}
+                onOpenSettings={() => setSettingsOpen(true)}
+            />
 
             {snapshot.availability === 'connection-manager-disabled' && (
                 <p className="wiw-banner wiw-banner-warn">

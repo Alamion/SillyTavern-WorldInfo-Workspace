@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseReply } from '../../src/core/assistant/parser';
+import { toProposals } from '../../src/core/assistant/validate';
+import { buildHandleMap } from '../../src/core/assistant/handles';
+import { resolveScope } from '../../src/core/assistant/scope';
+import { aldermeerState } from '../fixtures/assistant/outline-aldermeer';
 
 /**
  * Parser rules 1–8 of contracts/assistant-protocol.md, driven by the recorded
@@ -171,7 +175,7 @@ describe('tolerance', () => {
 });
 
 describe('performance', () => {
-    it('parses a 50-operation reply quickly (plan performance goal)', () => {
+    it('parses and validates a 50-operation reply quickly (plan performance goal)', () => {
         const blocks = Array.from(
             { length: 50 },
             (_unused, index) =>
@@ -179,9 +183,20 @@ describe('performance', () => {
                 `<title>Entry ${String(index)}</title><keys>a${String(index)}, b</keys>` +
                 `<content>\n${'Lore text. '.repeat(40)}\n</content></op>`
         ).join('\n\nProse between blocks.\n\n');
+        const state = aldermeerState();
+        const map = buildHandleMap(state);
+        const scope = [...resolveScope(state, { kind: 'workspace' }, []).nodeIds];
+        let counter = 0;
         const started = performance.now();
         const parsed = parseReply(blocks, { final: true });
+        const proposals = toProposals(parsed.blocks, {
+            state,
+            snapshot: { handles: map.handles, scopeNodeIds: scope },
+            newProposalId: () => `p${String((counter += 1))}`,
+        });
+        const elapsed = performance.now() - started;
         expect(parsed.blocks).toHaveLength(50);
-        expect(performance.now() - started).toBeLessThan(50);
+        expect(proposals.filter((proposal) => proposal.decision === 'pending')).toHaveLength(50);
+        expect(elapsed).toBeLessThan(50);
     });
 });

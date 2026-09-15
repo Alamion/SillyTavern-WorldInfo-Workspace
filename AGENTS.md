@@ -8,7 +8,7 @@ workspace-authoritative sync into the native World Info format via designated "W
 Info" root folders, an in-workspace AI lore assistant, and bidirectional markdown
 conversion. Roadmap and full requirements: `specs/001-workspace-plugin-roadmap/`.
 
-**Previous increment (spec 003)**: Phase 1 Core Workspace MVP implemented and validated
+**Earlier increment (spec 003)**: Phase 1 Core Workspace MVP implemented and validated
 (owner walkthrough S1–S13, 2026-09-14; results in `quickstart.md`):
 the workspace runs on real persisted data (`extensionSettings['WorldInfoWorkspace']`,
 schema v1 with migration/recovery), full tree CRUD with multi-select bulk actions and a
@@ -21,17 +21,18 @@ flattened pushes with divergence guards in both directions, orphan retention/res
 resolution, and the Lorebooks panel (all native books: activation, import next to the
 tree selection / update from native, delete — search, filters, pagination). Design contracts:
 `specs/003-core-workspace-mvp/` (research/data-model/contracts/quickstart/tasks).
-**Current increment (spec 004, implemented and owner-validated 2026-09-15)**: roadmap Phase 3 — Markdown Folder Sync (roadmap order
+**Previous increment (spec 004, implemented and owner-validated 2026-09-15)**: roadmap Phase 3 — Markdown Folder Sync (roadmap order
 amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and import of
 any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
 hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
 UI contract, quickstart S0–S14).
-**Next increment (spec 005, planned 2026-09-15)**: roadmap Phase 2 — AI Lore Assistant.
-Requests via `ConnectionManagerRequestService` with a profile chosen in assistant settings
-(streaming follows the profile's preset); prose replies with tagged operation blocks
-(`contracts/assistant-protocol.md`), batch proposals with review/diff/undo, conversations
-in IndexedDB `WorldInfoWorkspace-assistant`. Design: `specs/005-ai-lore-assistant/`
-(research R1–R14, data model, protocol/LLM port/UI/hooks contracts, quickstart A0–A21).
+**Current increment (spec 005, implemented 2026-09-15; live validation pending)**: roadmap
+Phase 2 — AI Lore Assistant. Requests via `ConnectionManagerRequestService` on a profile
+chosen in the assistant settings (streaming follows the profile's preset); prose replies
+with tagged operation blocks (`contracts/assistant-protocol.md`), batch proposals with
+review/diff/undo, conversations in IndexedDB `WorldInfoWorkspace-assistant`. Design:
+`specs/005-ai-lore-assistant/` (research R1–R14, data model, protocol/LLM port/UI/hooks
+contracts, quickstart A0–A21).
 
 ## Key Reference
 
@@ -91,6 +92,13 @@ src/
 │   │                    #   importPlan.ts, reconcile.ts (three-way), linkRender.ts,
 │   │                    #   applyPull.ts, imageRefs.ts, reference.ts, report.ts, hash.ts,
 │   │                    #   dataUri.ts
+│   ├── assistant/       # AI assistant (spec 005): types.ts, ports.ts (LlmPort,
+│   │                    #   ConversationStorePort, ChatContextPort), parser.ts (tolerant
+│   │                    #   incremental protocol parser), protocol.ts (model-facing text),
+│   │                    #   prompts.ts (instructions, decision notes), handles.ts, scope.ts,
+│   │                    #   context.ts (request + budget), validate.ts (blocks → proposals),
+│   │                    #   rules.ts (destructive/duplicate/stale), plan.ts (order, blocked,
+│   │                    #   accept-all), undo.ts, failures.ts, settingsOps.ts
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
 │   ├── fieldSchema.ts   # Typed field schema + drawer layout (from Phase 0)
 │   ├── preview.ts       # Markdown renderer + placeholder hook (FR-010)
@@ -105,7 +113,14 @@ src/
 │   ├── bookStates.ts        # Book facts: global activation, character/chat binding, bound folder
 │   ├── syncEngine.ts        # Push pipeline, divergence reports, orphan/import flows
 │   ├── saveEvents.ts        # Save outcome events (failure banner, FR-009)
-│   ├── workspaceActions.ts  # Tree change + sync-engine notification; restored WI roots
+│   ├── workspaceActions.ts  # Tree change + sync-engine notification; restored WI roots;
+│   │                        #   deleteNodes/describeDeletion (the single delete path)
+│   ├── llmClient.ts         # LlmPort over ConnectionManagerRequestService (spec 005)
+│   ├── conversationStore.ts # IndexedDB WorldInfoWorkspace-assistant + memory fallback
+│   ├── chatContext.ts       # Chat messages, character card, persona, activated entries
+│   ├── assistantApply.ts    # Apply proposals / deletions / undo via tree ops + hooks
+│   ├── assistantController.ts # UI-facing assistant surface (conversations, requests,
+│   │                        #   streaming, retries, proposal decisions, undo)
 │   ├── fsaDisk.ts           # File System Access folder port + IndexedDB link store
 │   ├── yamlCodec.ts         # YAML via SillyTavern.libs.yaml (never bundled)
 │   ├── imageStore.ts        # App image storage (user/images/WorldInfoWorkspace/)
@@ -130,7 +145,10 @@ src/
 │   ├── ConflictDialog.tsx   # Per-item keep workspace / keep file / skip
 │   ├── OperationReport.tsx  # Import/export/sync report modal
 │   ├── MappingReference.tsx # Convention tables + sample entry
-│   ├── AssistantPanel.tsx   # Batch-proposal mock (Phase 2 scope)
+│   ├── AssistantPanel.tsx   # Assistant region root (spec 005)
+│   ├── assistant/           # ConversationSwitcher, ConversationView, Composer,
+│   │                        #   ProposalCard/Editor/Diff, BatchBar, ReplyNotices,
+│   │                        #   FailureCard, SettingsMenu, ContextMenu, useAssistant
 │   └── mount.tsx            # React root creation
 ├── styles/
 │   ├── wiw-theme.scss   # SHARED style system (buttons, panels, rows, banners, menus,
@@ -142,7 +160,10 @@ src/
 tests/
 ├── manifest.test.ts     # Manifest contract test (spec 001)
 ├── support/             # memoryDisk.ts (in-memory DiskFolder + fault injection, node
-│                        #   digest/yaml, MemoryImageStore), mdFixtures.ts
+│                        #   digest/yaml, MemoryImageStore), mdFixtures.ts, fakeHost.ts
+│                        #   (shared sync-engine harness), fakeLlm.ts, fakeChatContext.ts,
+│                        #   memoryConversationStore.ts
+├── fixtures/assistant/  # recorded live reply + hostile protocol cases, Aldermeer state
 ├── contract/
 │   ├── native-wi.test.ts        # Adapter usage vs app contract (jsdom)
 │   ├── disk-port.test.ts        # DiskFolder guarantees (runDiskPortSuite)
@@ -155,14 +176,18 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.3.0)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.0)
 ```
 
 ## Settings
 
 Workspace state persists under `extensionSettings['WorldInfoWorkspace']` (schema v1,
 saved via `saveSettingsDebounced` after every mutation): `{ version: 1, root:
-FolderNode-tree, settings: { sortMode }, _recovered? }`. Node kinds: folder (expanded,
+FolderNode-tree, settings: { sortMode, assistant? }, _recovered? }`. `settings.assistant`
+(spec 005, optional/additive) = `{ profileId, responseTokens, contextTokens, instructions,
+defaultContext }`, repaired field by field by `getAssistantSettings`; it is NOT saved while
+a data recovery is unresolved (`settingsStore.isRecoveryPending()`). Conversations never
+live in settings. Node kinds: folder (expanded,
 isWiRoot, book binding `{ bookName, orphans, tombstones }`), entry (full native entry
 incl. `triggers` and the native `characterFilter` object + sync), image (src/caption).
 Sync is PER BOOK: `sync.books[bookName] = { uid, hash (FNV-1a), status in-sync|dirty }`.
@@ -241,6 +266,37 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
 - **Live automation**: Playwright cannot drive the native picker — substitute
   `window.showDirectoryPicker = () => navigator.storage.getDirectory()` via
   `page.addInitScript` (OPFS handle, same interface).
+
+## AI assistant (spec 005)
+
+- **Requests**: only `ConnectionManagerRequestService.sendRequest(profileId, messages,
+  maxTokens, { stream, signal, extractData: true, includePreset, includeInstruct })`
+  through `adapters/llmClient.ts` — never `generateRaw`/`generateQuietPrompt`, never the
+  main abort controller, never credentials. `stream` comes from the profile's preset
+  (`stream_openai` / textgen `streaming`); requests need the Connection Manager extension.
+  Text Completion profiles are best-effort.
+- **Protocol** (`contracts/assistant-protocol.md`): prose + `<op type=… …>` blocks with
+  per-request handles (`f1`, `e12`, `i3`) and refs (`new1`). The parser is tolerant and
+  incremental (called on every stream chunk); broken blocks are counted, shown on request,
+  and "Regenerate with the same context" re-sends the stored `requestMessages`.
+- **Context** (`core/assistant/context.ts`): instructions, outline, in-scope items in full,
+  optional chat/card/persona/activated entries, history with decision notes; budget by
+  ~3.5 chars/token; everything left out is reported.
+- **Proposals**: validated against scope and Phase 1 field rules; destructive = deletion,
+  > 50 % of content removed (word-level), or any keyword removed → own confirmation, never
+  via Accept all. Stale targets (changed since parse) need a fresh review. Applying goes
+  through tree ops + `applyTreeChange` / `deleteNodes`, so native sync and the markdown
+  link behave as for manual edits. Any applied batch can be undone while the conversation
+  exists; items edited since are skipped and reported.
+- **Failures**: rate-limit/network retry automatically twice (10 s, 30 s), visibly and
+  stoppably; everything else is a manual Retry. Free OpenRouter models are rate-limited
+  often — this is expected.
+- **Storage**: IndexedDB `WorldInfoWorkspace-assistant` (stores `conversations`,
+  `messages` keyed `[conversationId, seq]`), per browser profile; memory fallback with a
+  banner when IndexedDB is unavailable.
+- **Hooks** (additive): `wi-workspace:assistant-applied` `{ conversationId, batchId,
+  operations: [{ op, nodeId, name }], failed? }`, `wi-workspace:assistant-undone`
+  `{ conversationId, batchId, reverted: string[], skipped: string[] }`.
 
 ## SillyTavern Integration
 

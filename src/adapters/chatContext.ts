@@ -1,4 +1,4 @@
-import { getAppContext, getLiveAppContext } from './appApi';
+import { getLiveAppContext } from './appApi';
 import type {
     ActivatedEntryRef,
     CharacterCardView,
@@ -22,7 +22,9 @@ interface ActivatedPayloadEntry extends Partial<NativeWorldInfoEntry> {
 export function createChatContext(): ChatContextPort {
     let activated: ActivatedEntryRef[] = [];
 
-    const ctx = getAppContext();
+    // The event source is an app singleton; read it from a fresh context so the
+    // adapter never binds to a stale memoized context object.
+    const ctx = getLiveAppContext();
     const activatedEvent = ctx.eventTypes.WORLD_INFO_ACTIVATED;
     if (typeof activatedEvent === 'string') {
         ctx.eventSource.on(activatedEvent, (...args: unknown[]) => {

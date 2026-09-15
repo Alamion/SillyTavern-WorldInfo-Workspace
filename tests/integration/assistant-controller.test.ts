@@ -623,3 +623,87 @@ describe('reorganization and undo (US2)', () => {
         expect(restored?.batch?.applied).toHaveLength(1);
     });
 });
+
+describe('conversations (US5)', () => {
+    it('tells the model what was accepted and denied in the next request', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection([NODE_IDS.hearth]);
+        harness.llm.reply(
+            [
+                '<op type="create_entry" parent="f3"><title>The Salty Keel</title><content>a</content></op>',
+                '<op type="create_entry" parent="f3"><title>The Hearthfire Inn</title><content>b</content></op>',
+            ].join('\n')
+        );
+        await harness.controller.createConversation();
+        await harness.controller.send('two taverns');
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        await harness.controller.accept(message?.seq ?? 1, message?.batch?.proposals[0]?.id ?? '');
+        await harness.controller.deny(message?.seq ?? 1, message?.batch?.proposals[1]?.id ?? '');
+        harness.llm.reply('More ideas.');
+        await harness.controller.send('more ideas');
+        const sent = harness.llm.requests[1]?.messages.map((item) => item.content).join('\n') ?? '';
+        expect(sent).toContain('accepted create_entry "The Salty Keel"');
+        expect(sent).toContain('denied create_entry "The Hearthfire Inn" (do not propose again unless asked)');
+    });
+
+    it('re-checks staleness of restored pending proposals', async () => {
+        const store = createMemoryConversationStore();
+        const first = createHarness({ store });
+        await ready(first);
+        first.controller.setSelection([NODE_IDS.cities]);
+        first.llm.reply('<op type="edit_entry" id="e1"><content>Harbor rewritten.</content></op>');
+        await first.controller.createConversation();
+        await first.controller.send('rewrite');
+
+        const second = createHarness({ store });
+        await second.controller.init();
+        second.controller.updateSettings({ profileId: FAKE_PROFILE.id });
+        second.store.update((draft) => {
+            const aldermeer = draft.root.children[0];
+            const cities = aldermeer?.kind === 'folder' ? aldermeer.children[0] : undefined;
+            const entry = cities?.kind === 'folder' ? cities.children[0] : undefined;
+            if (entry?.kind === 'entry') {
+                entry.native.content = 'changed on this device';
+                entry.updatedAt = '2026-09-16T09:00:00.000Z';
+            }
+        });
+        const restored = second.controller.getSnapshot().messages.at(-1);
+        await second.controller.accept(restored?.seq ?? 1, restored?.batch?.proposals[0]?.id ?? '');
+        expect(second.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('stale');
+    });
+
+    it('renames, refuses empty names, switches and deletes conversations', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        const first = await harness.controller.createConversation();
+        const second = await harness.controller.createConversation();
+        await harness.controller.renameConversation(first, 'Harbor work');
+        await harness.controller.renameConversation(first, '   ');
+        expect(harness.controller.getSnapshot().conversations.find((item) => item.id === first)?.title).toBe(
+            'Harbor work'
+        );
+        await harness.controller.selectConversation(first);
+        expect(harness.controller.getSnapshot().activeConversationId).toBe(first);
+        await harness.controller.deleteConversation(first);
+        expect(harness.controller.getSnapshot().conversations.map((item) => item.id)).toEqual([second]);
+        expect(harness.controller.getSnapshot().activeConversationId).toBe(second);
+        expect(await harness.conversations.listMessages(first)).toEqual([]);
+    });
+
+    it('keeps mode and context per conversation', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        const first = await harness.controller.createConversation();
+        await harness.controller.setMode('discuss');
+        await harness.controller.updateConversationContext({ chatMessages: 12 });
+        const second = await harness.controller.createConversation();
+        expect(harness.controller.getSnapshot().activeConversation?.mode).toBe('propose');
+        await harness.controller.selectConversation(first);
+        expect(harness.controller.getSnapshot().activeConversation).toMatchObject({
+            mode: 'discuss',
+            context: { chatMessages: 12 },
+        });
+        void second;
+    });
+});

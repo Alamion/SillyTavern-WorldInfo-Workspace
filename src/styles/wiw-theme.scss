@@ -1151,3 +1151,36 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         flex: 1 1 8rem;
     }
 }
+
+// Assistant inside the mobile bottom sheet (spec 005 T074): actions wrap into
+// full-width rows, previews and settings panels use the whole sheet width.
+@media (max-width: 900px) {
+    .wiw-assistant-header {
+        flex-wrap: wrap;
+
+        .wiw-assistant-title {
+            flex: 1 1 100%;
+        }
+    }
+
+    .wiw-proposal-actions,
+    .wiw-notice-actions,
+    .wiw-assistant-composer-row {
+        > .wiw-button {
+            flex: 1 1 auto;
+        }
+
+        > input {
+            flex: 1 1 100%;
+        }
+    }
+
+    .wiw-assistant-settings {
+        min-width: 0;
+        width: 94%;
+    }
+
+    .wiw-proposal-preview {
+        max-height: 8rem;
+    }
+}
