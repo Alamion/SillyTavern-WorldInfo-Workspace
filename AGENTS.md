@@ -25,7 +25,13 @@ tree selection / update from native, delete — search, filters, pagination). De
 amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and import of
 any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
 hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
-UI contract, quickstart S0–S14). Next: Phase 2 (AI assistant).
+UI contract, quickstart S0–S14).
+**Next increment (spec 005, planned 2026-09-15)**: roadmap Phase 2 — AI Lore Assistant.
+Requests via `ConnectionManagerRequestService` with a profile chosen in assistant settings
+(streaming follows the profile's preset); prose replies with tagged operation blocks
+(`contracts/assistant-protocol.md`), batch proposals with review/diff/undo, conversations
+in IndexedDB `WorldInfoWorkspace-assistant`. Design: `specs/005-ai-lore-assistant/`
+(research R1–R14, data model, protocol/LLM port/UI/hooks contracts, quickstart A0–A21).
 
 ## Key Reference
 
