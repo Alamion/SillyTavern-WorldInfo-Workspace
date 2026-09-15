@@ -1,8 +1,17 @@
+import { applyDeletion, applyProposals, undoAppliedBatch } from './assistantApply';
+import { buildRequest } from '../core/assistant/context';
 import { describeFailure, retryPolicy } from '../core/assistant/failures';
+import { parseReply } from '../core/assistant/parser';
+import { acceptAllSelection, applyOrder, withBlocked } from '../core/assistant/plan';
+import { stalenessOf } from '../core/assistant/rules';
+import { toProposals } from '../core/assistant/validate';
+import type { SyncEngine } from './syncEngine';
+import type { ApplyOutcome } from './assistantApply';
 import type { ChatContextPort, ConversationStorePort, LlmPort, ProfileInfo } from '../core/assistant/ports';
 import { systemPrompt } from '../core/assistant/prompts';
 import { canSaveAssistantSettings, setAssistantSettings } from '../core/assistant/settingsOps';
 import type {
+    AppliedBatch,
     AssistantFailure,
     AssistantMode,
     AssistantSettings,
@@ -10,8 +19,12 @@ import type {
     Conversation,
     LlmMessage,
     Message,
+    OperationProposal,
+    ProposalBatch,
+    ProposedValues,
 } from '../core/assistant/types';
-import { getAssistantSettings, type WorkspaceState } from '../core/state/schema';
+import { findNode, getAssistantSettings, type WorkspaceState } from '../core/state/schema';
+import { fingerprintValues } from '../core/assistant/rules';
 import type { WorkspaceStore } from '../core/state/store';
 
 /**
@@ -48,6 +61,11 @@ export interface AssistantSnapshot {
 
 export interface AssistantControllerDeps {
     store: WorkspaceStore;
+    sync: SyncEngine;
+    /** Confirmation dialog for destructive proposals (FR-010). */
+    confirm: (message: string) => Promise<boolean>;
+    /** Ids tracked by the markdown link, for the delete disclosure. */
+    trackedIds?: () => ReadonlySet<string>;
     llm: LlmPort;
     conversations: ConversationStorePort;
     chat: ChatContextPort;
@@ -76,9 +94,26 @@ export interface AssistantController {
     stop(): void;
     retry(seq: number): Promise<void>;
     retryNow(seq: number): Promise<void>;
+    /** Destructive confirmation and batch undo (FR-010, FR-015). */
+    confirmDestructive(seq: number, proposalId: string): Promise<void>;
+    undoBatch(seq: number, appliedBatchId: string): Promise<void>;
+    /** Proposal review (FR-009, FR-010, FR-013, FR-017). */
+    accept(seq: number, proposalId: string): Promise<void>;
+    acceptAll(seq: number): Promise<void>;
+    deny(seq: number, proposalId: string): Promise<void>;
+    denyAll(seq: number): Promise<void>;
+    editProposal(seq: number, proposalId: string, values: ProposedValues): Promise<void>;
+    refreshProposal(seq: number, proposalId: string): Promise<void>;
+    feedback(seq: number, text: string, proposalId?: string): Promise<void>;
+    continueReply(seq: number): Promise<void>;
+    regenerate(seq: number, options?: { sameContext?: boolean }): Promise<void>;
+    askToFix(seq: number): Promise<void>;
 }
 
 const TITLE_LIMIT = 60;
+
+const findNodeInState = findNode;
+const fingerprintOf = fingerprintValues;
 
 /** Snapshot for a request built before the US1 context builder exists. */
 function emptySnapshot(requestMessages: LlmMessage[]): NonNullable<Message['context']> {
@@ -220,7 +255,8 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
     const runRequest = async (
         conversation: Conversation,
         assistantSeq: number,
-        requestMessages: LlmMessage[]
+        requestMessages: LlmMessage[],
+        contextSnapshot?: NonNullable<Message['context']>
     ): Promise<void> => {
         const current = settings();
         const availability = deps.llm.availability();
@@ -249,9 +285,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 api: profile.api,
                 model: profile.model,
             },
-            // The context snapshot of a request already built by the US1 builder is
-            // kept; the foundational path records just the messages it sent.
-            context: existing.context ?? emptySnapshot(requestMessages),
+            context: contextSnapshot ?? existing.context ?? emptySnapshot(requestMessages),
         });
         notify();
 
@@ -271,22 +305,32 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                     return;
                 }
                 if (event.type === 'progress') {
+                    // Blocks are parsed as they close, so proposals appear while
+                    // the reply is still streaming (FR-002).
+                    const streaming = parseReply(event.text, {});
                     void putMessage({
                         ...message,
                         status: 'receiving',
                         text: event.text,
-                        reasoning: event.reasoning === '' ? undefined : event.reasoning,
+                        prose: streaming.prose,
+                        reasoning:
+                            event.reasoning === '' ? streaming.reasoning || undefined : event.reasoning,
                     });
                     notify();
                     return;
                 }
                 if (event.type === 'done') {
-                    void putMessage({
+                    const parsed = parseReply(event.text, { final: true });
+                    const received: Message = {
                         ...message,
                         status: 'received',
                         text: event.text,
-                        reasoning: event.reasoning === '' ? undefined : event.reasoning,
-                    });
+                        prose: parsed.prose,
+                        reasoning:
+                            event.reasoning === '' ? parsed.reasoning || undefined : event.reasoning,
+                    };
+                    const batch = batchFor(received, event.text);
+                    void putMessage(batch === undefined ? received : { ...received, batch });
                     notify();
                     return;
                 }
@@ -408,11 +452,196 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             createdAt: deps.now(),
         });
         notify();
-        const requestMessages: LlmMessage[] = [
-            { role: 'system', content: systemPrompt(conversation.mode, settings().instructions) },
-            ...historyMessages(conversation.id),
-        ];
-        await runRequest(conversation, assistantSeq, requestMessages);
+        const built = buildForConversation(conversation, trimmed, assistantSeq);
+        await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
+    };
+
+    /** Full request for a conversation turn (context builder, research R6). */
+    const buildForConversation = (
+        conversation: Conversation,
+        request: string,
+        assistantSeq: number
+    ): { messages: LlmMessage[]; snapshot: NonNullable<Message['context']> } => {
+        const current = settings();
+        const context = conversation.context;
+        const history = messagesOf(conversation.id).filter(
+            (message) => message.seq < assistantSeq - 1 && message.status !== 'failed'
+        );
+        const built = buildRequest({
+            state: deps.store.getState(),
+            mode: conversation.mode,
+            instructions: current.instructions,
+            context,
+            selection,
+            request,
+            history,
+            contextTokens: current.contextTokens,
+            responseTokens: current.responseTokens,
+            chat: {
+                messages: deps.chat.chatMessages(context.chatMessages),
+                card: context.characterCard ? deps.chat.characterCard() : null,
+                persona: context.persona ? deps.chat.persona() : null,
+                activated: context.activatedEntries ? deps.chat.activatedEntries() : [],
+            },
+        });
+        return { messages: built.messages, snapshot: built.snapshot };
+    };
+
+    const messageAt = (seq: number): Message | undefined =>
+        activeConversationId === null
+            ? undefined
+            : messagesOf(activeConversationId).find((item) => item.seq === seq);
+
+    /** Parses a reply into a reviewable batch (propose mode only). */
+    const batchFor = (message: Message, text: string): ProposalBatch | undefined => {
+        if (message.mode !== 'propose') {
+            return undefined;
+        }
+        const parsed = parseReply(text, { final: true });
+        let counter = 0;
+        const proposals = toProposals(parsed.blocks, {
+            state: deps.store.getState(),
+            snapshot: {
+                handles: message.context?.handles ?? {},
+                scopeNodeIds: message.context?.scopeNodeIds ?? [],
+            },
+            newProposalId: () => `${String(message.seq)}-${String((counter += 1))}`,
+        });
+        return {
+            id: `${message.conversationId}-${String(message.seq)}`,
+            proposals: withBlocked(proposals),
+            unparsed: parsed.unparsed,
+            applied: message.batch?.applied ?? [],
+        };
+    };
+
+    const updateBatch = async (
+        seq: number,
+        change: (batch: ProposalBatch) => ProposalBatch
+    ): Promise<void> => {
+        const message = messageAt(seq);
+        if (!message?.batch) {
+            return;
+        }
+        const next = change(message.batch);
+        await putMessage({ ...message, batch: { ...next, proposals: withBlocked(next.proposals) } });
+        notify();
+    };
+
+    const setDecision = async (
+        seq: number,
+        proposalId: string,
+        decision: OperationProposal['decision']
+    ): Promise<void> => {
+        await updateBatch(seq, (batch) => ({
+            ...batch,
+            proposals: batch.proposals.map((proposal) =>
+                proposal.id === proposalId && proposal.decision === 'pending'
+                    ? { ...proposal, decision }
+                    : proposal
+            ),
+        }));
+    };
+
+    /** Applies accepted proposals and writes their outcome back (FR-011–FR-013). */
+    const applyAccepted = async (seq: number, proposalIds: readonly string[]): Promise<void> => {
+        const message = messageAt(seq);
+        if (!message?.batch || proposalIds.length === 0) {
+            return;
+        }
+        const ordered = applyOrder(
+            message.batch.proposals.filter((proposal) => proposalIds.includes(proposal.id))
+        ).map((proposal) => proposal.id);
+        const result = applyProposals(
+            {
+                store: deps.store,
+                sync: deps.sync,
+                newId: deps.newId,
+                now: deps.now,
+                emit: deps.emit,
+            },
+            { conversationId: message.conversationId },
+            message.batch,
+            ordered
+        );
+        await writeOutcomes(seq, result);
+        await deps.conversations.flush(message.conversationId);
+    };
+
+    const writeOutcomes = async (
+        seq: number,
+        result: { batch: AppliedBatch; outcomes: ApplyOutcome[] }
+    ): Promise<void> => {
+        await updateBatch(seq, (batch) => ({
+            ...batch,
+            applied: result.batch.items.length > 0 ? [...batch.applied, result.batch] : batch.applied,
+            proposals: batch.proposals.map((proposal) => {
+                const outcome = result.outcomes.find((item) => item.proposalId === proposal.id);
+                if (!outcome) {
+                    return proposal;
+                }
+                if (outcome.status === 'applied') {
+                    return { ...proposal, decision: 'applied' as const };
+                }
+                if (outcome.status === 'stale') {
+                    return {
+                        ...proposal,
+                        decision: 'stale' as const,
+                        blockedReason:
+                            outcome.reason === 'missing'
+                                ? 'the item no longer exists'
+                                : 'the item changed since this was proposed',
+                    };
+                }
+                return { ...proposal, decision: 'failed' as const, failedReason: outcome.reason };
+            }),
+        }));
+    };
+
+    /** A follow-up turn in the same conversation (feedback, continue, ask to fix). */
+    const followUp = async (request: string, assistantPrefill?: string): Promise<void> => {
+        const conversation = conversations.find((item) => item.id === activeConversationId);
+        if (!conversation || busy) {
+            return;
+        }
+        busy = true;
+        abortController = new AbortController();
+        try {
+            const userSeq = conversation.nextSeq;
+            const assistantSeq = userSeq + 1;
+            const touched = await touchConversation({ ...conversation, nextSeq: assistantSeq + 1 });
+            await putMessage({
+                conversationId: touched.id,
+                seq: userSeq,
+                role: 'user',
+                text: request,
+                status: 'received',
+                mode: touched.mode,
+                createdAt: deps.now(),
+            });
+            await putMessage({
+                conversationId: touched.id,
+                seq: assistantSeq,
+                role: 'assistant',
+                text: '',
+                status: 'pending',
+                mode: touched.mode,
+                createdAt: deps.now(),
+            });
+            notify();
+            const built = buildForConversation(touched, request, assistantSeq);
+            const messages =
+                assistantPrefill === undefined
+                    ? built.messages
+                    : [...built.messages, { role: 'assistant' as const, content: assistantPrefill }];
+            await runRequest(touched, assistantSeq, messages, {
+                ...built.snapshot,
+                requestMessages: messages,
+            });
+        } finally {
+            busy = false;
+            abortController = null;
+        }
     };
 
     const create = async (): Promise<string> => {
@@ -541,6 +770,227 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 busy = false;
                 abortController = null;
             }
+        },
+        async confirmDestructive(seq, proposalId) {
+            const message = messageAt(seq);
+            const proposal = message?.batch?.proposals.find((item) => item.id === proposalId);
+            if (!message || !proposal || proposal.decision !== 'pending') {
+                return;
+            }
+            if (proposal.op === 'delete' && proposal.targetId !== undefined) {
+                const result = await applyDeletion(
+                    {
+                        store: deps.store,
+                        sync: deps.sync,
+                        newId: deps.newId,
+                        now: deps.now,
+                        emit: deps.emit,
+                        confirm: deps.confirm,
+                        ...(deps.trackedIds !== undefined ? { trackedIds: deps.trackedIds } : {}),
+                    },
+                    { conversationId: message.conversationId },
+                    message.batch as ProposalBatch,
+                    proposalId
+                );
+                await writeOutcomes(seq, result);
+                return;
+            }
+            // Destructive EDIT: disclose what disappears before applying.
+            const node = proposal.targetId !== undefined ? findNode(deps.store.getState(), proposal.targetId) : undefined;
+            const confirmed = await deps.confirm(
+                `Apply "${proposal.summary}"? It removes a large part of ${
+                    node?.name ?? 'the entry'
+                } (or one of its keywords). This can be undone from the batch bar.`
+            );
+            if (!confirmed) {
+                return;
+            }
+            await applyAccepted(seq, [proposalId]);
+        },
+        async undoBatch(seq, appliedBatchId) {
+            const message = messageAt(seq);
+            const applied = message?.batch?.applied.find((item) => item.id === appliedBatchId);
+            if (!message?.batch || !applied) {
+                return;
+            }
+            const undone = undoAppliedBatch(
+                {
+                    store: deps.store,
+                    sync: deps.sync,
+                    newId: deps.newId,
+                    now: deps.now,
+                    emit: deps.emit,
+                },
+                { conversationId: message.conversationId },
+                applied
+            );
+            const revertedProposals = new Set(
+                applied.items
+                    .filter((item) => undone.reverted.includes(item.nodeId))
+                    .map((item) => item.proposalId)
+            );
+            await updateBatch(seq, (batch) => ({
+                ...batch,
+                applied: batch.applied.map((item) =>
+                    item.id === appliedBatchId ? { ...item, undone } : item
+                ),
+                proposals: batch.proposals.map((proposal) =>
+                    revertedProposals.has(proposal.id)
+                        ? { ...proposal, decision: 'reverted' as const }
+                        : proposal
+                ),
+            }));
+            await deps.conversations.flush(message.conversationId);
+        },
+        async accept(seq, proposalId) {
+            const message = messageAt(seq);
+            const proposal = message?.batch?.proposals.find((item) => item.id === proposalId);
+            if (!proposal) {
+                return;
+            }
+            const stale = stalenessOf(deps.store.getState(), proposal);
+            if (stale !== null) {
+                await updateBatch(seq, (batch) => ({
+                    ...batch,
+                    proposals: batch.proposals.map((item) =>
+                        item.id === proposalId
+                            ? {
+                                  ...item,
+                                  decision: 'stale' as const,
+                                  blockedReason:
+                                      stale === 'missing'
+                                          ? 'the item no longer exists'
+                                          : 'the item changed since this was proposed',
+                              }
+                            : item
+                    ),
+                }));
+                return;
+            }
+            await applyAccepted(seq, [proposalId]);
+        },
+        async acceptAll(seq) {
+            const message = messageAt(seq);
+            if (!message?.batch) {
+                return;
+            }
+            await applyAccepted(seq, acceptAllSelection(message.batch.proposals));
+        },
+        async deny(seq, proposalId) {
+            await setDecision(seq, proposalId, 'denied');
+        },
+        async denyAll(seq) {
+            await updateBatch(seq, (batch) => ({
+                ...batch,
+                proposals: batch.proposals.map((proposal) =>
+                    proposal.decision === 'pending' ? { ...proposal, decision: 'denied' as const } : proposal
+                ),
+            }));
+        },
+        async editProposal(seq, proposalId, values) {
+            await updateBatch(seq, (batch) => ({
+                ...batch,
+                proposals: batch.proposals.map((proposal) =>
+                    proposal.id === proposalId ? { ...proposal, userEdited: values } : proposal
+                ),
+            }));
+        },
+        async refreshProposal(seq, proposalId) {
+            await updateBatch(seq, (batch) => ({
+                ...batch,
+                proposals: batch.proposals.map((proposal) => {
+                    if (proposal.id !== proposalId || proposal.decision !== 'stale') {
+                        return proposal;
+                    }
+                    const node =
+                        proposal.targetId !== undefined
+                            ? findNodeInState(deps.store.getState(), proposal.targetId)
+                            : undefined;
+                    if (!node) {
+                        return { ...proposal, decision: 'invalid' as const, invalidReason: 'the item no longer exists' };
+                    }
+                    const next: OperationProposal = { ...proposal, decision: 'pending' };
+                    delete next.blockedReason;
+                    next.baseline = {
+                        updatedAt: node.updatedAt,
+                        fingerprint: fingerprintOf(node, proposal.userEdited ?? proposal.values),
+                    };
+                    return next;
+                }),
+            }));
+        },
+        async feedback(seq, text, proposalId) {
+            const message = messageAt(seq);
+            const target = message?.batch?.proposals.find((item) => item.id === proposalId);
+            const scopeNote =
+                target !== undefined ? ` Only revise this proposal: ${target.summary}.` : '';
+            if (proposalId !== undefined) {
+                await setDecision(seq, proposalId, 'superseded');
+            }
+            await followUp(`${text}${scopeNote}`);
+        },
+        async continueReply(seq) {
+            const message = messageAt(seq);
+            if (!message) {
+                return;
+            }
+            await followUp('Continue exactly where you stopped.', message.text);
+        },
+        async regenerate(seq, options = {}) {
+            const conversation = conversations.find((item) => item.id === activeConversationId);
+            const message = messageAt(seq);
+            if (!conversation || !message || busy) {
+                return;
+            }
+            const userRequest = messagesOf(conversation.id).find((item) => item.seq === seq - 1)?.text ?? '';
+            busy = true;
+            abortController = new AbortController();
+            try {
+                await deps.conversations.deleteMessagesAfter(conversation.id, seq);
+                const bucket = messagesOf(conversation.id);
+                bucket.splice(
+                    0,
+                    bucket.length,
+                    ...bucket.filter((item) => item.seq <= seq)
+                );
+                await putMessage({
+                    ...message,
+                    text: '',
+                    prose: undefined,
+                    previousText: message.text === '' ? message.previousText : message.text,
+                    reasoning: undefined,
+                    batch: message.batch !== undefined ? { ...message.batch, proposals: [] } : undefined,
+                    status: 'pending',
+                    failure: undefined,
+                    retryAt: undefined,
+                    retryAttempt: 0,
+                });
+                notify();
+                if (options.sameContext === true && message.context !== undefined) {
+                    await runRequest(conversation, seq, message.context.requestMessages, message.context);
+                    return;
+                }
+                const built = buildForConversation(conversation, userRequest, seq);
+                await runRequest(conversation, seq, built.messages, built.snapshot);
+            } finally {
+                busy = false;
+                abortController = null;
+            }
+        },
+        async askToFix(seq) {
+            const message = messageAt(seq);
+            if (!message?.batch) {
+                return;
+            }
+            const reasons = [
+                ...message.batch.unparsed.map((item) => `- ${item.reason}: ${item.excerpt}`),
+                ...message.batch.proposals
+                    .filter((proposal) => proposal.invalidReason !== undefined)
+                    .map((proposal) => `- ${proposal.summary}: ${proposal.invalidReason ?? ''}`),
+            ].join('\n');
+            await followUp(
+                `Your previous operation blocks could not be used:\n${reasons}\nSend them again, fixed, using only handles from the workspace context.`
+            );
         },
         stop() {
             // Stop cancels a pending automatic retry as well as a running request

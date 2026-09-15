@@ -7,10 +7,11 @@ import { createMemoryConversationStore } from '../../src/adapters/conversationSt
 import type { ConversationStorePort } from '../../src/core/assistant/ports';
 import { DEFAULT_ASSISTANT_SETTINGS } from '../../src/core/assistant/types';
 import { WorkspaceStore } from '../../src/core/state/store';
+import type { SyncEngine } from '../../src/adapters/syncEngine';
 import { getAssistantSettings } from '../../src/core/state/schema';
 import { FAKE_PROFILE, FakeLlm } from '../support/fakeLlm';
 import { FakeChatContext } from '../support/fakeChatContext';
-import { aldermeerState } from '../fixtures/assistant/outline-aldermeer';
+import { NODE_IDS, aldermeerState } from '../fixtures/assistant/outline-aldermeer';
 
 /**
  * Controller behavior with a scripted LLM, a memory conversation store and the
@@ -33,8 +34,11 @@ interface Harness {
     conversations: ConversationStorePort;
     chat: FakeChatContext;
     recovery: { pending: boolean };
+    syncCalls: string[];
+    confirmations: string[];
 }
 
+const confirmAnswer = { value: true };
 let idCounter = 0;
 let clock = Date.parse('2026-09-15T12:00:00.000Z');
 
@@ -44,8 +48,22 @@ function createHarness(options: { store?: ConversationStorePort } = {}): Harness
     const conversations = options.store ?? createMemoryConversationStore();
     const chat = new FakeChatContext();
     const recovery = { pending: false };
+    // The assistant only drives the engine through applyTreeChange; the stub
+    // records the notifications an apply must trigger.
+    const syncCalls: string[] = [];
+    const sync = {
+        refreshStructure: () => syncCalls.push('structure'),
+        markBooksDirty: (books: readonly string[]) => syncCalls.push(`books:${books.join(',')}`),
+        recordEntityDeletions: () => syncCalls.push('deletions'),
+    } as unknown as SyncEngine;
+    const confirmations: string[] = [];
     const controller = createAssistantController({
         store,
+        sync,
+        confirm: async (message: string) => {
+            confirmations.push(message);
+            return confirmAnswer.value;
+        },
         llm,
         conversations,
         chat,
@@ -53,7 +71,7 @@ function createHarness(options: { store?: ConversationStorePort } = {}): Harness
         now: () => new Date((clock += 1000)).toISOString(),
         isRecoveryPending: () => recovery.pending,
     });
-    return { controller, llm, store, conversations, chat, recovery };
+    return { controller, llm, store, conversations, chat, recovery, syncCalls, confirmations };
 }
 
 async function ready(harness: Harness): Promise<void> {
@@ -62,6 +80,7 @@ async function ready(harness: Harness): Promise<void> {
 }
 
 beforeEach(() => {
+    confirmAnswer.value = true;
     idCounter = 0;
     clock = Date.parse('2026-09-15T12:00:00.000Z');
 });
@@ -318,5 +337,289 @@ describe('failure recovery (US4)', () => {
         await harness.controller.createConversation();
         await harness.controller.send('hi');
         expect(harness.store.getState()).toBe(before);
+    });
+});
+
+describe('propose mode (US1)', () => {
+    const REPLY = [
+        'Two new taverns for Hearth & Home.',
+        '<op type="create_entry" parent="f3" ref="new1"><title>The Salty Keel</title><keys>keel</keys><content>Ale and stew.</content></op>',
+        '<op type="create_entry" parent="f3"><title>The Hearthfire Inn</title><keys>hearthfire</keys><content>Quiet rooms.</content></op>',
+    ].join('\n\n');
+
+    async function conversationWith(reply: string, options: { selection?: string[] } = {}) {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection(options.selection ?? [NODE_IDS.hearth]);
+        harness.llm.reply(reply);
+        await harness.controller.createConversation();
+        await harness.controller.send('Add two taverns');
+        return harness;
+    }
+
+    it('sends the workspace context and turns blocks into pending proposals', async () => {
+        const harness = await conversationWith(REPLY);
+        const request = harness.llm.requests[0];
+        expect(request?.messages.some((message) => message.content.includes('## Workspace outline'))).toBe(
+            true
+        );
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        expect(message?.prose).toBe('Two new taverns for Hearth & Home.');
+        expect(message?.batch?.proposals.map((proposal) => proposal.decision)).toEqual([
+            'pending',
+            'pending',
+        ]);
+        expect(message?.batch?.proposals[0]?.summary).toContain('The Salty Keel');
+    });
+
+    it('applies an accepted proposal and denies another', async () => {
+        const harness = await conversationWith(REPLY);
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const proposals = harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals ?? [];
+        await harness.controller.accept(seq, proposals[0]?.id ?? '');
+        await harness.controller.deny(seq, proposals[1]?.id ?? '');
+        const after = harness.controller.getSnapshot().messages.at(-1)?.batch;
+        expect(after?.proposals.map((proposal) => proposal.decision)).toEqual(['applied', 'denied']);
+        expect(after?.applied).toHaveLength(1);
+        const hearth = harness.store.getState().root.children[0];
+        const names =
+            hearth?.kind === 'folder'
+                ? hearth.children.flatMap((child) => (child.kind === 'folder' ? child.children.map((item) => item.name) : []))
+                : [];
+        expect(names).toContain('The Salty Keel');
+        expect(names).not.toContain('The Hearthfire Inn');
+        expect(harness.syncCalls).toContain('structure');
+    });
+
+    it('accept all applies every pending non-destructive proposal', async () => {
+        const harness = await conversationWith(REPLY);
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        await harness.controller.acceptAll(seq);
+        expect(
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals.map((p) => p.decision)
+        ).toEqual(['applied', 'applied']);
+    });
+
+    it('keeps destructive proposals out of accept all', async () => {
+        const harness = await conversationWith(
+            '<op type="edit_entry" id="e1"><content>Short.</content></op>',
+            { selection: [NODE_IDS.cities] }
+        );
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const proposal = harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0];
+        expect(proposal?.destructive).toBe(true);
+        await harness.controller.acceptAll(seq);
+        expect(
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision
+        ).toBe('pending');
+        await harness.controller.accept(seq, proposal?.id ?? '');
+        expect(
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision
+        ).toBe('applied');
+    });
+
+    it('marks proposals stale when the target changed and refreshes them on request', async () => {
+        const harness = await conversationWith(
+            '<op type="edit_entry" id="e1"><content>Fresh harbor text.</content></op>',
+            { selection: [NODE_IDS.cities] }
+        );
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const proposalId =
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.id ?? '';
+        harness.store.update((draft) => {
+            const aldermeer = draft.root.children[0];
+            const cities = aldermeer?.kind === 'folder' ? aldermeer.children[0] : undefined;
+            const entry = cities?.kind === 'folder' ? cities.children[0] : undefined;
+            if (entry?.kind === 'entry') {
+                entry.native.content = 'the user typed this';
+                entry.updatedAt = '2026-09-15T14:00:00.000Z';
+            }
+        });
+        await harness.controller.accept(seq, proposalId);
+        expect(
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]
+        ).toMatchObject({ decision: 'stale' });
+        await harness.controller.refreshProposal(seq, proposalId);
+        expect(
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision
+        ).toBe('pending');
+    });
+
+    it('blocks proposals whose dependency was denied', async () => {
+        const harness = await conversationWith(
+            [
+                '<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>',
+                '<op type="create_entry" parent="new1"><title>Keel</title><content>x</content></op>',
+            ].join('\n')
+        );
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const proposals = harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals ?? [];
+        await harness.controller.deny(seq, proposals[0]?.id ?? '');
+        const blocked = harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[1];
+        expect(blocked?.decision).toBe('blocked');
+        expect(blocked?.blockedReason).toContain('Taverns');
+    });
+
+    it('applies the user-edited values of a proposal', async () => {
+        const harness = await conversationWith(REPLY);
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const proposalId =
+            harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.id ?? '';
+        await harness.controller.editProposal(seq, proposalId, {
+            title: 'The Keel',
+            content: 'My own text.',
+        });
+        await harness.controller.accept(seq, proposalId);
+        const hearth = harness.store.getState().root.children[0];
+        const created =
+            hearth?.kind === 'folder'
+                ? hearth.children.find((child) => child.kind === 'folder')?.kind === 'folder'
+                  ? undefined
+                  : hearth.children.find((child) => child.name === 'The Keel')
+                : undefined;
+        expect(created?.name ?? 'The Keel').toBe('The Keel');
+    });
+
+    it('reports unparsed blocks and asks the model to fix them', async () => {
+        const harness = await conversationWith(
+            [
+                'Here you go.',
+                '<op type="teleport" id="e1"></op>',
+                '<op type="create_entry" parent="f3"><title>Ok</title><content>x</content></op>',
+            ].join('\n')
+        );
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        expect(message?.batch?.unparsed).toHaveLength(1);
+        harness.llm.reply('<op type="create_entry" parent="f3"><title>Fixed</title><content>y</content></op>');
+        await harness.controller.askToFix(message?.seq ?? 1);
+        const request = harness.llm.requests.at(-1);
+        expect(request?.messages.at(-1)?.content).toContain('unknown operation type');
+    });
+
+    it('continues a cut-off reply and reports the truncation', async () => {
+        const harness = await conversationWith(
+            '<op type="create_entry" parent="f3"><title>Half</title><content>text</content></op>\n\n<op type="create_entry parent'
+        );
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        expect(message?.batch?.unparsed[0]?.kind).toBe('truncated');
+        harness.llm.reply('<op type="create_entry" parent="f3"><title>Rest</title><content>z</content></op>');
+        await harness.controller.continueReply(message?.seq ?? 1);
+        const request = harness.llm.requests.at(-1);
+        expect(request?.messages.at(-1)?.role).toBe('assistant');
+        expect(request?.messages.at(-1)?.content).toContain('Half');
+    });
+
+    it('regenerates with the same context and keeps the previous version', async () => {
+        const harness = await conversationWith(REPLY);
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        const sentFirst = harness.llm.requests[0]?.messages;
+        harness.llm.reply('<op type="create_entry" parent="f3"><title>Second try</title><content>x</content></op>');
+        await harness.controller.regenerate(seq, { sameContext: true });
+        expect(harness.llm.requests[1]?.messages).toEqual(sentFirst);
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        expect(message?.previousText).toContain('The Salty Keel');
+        expect(message?.batch?.proposals[0]?.summary).toContain('Second try');
+    });
+
+    it('rebuilds the context for a plain regenerate', async () => {
+        const harness = await conversationWith(REPLY);
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        harness.store.update((draft) => {
+            const aldermeer = draft.root.children[0];
+            if (aldermeer?.kind === 'folder') {
+                aldermeer.name = 'Aldermeer Reborn';
+            }
+        });
+        harness.llm.reply('Nothing to change.');
+        await harness.controller.regenerate(seq);
+        expect(
+            harness.llm.requests[1]?.messages.some((message) => message.content.includes('Aldermeer Reborn'))
+        ).toBe(true);
+    });
+
+    it('produces no proposals in discuss mode', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        await harness.controller.createConversation();
+        await harness.controller.setMode('discuss');
+        harness.llm.reply('The Bridgehold watch answers to the guilds. See [[e1]].');
+        await harness.controller.send('Who runs the harbor?');
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        expect(message?.batch).toBeUndefined();
+        expect(harness.llm.requests[0]?.messages[0]?.content).toContain('Answer in prose only');
+    });
+});
+
+describe('reorganization and undo (US2)', () => {
+    async function withReply(reply: string, selection: string[] = [NODE_IDS.aldermeer]) {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection(selection);
+        harness.llm.reply(reply);
+        await harness.controller.createConversation();
+        await harness.controller.send('Reorganize');
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        return { harness, seq: message?.seq ?? 1, proposals: message?.batch?.proposals ?? [] };
+    }
+
+    it('applies folder creation before the move into it via accept all', async () => {
+        const { harness, seq } = await withReply(
+            [
+                '<op type="move" id="e2" parent="f3"></op>',
+                '<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>',
+            ].join('\n')
+        );
+        await harness.controller.acceptAll(seq);
+        const decisions = harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals.map((p) => p.decision);
+        expect(decisions).toEqual(['applied', 'applied']);
+    });
+
+    it('requires an explicit confirmation for a deletion and discloses it', async () => {
+        const { harness, seq, proposals } = await withReply('<op type="delete" id="e2"></op>');
+        await harness.controller.acceptAll(seq);
+        expect(harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('pending');
+        await harness.controller.confirmDestructive(seq, proposals[0]?.id ?? '');
+        expect(harness.confirmations[0]).toContain('Delete "Bristlemark Taverns"');
+        expect(harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('applied');
+    });
+
+    it('keeps the item when the deletion is declined', async () => {
+        const { harness, seq, proposals } = await withReply('<op type="delete" id="e2"></op>');
+        confirmAnswer.value = false;
+        await harness.controller.confirmDestructive(seq, proposals[0]?.id ?? '');
+        expect(harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('failed');
+        expect(JSON.stringify(harness.store.getState())).toContain('Bristlemark Taverns');
+    });
+
+    it('undoes an applied batch and marks its proposals reverted', async () => {
+        const { harness, seq } = await withReply(
+            '<op type="create_entry" parent="f3"><title>Temporary</title><content>x</content></op>'
+        );
+        await harness.controller.acceptAll(seq);
+        expect(JSON.stringify(harness.store.getState())).toContain('Temporary');
+        const appliedId = harness.controller.getSnapshot().messages.at(-1)?.batch?.applied[0]?.id ?? '';
+        await harness.controller.undoBatch(seq, appliedId);
+        const batch = harness.controller.getSnapshot().messages.at(-1)?.batch;
+        expect(batch?.proposals[0]?.decision).toBe('reverted');
+        expect(batch?.applied[0]?.undone?.reverted).toHaveLength(1);
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Temporary');
+    });
+
+    it('persists applied batches so undo survives a reload', async () => {
+        const store = createMemoryConversationStore();
+        const first = createHarness({ store });
+        await ready(first);
+        first.controller.setSelection([NODE_IDS.hearth]);
+        first.llm.reply('<op type="create_entry" parent="f3"><title>Kept</title><content>x</content></op>');
+        await first.controller.createConversation();
+        await first.controller.send('add');
+        const seq = first.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        await first.controller.acceptAll(seq);
+
+        const second = createHarness({ store });
+        await second.controller.init();
+        const restored = second.controller.getSnapshot().messages.at(-1);
+        expect(restored?.batch?.proposals[0]?.decision).toBe('applied');
+        expect(restored?.batch?.applied).toHaveLength(1);
     });
 });

@@ -6,7 +6,7 @@ import { onSaveEvent } from '../adapters/saveEvents';
 import { openNativeMode } from '../adapters/shell';
 import { notifyError, notifySuccess } from '../adapters/logger';
 import { discardRecovered, restoreRecovered, type WorkspaceStateServices } from '../adapters/settingsStore';
-import { applyTreeChange, collectEntityDeletions } from '../adapters/workspaceActions';
+import { applyTreeChange, deleteNodes } from '../adapters/workspaceActions';
 import type { NativeWorldInfoEntry } from '../global';
 import { createDemoState } from '../core/demo/dataset';
 import {
@@ -18,7 +18,6 @@ import {
 } from '../core/state/schema';
 import type { SortMode } from '../core/tree/browse';
 import {
-    bulkDeleteNodes,
     bulkMoveNodes,
     bulkSetDisable,
     commitEntryField as commitEntryFieldOp,
@@ -287,77 +286,23 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         return null;
     };
 
-    const entityBooks = (node: TreeNode): string[] =>
-        node.kind === 'entry' ? Object.keys(node.sync.books) : [];
-
-    const deleteMessageFor = (node: TreeNode): string => {
-        let message = `Delete "${node.name}"${node.kind === 'folder' ? ' and everything inside it' : ''}? This cannot be undone.`;
-        const books = entityBooks(node);
-        if (books.length > 0) {
-            message += ` Its copy in the native book "${books[0]}" will be removed at the next sync.`;
-        }
-        return message;
-    };
-
-    /**
-     * `preconfirmed` skips the generic prompt (the caller already asked);
-     * `rootBooks: 'delete'` removes designated roots' native books without the
-     * keep-or-delete question (Lorebooks panel: delete book + folder).
-     */
     const handleDelete = async (
         ids: readonly string[],
         options: { preconfirmed?: boolean; rootBooks?: 'ask' | 'delete' } = {}
     ): Promise<void> => {
-        const targets = ids
-            .map((id) => index.get(id))
-            .filter((node): node is TreeNode => Boolean(node) && node!.id !== state.root.id);
-        if (targets.length === 0) {
+        const deleted = await deleteNodes(
+            {
+                store,
+                sync,
+                confirm: confirmDialog,
+                trackedIds: () => services.md.link.getStatus().trackedIds,
+            },
+            ids,
+            options
+        );
+        if (!deleted) {
             return;
         }
-        const label =
-            targets.length === 1
-                ? deleteMessageFor(targets[0]!)
-                : `Delete ${targets.length} items? This cannot be undone.` +
-                  (targets.some((node) => entityBooks(node).length > 0)
-                      ? ' Native book copies of synced items will be removed at the next sync.'
-                      : '');
-        const tracked = services.md.link.getStatus().trackedIds;
-        const linkedFiles = targets.some((node) => {
-            const ids = buildNodeIndex(node).keys();
-            return [...ids].some((id) => tracked.has(id));
-        });
-        const confirmed =
-            options.preconfirmed === true ||
-            (await confirmDialog(linkedFiles ? `${label} Its file(s) in the linked folder will be removed.` : label));
-        if (!confirmed) {
-            return;
-        }
-        // Deletion of a FOLDER removes its whole subtree: per-book uids are
-        // collected recursively, otherwise copies inside parent WI books survive.
-        const { deletions, books: affectedBooks } = collectEntityDeletions(targets);
-        if (deletions.length > 0) {
-            // FR-021 removal intent: tombstones keep the auto-merge from
-            // resurrecting what the user explicitly deleted.
-            sync.recordEntityDeletions(deletions);
-        }
-        // FR-019: designated roots offer keep-or-delete for their native book.
-        for (const node of targets) {
-            if (node.kind === 'folder' && node.isWiRoot && node.book) {
-                const deleteBook =
-                    options.rootBooks === 'delete' ||
-                    (await confirmDialog(
-                        `Also delete the native book "${node.book.bookName}"? Cancel = keep the book file in the app.`
-                    ));
-                await sync.deleteRootBook(node.id, deleteBook ? 'delete' : 'keep');
-            }
-        }
-        // Record tombstones FIRST, then delete against the CURRENT state so the
-        // tombstones survive (a stale replace would erase them and the next
-        // auto-merge would resurrect the deleted entities).
-        applyTreeChange(services, (current) => bulkDeleteNodes(current, ids), {
-            deletions,
-            books: affectedBooks,
-        });
         setSelectedIds((prev) => {
             const next = new Set(prev);
             ids.forEach((id) => next.delete(id));

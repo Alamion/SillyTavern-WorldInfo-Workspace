@@ -324,6 +324,53 @@ export function commitImage(
     return next;
 }
 
+/**
+ * Re-inserts a previously removed subtree at its old position (assistant batch
+ * undo, spec 005 FR-015). Ids are preserved so per-book sync state and markdown
+ * tracking keep pointing at the same entities. Rejected when the parent is gone
+ * or any id is already present.
+ */
+export function insertSubtree(
+    state: WorkspaceState,
+    parentId: string,
+    index: number,
+    subtree: TreeNode
+): WorkspaceState | null {
+    const parent = findNode(state, parentId);
+    if (parent?.kind !== 'folder') {
+        return null;
+    }
+    const existing = new Set<string>();
+    const collect = (node: TreeNode): void => {
+        existing.add(node.id);
+        if (node.kind === 'folder') {
+            node.children.forEach(collect);
+        }
+    };
+    collect(state.root);
+    const incoming: string[] = [];
+    const walk = (node: TreeNode): void => {
+        incoming.push(node.id);
+        if (node.kind === 'folder') {
+            node.children.forEach(walk);
+        }
+    };
+    walk(subtree);
+    if (incoming.some((id) => existing.has(id))) {
+        return null;
+    }
+    const next = clone(state);
+    const target = findNode(next, parentId);
+    if (target?.kind !== 'folder') {
+        return null;
+    }
+    const node = structuredClone(subtree);
+    node.parentId = parentId;
+    const at = Math.min(Math.max(index, 0), target.children.length);
+    target.children.splice(at, 0, node);
+    return next;
+}
+
 export function setExpanded(
     state: WorkspaceState,
     folderId: string,

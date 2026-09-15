@@ -1,4 +1,5 @@
-import { findNode, type TreeNode, type WorkspaceState } from '../core/state/schema';
+import { buildNodeIndex, findNode, type TreeNode, type WorkspaceState } from '../core/state/schema';
+import { bulkDeleteNodes } from '../core/tree/operations';
 import type { WorkspaceStore } from '../core/state/store';
 import type { SyncEngine } from './syncEngine';
 
@@ -98,4 +99,112 @@ export async function designateRestoredRoot(
         }
     }
     await deps.sync.designateRoot(folderId, 'create', proposal);
+}
+
+
+export interface DeletionDescription {
+    /** Every item that would be removed (folders include their subtree). */
+    items: TreeNode[];
+    /** Native books that hold copies of the deleted entries. */
+    books: string[];
+    /** Designated World Info roots among the targets (book keep-or-delete). */
+    roots: Array<{ nodeId: string; bookName: string }>;
+    /** True when files of the linked markdown folder would be removed. */
+    linkedFiles: boolean;
+    /** The confirmation text shown to the user. */
+    message: string;
+}
+
+function entityBooks(node: TreeNode): string[] {
+    return node.kind === 'entry' ? Object.keys(node.sync.books) : [];
+}
+
+/**
+ * Full disclosure of what a deletion removes (spec 003 FR-021, spec 005 FR-010):
+ * used by the tree UI and by the assistant's destructive confirmation.
+ */
+export function describeDeletion(
+    state: WorkspaceState,
+    ids: readonly string[],
+    trackedIds: ReadonlySet<string> = new Set()
+): DeletionDescription {
+    const targets = ids
+        .map((id) => findNode(state, id))
+        .filter((node): node is TreeNode => node !== undefined && node.id !== state.root.id);
+    const items: TreeNode[] = [];
+    for (const target of targets) {
+        items.push(...buildNodeIndex(target).values());
+    }
+    const { deletions, books } = collectEntityDeletions(targets);
+    void deletions;
+    const roots = targets
+        .filter((node) => node.kind === 'folder' && node.isWiRoot && node.book !== null)
+        .map((node) => ({
+            nodeId: node.id,
+            bookName: node.kind === 'folder' && node.book ? node.book.bookName : '',
+        }));
+    const linkedFiles = items.some((item) => trackedIds.has(item.id));
+    const single = targets.length === 1 ? targets[0] : undefined;
+    let message: string;
+    if (single) {
+        message = `Delete "${single.name}"${single.kind === 'folder' ? ' and everything inside it' : ''}? This cannot be undone.`;
+        const entryBooks = entityBooks(single);
+        if (entryBooks.length > 0) {
+            message += ` Its copy in the native book "${entryBooks[0] ?? ''}" will be removed at the next sync.`;
+        }
+    } else {
+        message = `Delete ${String(targets.length)} items? This cannot be undone.`;
+        if (targets.some((node) => entityBooks(node).length > 0)) {
+            message += ' Native book copies of synced items will be removed at the next sync.';
+        }
+    }
+    if (linkedFiles) {
+        message += ' Its file(s) in the linked folder will be removed.';
+    }
+    return { items, books, roots, linkedFiles, message };
+}
+
+export interface DeleteNodesDeps {
+    store: WorkspaceStore;
+    sync: SyncEngine;
+    confirm: (message: string) => Promise<boolean>;
+    trackedIds?: () => ReadonlySet<string>;
+}
+
+/**
+ * The single delete path of the workspace (extracted from WorkspaceApp so the
+ * assistant applies deletions exactly like the tree UI): confirmation with full
+ * disclosure, tombstones recorded BEFORE the tree change, the keep-or-delete
+ * question for designated roots, then the delete against the CURRENT state.
+ */
+export async function deleteNodes(
+    deps: DeleteNodesDeps,
+    ids: readonly string[],
+    options: { preconfirmed?: boolean; rootBooks?: 'ask' | 'delete' } = {}
+): Promise<boolean> {
+    const state = deps.store.getState();
+    const description = describeDeletion(state, ids, deps.trackedIds?.() ?? new Set());
+    if (description.items.length === 0) {
+        return false;
+    }
+    if (options.preconfirmed !== true && !(await deps.confirm(description.message))) {
+        return false;
+    }
+    const targets = ids
+        .map((id) => findNode(deps.store.getState(), id))
+        .filter((node): node is TreeNode => node !== undefined && node.id !== state.root.id);
+    const { deletions, books } = collectEntityDeletions(targets);
+    if (deletions.length > 0) {
+        deps.sync.recordEntityDeletions(deletions);
+    }
+    for (const root of description.roots) {
+        const deleteBook =
+            options.rootBooks === 'delete' ||
+            (await deps.confirm(
+                `Also delete the native book "${root.bookName}"? Cancel = keep the book file in the app.`
+            ));
+        await deps.sync.deleteRootBook(root.nodeId, deleteBook ? 'delete' : 'keep');
+    }
+    applyTreeChange(deps, (current) => bulkDeleteNodes(current, ids), { deletions, books });
+    return true;
 }

@@ -251,6 +251,8 @@ export interface Message {
     seq: number;
     role: 'user' | 'assistant' | 'note';
     text: string;
+    /** Assistant messages: the reply prose with operation blocks removed. */
+    prose?: string;
     reasoning?: string;
     status: MessageStatus;
     failure?: AssistantFailure;

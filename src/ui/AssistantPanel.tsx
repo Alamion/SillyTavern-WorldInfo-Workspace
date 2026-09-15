@@ -4,7 +4,10 @@ import { notifyWarning } from '../adapters/logger';
 import { inputDialog } from '../adapters/popups';
 import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
+import { BatchBar } from './assistant/BatchBar';
 import { ConversationView, type MessageActions } from './assistant/ConversationView';
+import { ProposalCard, type ProposalActions } from './assistant/ProposalCard';
+import { ReplyNotices } from './assistant/ReplyNotices';
 import { Composer } from './assistant/Composer';
 import { ContextMenu, contextSummary } from './assistant/ContextMenu';
 import { SettingsMenu } from './assistant/SettingsMenu';
@@ -51,6 +54,15 @@ export function AssistantPanel({
             onOpenNode(nodeId);
         },
     };
+
+    const proposalActions = (seq: number): ProposalActions => ({
+        onAccept: (proposalId) => void assistant.accept(seq, proposalId),
+        onConfirmDestructive: (proposalId) => void assistant.confirmDestructive(seq, proposalId),
+        onDeny: (proposalId) => void assistant.deny(seq, proposalId),
+        onEdit: (proposalId, values) => void assistant.editProposal(seq, proposalId, values),
+        onFeedback: (proposalId, text) => void assistant.feedback(seq, text, proposalId),
+        onRefresh: (proposalId) => void assistant.refreshProposal(seq, proposalId),
+    });
 
     return (
         <div className="wiw-assistant">
@@ -147,7 +159,58 @@ export function AssistantPanel({
                 </p>
             )}
 
-            <ConversationView messages={snapshot.messages} actions={actions} />
+            <ConversationView
+                messages={snapshot.messages}
+                actions={actions}
+                renderBatch={(message) => {
+                    const batch = message.batch;
+                    return (
+                        <>
+                            <ReplyNotices
+                                message={message}
+                                onContinue={() => void assistant.continueReply(message.seq)}
+                                onRegenerate={() => void assistant.regenerate(message.seq)}
+                                onRegenerateSameContext={() =>
+                                    void assistant.regenerate(message.seq, { sameContext: true })
+                                }
+                                onAskToFix={() => void assistant.askToFix(message.seq)}
+                            />
+                            {batch !== undefined && batch.proposals.length > 0 && (
+                                <div className="wiw-proposals">
+                                    <ul className="wiw-proposal-list">
+                                        {batch.proposals.map((proposal) => (
+                                            <ProposalCard
+                                                key={proposal.id}
+                                                proposal={proposal}
+                                                state={state}
+                                                actions={proposalActions(message.seq)}
+                                            />
+                                        ))}
+                                    </ul>
+                                    <BatchBar
+                                        batch={batch}
+                                        busy={busy}
+                                        onAcceptAll={() => {
+                                            void assistant.acceptAll(message.seq).then(() => {
+                                                // Destructive proposals stay pending: bring the
+                                                // first one into view for its own confirmation.
+                                                document
+                                                    .querySelector('.wiw-assistant [data-destructive-pending="true"]')
+                                                    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                                            });
+                                        }}
+                                        onDenyAll={() => void assistant.denyAll(message.seq)}
+                                        onFeedback={(text) => void assistant.feedback(message.seq, text)}
+                                        onUndo={(appliedBatchId) =>
+                                            void assistant.undoBatch(message.seq, appliedBatchId)
+                                        }
+                                    />
+                                </div>
+                            )}
+                        </>
+                    );
+                }}
+            />
 
             <Composer
                 mode={snapshot.activeConversation?.mode ?? 'propose'}

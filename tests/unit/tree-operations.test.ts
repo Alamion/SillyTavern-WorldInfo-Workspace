@@ -7,6 +7,7 @@ import {
     type WorkspaceState,
 } from '../../src/core/state/schema';
 import {
+    insertSubtree,
     bulkDeleteNodes,
     bulkMoveNodes,
     bulkSetDisable,
@@ -204,5 +205,26 @@ describe('tree operations: rename & delete', () => {
         // No-op toggles leave the books untouched.
         const again = bulkSetDisable(next, [fx.entryA], true);
         expect(again).toEqual(next);
+    });
+});
+describe('insertSubtree (spec 005 undo)', () => {
+    it('re-inserts a removed subtree at its old index with its ids', () => {
+        const state = createDefaultState();
+        const folder = createFolderNode({ id: 'f', parentId: state.root.id, name: 'F', now: 'now' });
+        const child = createEntryNode({ id: 'c', parentId: 'f', name: 'C', now: 'now', nativeUid: 1 });
+        folder.children.push(child);
+        const other = createFolderNode({ id: 'o', parentId: state.root.id, name: 'O', now: 'now' });
+        state.root.children.push(other);
+        const next = insertSubtree(state, state.root.id, 0, folder);
+        expect(next?.root.children.map((node) => node.id)).toEqual(['f', 'o']);
+        expect(next && findNode(next, 'c')?.parentId).toBe('f');
+    });
+
+    it('rejects a missing parent or an id that already exists', () => {
+        const state = createDefaultState();
+        const folder = createFolderNode({ id: 'f', parentId: state.root.id, name: 'F', now: 'now' });
+        expect(insertSubtree(state, 'missing', 0, folder)).toBeNull();
+        state.root.children.push(folder);
+        expect(insertSubtree(state, state.root.id, 0, folder)).toBeNull();
     });
 });

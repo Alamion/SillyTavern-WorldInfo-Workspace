@@ -1,4 +1,5 @@
 import { getAppContext } from './appApi';
+import { confirmDialog } from './popups';
 import { notifyWarning } from './logger';
 import type { SaveEvent } from './saveEvents';
 import {
@@ -114,6 +115,9 @@ export function initWorkspaceState(): WorkspaceStateServices {
 
     const assistant = createAssistantController({
         store,
+        sync,
+        confirm: confirmDialog,
+        trackedIds: () => md.link.getStatus().trackedIds,
         llm: createLlmClient(() => ctx),
         conversations: openConversationStore(),
         chat: createChatContext(),
