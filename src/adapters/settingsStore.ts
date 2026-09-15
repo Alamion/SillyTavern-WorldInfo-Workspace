@@ -13,6 +13,10 @@ import { createWorldInfoAdapter, type WorldInfoAdapter } from './worldInfoAdapte
 import { createActiveBooksAdapter, type ActiveBooksAdapter } from './activeBooksAdapter';
 import { createSyncEngine, type SyncEngine } from './syncEngine';
 import { createMdController, type MdController } from './mdController';
+import { createAssistantController, type AssistantController } from './assistantController';
+import { createLlmClient } from './llmClient';
+import { openConversationStore } from './conversationStore';
+import { createChatContext } from './chatContext';
 import { fsaAccess } from './fsaDisk';
 import { createImageStore } from './imageStore';
 import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
@@ -30,9 +34,20 @@ export interface WorkspaceStateServices {
     activeBooks: ActiveBooksAdapter;
     sync: SyncEngine;
     md: MdController;
+    assistant: AssistantController;
 }
 
 let services: WorkspaceStateServices | null = null;
+/**
+ * True while a data recovery is unresolved and the empty fallback has NOT been
+ * published: assistant settings must not be saved in that window, because any
+ * publish would overwrite the recoverable payload (spec 005 FR-035).
+ */
+let recoveryPending = false;
+
+export function isRecoveryPending(): boolean {
+    return recoveryPending;
+}
 
 export function initWorkspaceState(): WorkspaceStateServices {
     if (services) {
@@ -43,6 +58,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
     const state: WorkspaceState = migrate(raw);
     const store = new WorkspaceStore(state);
     const recoveredNow = isFreshRecovery(raw, state);
+    recoveryPending = recoveredNow;
 
     const publish = (): void => {
         ctx.extensionSettings[MODULE_NAMESPACE] = store.getState();
@@ -96,7 +112,21 @@ export function initWorkspaceState(): WorkspaceStateServices {
         void md.link.init();
     }
 
-    services = { store, worldInfo, activeBooks, sync, md };
+    const assistant = createAssistantController({
+        store,
+        llm: createLlmClient(() => ctx),
+        conversations: openConversationStore(),
+        chat: createChatContext(),
+        newId: () => ctx.uuidv4(),
+        now: () => new Date().toISOString(),
+        isRecoveryPending,
+        emit: (event, payload) => void ctx.eventSource.emit(event, payload),
+    });
+    void assistant.init().catch((error: unknown) => {
+        notifyWarning(`Assistant conversations could not be loaded: ${String(error)}`);
+    });
+
+    services = { store, worldInfo, activeBooks, sync, md, assistant };
     return services;
 }
 
@@ -119,6 +149,7 @@ export function restoreRecovered(store: WorkspaceStore): RestoreOutcome {
         return { ok: false, issues: issues.length > 0 ? issues : ['backup has an unsupported structure'] };
     }
     store.replace(restored);
+    recoveryPending = false;
     return { ok: true };
 }
 
@@ -126,6 +157,7 @@ export function discardRecovered(store: WorkspaceStore): void {
     store.update((draft) => {
         delete draft._recovered;
     });
+    recoveryPending = false;
 }
 
 function describeIssues(candidate: unknown): string[] {

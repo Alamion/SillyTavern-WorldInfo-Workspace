@@ -1,0 +1,10 @@
+Two blocks, the first one with sloppy quoting.
+
+<op type="create_entry" parent=f3 ref='new1>
+<title>The Salty Keel</title>
+<content>
+A bustling waterfront tavern.
+</content>
+</op>
+
+<op type="rename" id="e1"><title>Bristlemark Harbor</title></op>

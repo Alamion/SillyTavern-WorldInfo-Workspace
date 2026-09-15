@@ -25,6 +25,12 @@ export interface SillyTavernEventTypes {
     EXTENSION_SETTINGS_LOADED: string;
     WORLDINFO_UPDATED: string;
     WORLDINFO_SETTINGS_UPDATED: string;
+    /** Spec 005: assistant profile list and chat/lore context. */
+    CONNECTION_PROFILE_LOADED: string;
+    CONNECTION_PROFILE_CREATED: string;
+    CONNECTION_PROFILE_UPDATED: string;
+    CONNECTION_PROFILE_DELETED: string;
+    WORLD_INFO_ACTIVATED: string;
 }
 
 export interface NativeWorldInfoEntry {
@@ -132,10 +138,91 @@ export interface SillyTavernPopupResult {
     CUSTOM9: 1009;
 }
 
+/**
+ * Connection profiles and the extension request service (spec 005 research R1/R2/R11;
+ * derived from context/SillyTavern/public/scripts/extensions/shared.js:388-783,
+ * custom-request.js:481-531, extensions/connection-manager/index.js:160-181).
+ */
+export interface ConnectionProfile {
+    id: string;
+    name: string;
+    /** 'cc' = Chat Completion, 'tc' = Text Completion. */
+    mode: 'cc' | 'tc';
+    api?: string;
+    preset?: string;
+    model?: string;
+    instruct?: string;
+    proxy?: string;
+    'api-url'?: string;
+    'secret-id'?: string;
+    'prompt-post-processing'?: string;
+    'reasoning-template'?: string;
+    exclude?: string[];
+}
+
+export interface LlmRequestMessage {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+}
+
+export interface ConnectionManagerCustomParams {
+    stream?: boolean;
+    signal?: AbortSignal | null;
+    extractData?: boolean;
+    includePreset?: boolean;
+    includeInstruct?: boolean;
+}
+
+/** Non-streaming result of `sendRequest` with `extractData: true`. */
+export interface ExtractedLlmData {
+    content: unknown;
+    reasoning?: string;
+}
+
+export interface LlmStreamChunk {
+    text: string;
+    state: { reasoning: string };
+}
+
+export type LlmStreamFactory = () => AsyncGenerator<LlmStreamChunk>;
+
+export interface ConnectionManagerRequestServiceApi {
+    sendRequest(
+        profileId: string,
+        prompt: LlmRequestMessage[] | string,
+        maxTokens: number,
+        custom?: ConnectionManagerCustomParams,
+        overridePayload?: Record<string, unknown>
+    ): Promise<ExtractedLlmData | LlmStreamFactory>;
+    getSupportedProfiles(): ConnectionProfile[];
+    getProfile(profileId: string): ConnectionProfile;
+}
+
+export interface CompletionPresetManager {
+    getCompletionPresetByName(name: string): Record<string, unknown> | undefined;
+}
+
+export interface SillyTavernChatMessage {
+    name: string;
+    is_user: boolean;
+    is_system?: boolean;
+    mes: string;
+}
+
+export interface CharacterCardFields {
+    description: string;
+    personality: string;
+    scenario: string;
+    persona: string;
+    system: string;
+    jailbreak: string;
+    mesExamples: string;
+}
+
 export interface SillyTavernContext {
     eventSource: SillyTavernEventSource;
     eventTypes: SillyTavernEventTypes;
-    extensionSettings: Record<string, unknown>;
+    extensionSettings: Record<string, unknown> & { disabledExtensions?: string[] };
     saveSettingsDebounced(): void;
     uuidv4(): string;
     getRequestHeaders(options?: { omitContentType?: boolean }): Record<string, string>;
@@ -161,6 +248,18 @@ export interface SillyTavernContext {
     characterId: string | number | undefined;
     tags: SillyTavernTag[];
     chatMetadata?: Record<string, unknown>;
+    /** Spec 005 — assistant requests through connection profiles (research R1). */
+    ConnectionManagerRequestService?: ConnectionManagerRequestServiceApi;
+    getPresetManager?(apiId?: string): CompletionPresetManager | undefined;
+    /** Current chat messages (read through getLiveAppContext()). */
+    chat: SillyTavernChatMessage[];
+    /** Persona name / character name. */
+    name1: string;
+    name2: string;
+    getCharacterCardFields?(): CharacterCardFields;
+    /** Global API settings — only the streaming fallback of spec 005 R2 is read. */
+    chatCompletionSettings?: Record<string, unknown>;
+    textCompletionSettings?: Record<string, unknown>;
 }
 
 /**

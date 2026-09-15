@@ -1,0 +1,12 @@
+<think>
+The user wants a tavern. Hearth & Home (f3) is the obvious parent, and & must survive verbatim.
+</think>
+Adding one tavern with a market note.
+
+<op type="create_entry" parent="f3">
+<title>The Salty Keel & Anchor</title>
+<keys>salty keel, tavern</keys>
+<content>
+Ale & stew, served under <lantern light> that never goes out.
+</content>
+</op>

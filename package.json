@@ -19,6 +19,7 @@
         "css-loader": "^7.1.2",
         "eslint": "^9.9.0",
         "eslint-config-prettier": "^9.1.0",
+        "fake-indexeddb": "^6.2.5",
         "jsdom": "^30.0.1",
         "prettier": "^3.3.3",
         "react": "^18.3.1",

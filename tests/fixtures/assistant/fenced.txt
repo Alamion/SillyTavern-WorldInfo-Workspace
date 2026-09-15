@@ -1,0 +1,11 @@
+Sure — here are the changes:
+
+```
+<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>
+```
+
+```xml
+<op type="rename" id="e1"><title>Bristlemark Harbor</title></op>
+```
+
+Done.

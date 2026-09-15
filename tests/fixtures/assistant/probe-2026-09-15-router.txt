@@ -1,0 +1,34 @@
+I'll work through this step by step: create the Taverns folder, move the existing tavern entry, add two new taverns, and fix the Bristlemark entry.
+
+**Step 1:** Create the "Taverns" folder under Hearth & Home.
+<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>
+
+**Step 2:** Move Bristlemark Taverns into the new Taverns folder.
+<op type="move" id="e2" parent="new1"></op>
+
+**Step 3:** Add the first new tavern entry.
+<op type="create_entry" parent="new1" ref="new2">
+<title>The Salty Keel</title>
+<keys>salty keel, tavern, harbor, alehouse</keys>
+<content>
+A bustling waterfront tavern in Bristlemark's harbor district, famous for its fresh catch and strong cask ale. Sailors and fishers gather here to swap stories and drink deep into the night.
+</content>
+</op>
+
+**Step 4:** Add the second new tavern entry.
+<op type="create_entry" parent="new1" ref="new3">
+<title>The Hearthfire Inn</title>
+<keys>hearthfire inn, tavern, inn, alehouse</keys>
+<content>
+A warm, wood-paneled inn tucked away from the harbor's chaos. Known for its stew and quiet rooms upstairs, it draws travelers and locals seeking a more peaceful evening's drink.
+</content>
+</op>
+
+**Step 5:** Fix the Bristlemark entry by removing "Sells charcoal."
+<op type="edit_entry" id="e1">
+<content>
+Capital of Aldermeer, built on the confluence of the Lira and the Ossen. The harbor district never sleeps.
+</content>
+</op>
+
+That completes all four parts of the request.

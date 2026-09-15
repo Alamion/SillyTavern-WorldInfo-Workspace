@@ -1,0 +1,9 @@
+Adjusting insertion behavior.
+
+<op type="edit_entry" id="e1">
+<fields>sideways=1</fields>
+</op>
+
+<op type="edit_entry" id="e2">
+<fields>position=at_depth, depth=2</fields>
+</op>

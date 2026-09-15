@@ -7,13 +7,24 @@ import {
     createImageNode,
     deepValidateState,
     findNode,
+    getAssistantSettings,
     migrate,
     normalizeNativeEntry,
 } from '../../src/core/state/schema';
+import {
+    canSaveAssistantSettings,
+    setAssistantSettings,
+} from '../../src/core/assistant/settingsOps';
+import { DEFAULT_ASSISTANT_SETTINGS } from '../../src/core/assistant/types';
 import type { NativeWorldInfoEntry } from '../../src/global';
 import { fingerprintEntry } from '../../src/core/sync/fingerprint';
 
 const NOW = '2026-09-08T00:00:00.000Z';
+
+/** Minimal valid persisted payload (spec 003 contract) for settings tests. */
+function validPayload(): Record<string, unknown> {
+    return structuredClone(createDefaultState()) as unknown as Record<string, unknown>;
+}
 
 describe('schema defaults', () => {
     it('creates a valid empty v1 state with a fixed root', () => {
@@ -273,5 +284,78 @@ describe('legacy filter migration keeps sync hashes consistent', () => {
         }
         expect(restored.sync.books['Book']?.hash).toBe(fingerprintEntry(restored.native));
         expect(restored.sync.books['Book']?.hash).not.toBe(legacyHash);
+    });
+});
+
+describe('assistant settings (spec 005 FR-035)', () => {
+    it('loads defaults when the payload has no assistant block', () => {
+        const state = migrate({ ...validPayload(), settings: { sortMode: 'custom' } });
+        expect(getAssistantSettings(state)).toEqual(DEFAULT_ASSISTANT_SETTINGS);
+        expect(deepValidateState(state)).toEqual([]);
+    });
+
+    it('round-trips a valid assistant block', () => {
+        const assistant = {
+            profileId: 'p1',
+            responseTokens: 1500,
+            contextTokens: 24000,
+            instructions: 'Write like a bard.',
+            defaultContext: {
+                scope: { kind: 'folders', folderIds: ['a', 'b'] },
+                includeOutline: false,
+                chatMessages: 10,
+                characterCard: true,
+                persona: true,
+                activatedEntries: true,
+            },
+        };
+        const state = migrate({ ...validPayload(), settings: { sortMode: 'custom', assistant } });
+        expect(getAssistantSettings(state)).toEqual(assistant);
+    });
+
+    it('repairs out-of-range and unknown values field by field', () => {
+        const state = migrate({
+            ...validPayload(),
+            settings: {
+                sortMode: 'custom',
+                assistant: {
+                    profileId: 42,
+                    responseTokens: 5,
+                    contextTokens: 900,
+                    instructions: '   ',
+                    defaultContext: { scope: { kind: 'sideways' }, chatMessages: -3 },
+                },
+            },
+        });
+        expect(getAssistantSettings(state)).toEqual(DEFAULT_ASSISTANT_SETTINGS);
+    });
+
+    it('rejects a context limit that leaves no room for the response', () => {
+        const state = migrate({
+            ...validPayload(),
+            settings: {
+                sortMode: 'custom',
+                assistant: { responseTokens: 8000, contextTokens: 8200 },
+            },
+        });
+        expect(getAssistantSettings(state).contextTokens).toBe(
+            DEFAULT_ASSISTANT_SETTINGS.contextTokens
+        );
+    });
+
+    it('setAssistantSettings patches immutably and re-repairs', () => {
+        const state = migrate(validPayload());
+        const next = setAssistantSettings(state, { profileId: 'p9', responseTokens: 1 });
+        expect(getAssistantSettings(next).profileId).toBe('p9');
+        expect(getAssistantSettings(next).responseTokens).toBe(
+            DEFAULT_ASSISTANT_SETTINGS.responseTokens
+        );
+        expect(getAssistantSettings(state).profileId).toBeNull();
+        expect(next).not.toBe(state);
+    });
+
+    it('refuses to save while a recovery is pending', () => {
+        expect(canSaveAssistantSettings(true)).toBe(false);
+        expect(canSaveAssistantSettings(false)).toBe(true);
     });
 });

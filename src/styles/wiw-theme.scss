@@ -62,6 +62,11 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     min-height: 28px;
 }
 
+.wiw-button-active {
+    border-color: var(--SmartThemeQuoteColor);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 82%);
+}
+
 .wiw-danger-button {
     border-color: var(--SmartThemeBadColor);
     color: var(--SmartThemeBadColor);
@@ -854,5 +859,295 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 @media (max-width: 900px) {
     .wiw-diff {
         grid-template-columns: 1fr;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Assistant (spec 005) — region, conversation bubbles, proposal cards, badges,
+// request status, composer and reply notices. Moved out of prototype.scss and
+// extended; every surface of the panel uses these primitives.
+// ---------------------------------------------------------------------------
+
+.wiw-assistant {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+    min-height: 0;
+}
+
+.wiw-assistant-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+}
+
+.wiw-assistant-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.wiw-assistant-log {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.wiw-assistant-composer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    textarea {
+        width: 100%;
+        min-height: 3.6rem;
+        resize: vertical;
+    }
+}
+
+.wiw-assistant-composer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.wiw-assistant-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--SmartThemeEmColor);
+    font-size: 0.85em;
+}
+
+.wiw-bubble {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    background: var(--SmartThemeBlurTintColor);
+
+    .wiw-bubble-text {
+        margin: 0 0 0.2rem;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+}
+
+.wiw-bubble-user {
+    border-color: var(--SmartThemeQuoteColor);
+}
+
+.wiw-bubble-note {
+    border-style: dashed;
+    opacity: 0.75;
+    font-size: 0.85em;
+}
+
+.wiw-bubble-meta {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 0.3rem;
+    color: var(--SmartThemeEmColor);
+    font-size: 0.78em;
+}
+
+.wiw-assistant-ref {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--SmartThemeQuoteColor);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    font: inherit;
+}
+
+.wiw-collapsible {
+    margin-top: 0.3rem;
+
+    > summary {
+        cursor: pointer;
+        color: var(--SmartThemeEmColor);
+        font-size: 0.85em;
+    }
+}
+
+.wiw-proposals {
+    margin-top: 0.4rem;
+    padding: 0.45rem;
+    border: 1px solid var(--SmartThemeQuoteColor);
+    border-radius: 6px;
+}
+
+.wiw-proposal-list {
+    margin: 0 0 0.4rem;
+    padding: 0;
+    list-style: none;
+}
+
+.wiw-proposal-item {
+    padding: 0.4rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    margin-bottom: 0.4rem;
+}
+
+.wiw-proposal-applied {
+    opacity: 0.75;
+    border-color: var(--okGreen70a);
+}
+
+.wiw-proposal-denied,
+.wiw-proposal-superseded,
+.wiw-proposal-reverted {
+    opacity: 0.55;
+}
+
+.wiw-proposal-invalid,
+.wiw-proposal-failed {
+    border-color: var(--crimson70a);
+}
+
+.wiw-proposal-stale,
+.wiw-proposal-blocked {
+    border-color: var(--SmartThemeEmColor);
+    border-style: dashed;
+}
+
+.wiw-proposal-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.wiw-proposal-op-icon {
+    flex: 0 0 auto;
+    color: var(--SmartThemeEmColor);
+}
+
+.wiw-proposal-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wiw-proposal-path {
+    color: var(--SmartThemeEmColor);
+    font-size: 0.8em;
+}
+
+.wiw-proposal-preview {
+    margin: 0.2rem 0 0.3rem;
+    padding: 0.3rem 0.4rem;
+    border-left: 2px solid var(--SmartThemeBorderColor);
+    font-size: 0.9em;
+    max-height: 12rem;
+    overflow-y: auto;
+}
+
+.wiw-proposal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+// Badges — decision state and proposal warnings.
+.wiw-badge {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    padding: 0 0.3rem;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    white-space: nowrap;
+}
+
+.wiw-badge-ok {
+    border-color: var(--okGreen70a);
+    color: var(--okGreen70a);
+}
+
+.wiw-badge-danger {
+    border-color: var(--crimson70a);
+    color: var(--crimson70a);
+}
+
+.wiw-badge-warn {
+    border-color: var(--SmartThemeEmColor);
+    color: var(--SmartThemeEmColor);
+}
+
+// Notices — context summary, truncation, broken blocks.
+.wiw-notice {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    font-size: 0.85em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.wiw-notice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.wiw-notice-excerpt {
+    margin: 0;
+    padding: 0.3rem;
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+
+.wiw-assistant-empty {
+    margin: 0;
+    color: var(--SmartThemeEmColor);
+    font-size: 0.9em;
+}
+
+.wiw-assistant-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 16rem;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        font-size: 0.85em;
+    }
+
+    textarea {
+        min-height: 7rem;
+        resize: vertical;
+    }
+}
+
+.wiw-assistant-settings-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    > label {
+        flex: 1 1 8rem;
     }
 }

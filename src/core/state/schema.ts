@@ -1,4 +1,14 @@
 import type { NativeWorldInfoEntry } from '../../global';
+import {
+    CONTEXT_HEADROOM_TOKENS,
+    CONTEXT_TOKENS_RANGE,
+    DEFAULT_ASSISTANT_SETTINGS,
+    DEFAULT_CONTEXT_SETTINGS,
+    RESPONSE_TOKENS_RANGE,
+    type AssistantSettings,
+    type ContextScope,
+    type ContextSettings,
+} from '../assistant/types';
 import { fingerprintEntry } from '../sync/fingerprint';
 
 /**
@@ -95,6 +105,12 @@ export type TreeNode = FolderNode | EntryNode | ImageNode;
 
 export interface WorkspaceSettings {
     sortMode: SortMode;
+    /**
+     * AI assistant settings (spec 005 FR-035). Optional and additive: payloads
+     * written before spec 005 load unchanged, and `getAssistantSettings` fills
+     * defaults. Conversations are NOT stored here (they live per device).
+     */
+    assistant?: AssistantSettings;
 }
 
 export interface WorkspaceState {
@@ -259,6 +275,77 @@ export function createDefaultState(newRootId: string = ROOT_ID): WorkspaceState 
             children: [],
         },
         settings: { sortMode: 'custom' },
+    };
+}
+
+function repairInt(value: unknown, fallbackValue: number, min: number, max: number): number {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+        return fallbackValue;
+    }
+    return value;
+}
+
+function repairScope(value: unknown): ContextScope {
+    if (!isRecord(value)) {
+        return DEFAULT_CONTEXT_SETTINGS.scope;
+    }
+    if (value.kind === 'workspace' || value.kind === 'selection') {
+        return { kind: value.kind };
+    }
+    if (value.kind === 'folders' && Array.isArray(value.folderIds)) {
+        return {
+            kind: 'folders',
+            folderIds: value.folderIds.filter((id): id is string => typeof id === 'string'),
+        };
+    }
+    return DEFAULT_CONTEXT_SETTINGS.scope;
+}
+
+function repairContextSettings(value: unknown): ContextSettings {
+    const raw = isRecord(value) ? value : {};
+    const bool = (key: keyof ContextSettings, fallbackValue: boolean): boolean =>
+        typeof raw[key] === 'boolean' ? (raw[key] as boolean) : fallbackValue;
+    return {
+        scope: repairScope(raw.scope),
+        includeOutline: bool('includeOutline', DEFAULT_CONTEXT_SETTINGS.includeOutline),
+        chatMessages: repairInt(raw.chatMessages, DEFAULT_CONTEXT_SETTINGS.chatMessages, 0, 200),
+        characterCard: bool('characterCard', DEFAULT_CONTEXT_SETTINGS.characterCard),
+        persona: bool('persona', DEFAULT_CONTEXT_SETTINGS.persona),
+        activatedEntries: bool('activatedEntries', DEFAULT_CONTEXT_SETTINGS.activatedEntries),
+    };
+}
+
+/**
+ * Assistant settings with every field repaired to a usable value (spec 005
+ * data-model): a stale or hand-edited payload can never break the panel.
+ */
+export function getAssistantSettings(state: WorkspaceState): AssistantSettings {
+    const raw: unknown = state.settings.assistant;
+    const record = isRecord(raw) ? raw : {};
+    const responseTokens = repairInt(
+        record.responseTokens,
+        DEFAULT_ASSISTANT_SETTINGS.responseTokens,
+        RESPONSE_TOKENS_RANGE.min,
+        RESPONSE_TOKENS_RANGE.max
+    );
+    let contextTokens = repairInt(
+        record.contextTokens,
+        DEFAULT_ASSISTANT_SETTINGS.contextTokens,
+        CONTEXT_TOKENS_RANGE.min,
+        CONTEXT_TOKENS_RANGE.max
+    );
+    if (contextTokens < responseTokens + CONTEXT_HEADROOM_TOKENS) {
+        contextTokens = DEFAULT_ASSISTANT_SETTINGS.contextTokens;
+    }
+    return {
+        profileId: typeof record.profileId === 'string' ? record.profileId : null,
+        responseTokens,
+        contextTokens,
+        instructions:
+            typeof record.instructions === 'string' && record.instructions.trim() !== ''
+                ? record.instructions
+                : null,
+        defaultContext: repairContextSettings(record.defaultContext),
     };
 }
 

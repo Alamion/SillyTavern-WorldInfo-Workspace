@@ -1,0 +1,12 @@
+Here is the first entry, and I will add more after it.
+
+<op type="create_entry" parent="f3" ref="new1">
+<title>The Salty Keel</title>
+<keys>salty keel, tavern</keys>
+<content>
+A bustling waterfront tavern.
+</content>
+</op>
+
+<op type="create_entry" parent="f3" ref="new2">
+<title>The Hearthfire

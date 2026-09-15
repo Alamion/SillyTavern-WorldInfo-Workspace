@@ -767,7 +767,17 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                 )}
                 {!isMobile && assistantOpen && (
                     <aside className="wiw-region wiw-region-assistant">
-                        <AssistantPanel />
+                        <AssistantPanel
+                            services={services}
+                            state={state}
+                            selectedIds={selectedIds}
+                            onOpenNode={(nodeId) => {
+                                setSelectedIds(new Set([nodeId]));
+                                if (isMobile) {
+                                    setMobileSheet('editor');
+                                }
+                            }}
+                        />
                     </aside>
                 )}
                 {isMobile && (
@@ -791,7 +801,15 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
             )}
             {isMobile && mobileSheet === 'assistant' && (
                 <Sheet key="assistant-sheet" onClose={() => setMobileSheet('none')}>
-                    <AssistantPanel />
+                    <AssistantPanel
+                        services={services}
+                        state={state}
+                        selectedIds={selectedIds}
+                        onOpenNode={(nodeId) => {
+                            setSelectedIds(new Set([nodeId]));
+                            setMobileSheet('editor');
+                        }}
+                    />
                 </Sheet>
             )}
             {movePickerFor && (
