@@ -40,6 +40,10 @@ import { StructureTree, type TreeMenuAction, type TreeMenuState } from './Struct
 const TREE_MIN = 140;
 const TREE_COLLAPSE_BELOW = 120;
 const TREE_MAX = 640;
+const ASSISTANT_DEFAULT = 360;
+const ASSISTANT_MIN = 260;
+/** The assistant never takes more than this share of the workspace width. */
+const ASSISTANT_MAX_SHARE = 0.6;
 
 const BASE_NAMES: Record<CreateKind, string> = {
     folder: 'New Folder',
@@ -60,7 +64,12 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     const [assistantOpen, setAssistantOpen] = useState(false);
     const [treeWidth, setTreeWidth] = useState(300);
     const [treeCollapsed, setTreeCollapsed] = useState(false);
-    const [dragging, setDragging] = useState<{ startX: number; startWidth: number } | null>(null);
+    const [assistantWidth, setAssistantWidth] = useState(ASSISTANT_DEFAULT);
+    const [dragging, setDragging] = useState<{
+        target: 'tree' | 'assistant';
+        startX: number;
+        startWidth: number;
+    } | null>(null);
     const [mobileSheet, setMobileSheet] = useState<'none' | 'editor' | 'assistant'>('none');
     const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
 
@@ -521,12 +530,12 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         if (treeCollapsed) {
             return;
         }
-        setDragging({ startX: event.clientX, startWidth: treeWidth });
+        setDragging({ target: 'tree', startX: event.clientX, startWidth: treeWidth });
         event.currentTarget.setPointerCapture(event.pointerId);
     };
 
     const onSplitterMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        if (!dragging) {
+        if (dragging?.target !== 'tree') {
             return;
         }
         const width = dragging.startWidth + (event.clientX - dragging.startX);
@@ -536,6 +545,22 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
             return;
         }
         setTreeWidth(Math.min(Math.max(width, TREE_MIN), TREE_MAX));
+    };
+
+    // The assistant splitter sits on the panel's left edge: dragging left widens it.
+    const onAssistantSplitterDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+        setDragging({ target: 'assistant', startX: event.clientX, startWidth: assistantWidth });
+        event.currentTarget.setPointerCapture(event.pointerId);
+    };
+
+    const onAssistantSplitterMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+        if (dragging?.target !== 'assistant') {
+            return;
+        }
+        const container = event.currentTarget.parentElement?.clientWidth ?? window.innerWidth;
+        const max = Math.max(ASSISTANT_MIN, container * ASSISTANT_MAX_SHARE);
+        const width = dragging.startWidth - (event.clientX - dragging.startX);
+        setAssistantWidth(Math.min(Math.max(width, ASSISTANT_MIN), max));
     };
 
     const isEmpty = state.root.children.length === 0;
@@ -711,7 +736,17 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     </main>
                 )}
                 {!isMobile && assistantOpen && (
-                    <aside className="wiw-region wiw-region-assistant">
+                    <div
+                        className="wiw-splitter"
+                        title="Drag to resize; double-click to reset"
+                        onPointerDown={onAssistantSplitterDown}
+                        onPointerMove={onAssistantSplitterMove}
+                        onPointerUp={() => setDragging(null)}
+                        onDoubleClick={() => setAssistantWidth(ASSISTANT_DEFAULT)}
+                    />
+                )}
+                {!isMobile && assistantOpen && (
+                    <aside className="wiw-region wiw-region-assistant" style={{ flexBasis: assistantWidth }}>
                         <AssistantPanel
                             services={services}
                             state={state}

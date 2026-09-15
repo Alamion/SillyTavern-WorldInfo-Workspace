@@ -130,7 +130,7 @@ src/
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
-│   ├── WorkspaceApp.tsx     # Layout root: splitter, bulk bar, banners, modals
+│   ├── WorkspaceApp.tsx     # Layout root: tree and assistant splitters, bulk bar, banners, modals
 │   ├── StructureTree.tsx    # Real tree: toolbar, DnD + long-press menu, multi-select
 │   ├── ItemEditor.tsx       # entry / image / folder(+root book settings) views
 │   ├── LorebooksPanel.tsx   # All native books: activation, import/update (+ conflict
@@ -176,7 +176,7 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.0)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.1)
 ```
 
 ## Settings

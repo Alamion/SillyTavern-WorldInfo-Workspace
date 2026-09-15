@@ -1,7 +1,8 @@
 # Contract — Assistant UI
 
 Replaces the Phase 0 mock `src/ui/AssistantPanel.tsx` in the same region (desktop aside,
-mobile sheet). All styles extend `src/styles/wiw-theme.scss` (constitution: shared style
+mobile sheet; on desktop a draggable splitter sets its width — 260 px minimum, at most 60 % of
+the workspace, double-click resets to 360 px). All styles extend `src/styles/wiw-theme.scss` (constitution: shared style
 system); icons Font Awesome 6 Free.
 
 ## Region layout

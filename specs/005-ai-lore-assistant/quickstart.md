@@ -82,3 +82,23 @@ Defects found and fixed in this run (regression tests in `tests/unit/assistant-d
 
 Observation: with nothing selected in the tree the scope falls back to the whole workspace
 (spec FR-021 default), so the context notice can list every entry of the workspace.
+
+### 2026-09-16 — owner review changes (build 0.4.1)
+
+Changes made after the owner's first manual passes (regression tests alongside each):
+
+- Mode and context controls work before the first message (a conversation is created on demand).
+- Proposals may place new items in any folder the assistant was shown; refs are resolved across
+  the whole reply, so a ref used before its creation block, or declared by an invalid creation,
+  no longer turns dependents into `unknown handle "newN"`.
+- Feedback is available on invalid, blocked, stale and failed proposals and carries the reason;
+  explicit "Send feedback" buttons on proposals and batches.
+- Context by structure, location and keys (FR-021, FR-021a): only the chosen structure (plus the
+  folders above it) is shown and handled; every request states the selection and the current
+  folder for new items; entry contents are sent for selected + key-triggered entries (recursive),
+  or for all entries of the structure on request.
+- Redesigned "Assistant context" dialog (Structure / Entry contents / Current chat), verified by
+  screenshots at desktop and phone widths.
+- Themed form controls in the assistant panel.
+- Draggable splitter between the editor and the assistant panel (260 px minimum, at most 60 % of
+  the workspace width, double-click resets to 360 px).
