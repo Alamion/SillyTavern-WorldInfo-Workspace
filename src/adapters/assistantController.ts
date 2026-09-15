@@ -81,6 +81,8 @@ export interface AssistantController {
     getSnapshot(): AssistantSnapshot;
     init(): Promise<void>;
     createConversation(): Promise<string>;
+    /** The active conversation id, creating a conversation when there is none. */
+    ensureConversation(): Promise<string>;
     selectConversation(id: string): Promise<void>;
     renameConversation(id: string, title: string): Promise<void>;
     deleteConversation(id: string): Promise<void>;
@@ -662,6 +664,13 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         return conversation.id;
     };
 
+    const ensure = async (): Promise<string> => {
+        if (activeConversationId !== null && conversations.some((item) => item.id === activeConversationId)) {
+            return activeConversationId;
+        }
+        return await create();
+    };
+
     const writeSettings = (patch: Partial<AssistantSettings>): boolean => {
         if (!canSaveAssistantSettings(deps.isRecoveryPending())) {
             return false;
@@ -725,7 +734,11 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             }
             notify();
         },
+        ensureConversation: ensure,
         async setMode(mode) {
+            // Mode and context controls work before the first message: they create
+            // the conversation they configure (owner report 2026-09-15).
+            await ensure();
             const conversation = conversations.find((item) => item.id === activeConversationId);
             if (!conversation) {
                 return;
@@ -743,6 +756,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             return writeSettings({ defaultContext: structuredClone(conversation.context) });
         },
         async updateConversationContext(patch) {
+            await ensure();
             const conversation = conversations.find((item) => item.id === activeConversationId);
             if (!conversation) {
                 return;
@@ -922,8 +936,14 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         async feedback(seq, text, proposalId) {
             const message = messageAt(seq);
             const target = message?.batch?.proposals.find((item) => item.id === proposalId);
+            const problem =
+                target?.invalidReason ?? target?.blockedReason ?? target?.failedReason;
             const scopeNote =
-                target !== undefined ? ` Only revise this proposal: ${target.summary}.` : '';
+                target !== undefined
+                    ? ` Only revise this proposal: ${target.summary}.${
+                          problem !== undefined ? ` It could not be used: ${problem}.` : ''
+                      }`
+                    : '';
             if (proposalId !== undefined) {
                 await setDecision(seq, proposalId, 'superseded');
             }

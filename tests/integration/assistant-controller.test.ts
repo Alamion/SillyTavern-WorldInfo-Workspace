@@ -707,3 +707,42 @@ describe('conversations (US5)', () => {
         void second;
     });
 });
+
+describe('owner report 2026-09-15: controls before the first message', () => {
+    it('switching the mode without a conversation creates one in that mode', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        expect(harness.controller.getSnapshot().activeConversation).toBeNull();
+        await harness.controller.setMode('discuss');
+        expect(harness.controller.getSnapshot().activeConversation?.mode).toBe('discuss');
+    });
+
+    it('changing the context without a conversation creates one with that context', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        await harness.controller.updateConversationContext({ chatMessages: 5 });
+        expect(harness.controller.getSnapshot().activeConversation?.context.chatMessages).toBe(5);
+    });
+
+    it('ensureConversation returns the active conversation or creates one', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        const created = await harness.controller.ensureConversation();
+        expect(await harness.controller.ensureConversation()).toBe(created);
+    });
+
+    it('feedback works on an invalid proposal and names its problem', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection([NODE_IDS.hearth]);
+        harness.llm.reply('<op type="delete" id="e99"></op>');
+        await harness.controller.createConversation();
+        await harness.controller.send('clean up');
+        const message = harness.controller.getSnapshot().messages.at(-1);
+        harness.llm.reply('ok');
+        await harness.controller.feedback(message?.seq ?? 1, 'use the right item', message?.batch?.proposals[0]?.id);
+        const sent = harness.llm.requests.at(-1)?.messages.at(-1)?.content ?? '';
+        expect(sent).toContain('use the right item');
+        expect(sent).toContain('unknown handle "e99"');
+    });
+});

@@ -64,6 +64,8 @@ export function ProposalCard({
     const target = proposal.targetId !== undefined ? findNode(state, proposal.targetId) : undefined;
     const duplicate = proposal.duplicateOf !== undefined ? findNode(state, proposal.duplicateOf) : undefined;
     const pending = proposal.decision === 'pending';
+    // Feedback also revises proposals that could not be used (owner report 2026-09-15).
+    const revisable = ['pending', 'invalid', 'blocked', 'stale', 'failed'].includes(proposal.decision);
     const hasDiff = proposal.op === 'edit_entry' || values.content !== undefined;
 
     return (
@@ -156,8 +158,9 @@ export function ProposalCard({
                 )}
                 <button
                     type="button"
-                    className="wiw-button"
-                    disabled={!pending}
+                    className={`wiw-button ${feedback !== null ? 'wiw-button-active' : ''}`}
+                    disabled={!revisable}
+                    title="Ask the assistant to revise this proposal"
                     onClick={() => setFeedback(feedback === null ? '' : null)}
                 >
                     <i className="fa-solid fa-comment-dots" /> Feedback
@@ -165,9 +168,15 @@ export function ProposalCard({
             </div>
             {feedback !== null && (
                 <div className="wiw-notice">
+                    <span>
+                        {proposal.invalidReason !== undefined
+                            ? 'Tell the assistant how to fix this proposal (its problem is sent along):'
+                            : 'What should change in this proposal?'}
+                    </span>
                     <input
+                        autoFocus
                         value={feedback}
-                        placeholder="e.g. shorter, less purple"
+                        placeholder="e.g. shorter, less purple — Enter to send"
                         onChange={(event) => setFeedback(event.target.value)}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter' && feedback.trim() !== '') {
@@ -186,7 +195,10 @@ export function ProposalCard({
                                 setFeedback(null);
                             }}
                         >
-                            Send feedback
+                            <i className="fa-solid fa-paper-plane" /> Send feedback
+                        </button>
+                        <button type="button" className="wiw-button" onClick={() => setFeedback(null)}>
+                            Cancel
                         </button>
                     </div>
                 </div>

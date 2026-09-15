@@ -113,7 +113,32 @@ export function toProposals(
     const refs = new Map<string, { proposalId: string; kind: 'folder' | 'entry' }>();
     const proposals: OperationProposal[] = [];
 
-    const resolve = (handle: string | undefined): Resolved => {
+    // Refs are collected from the whole reply first: models often reference a new
+    // folder before the block that creates it, and an invalid creation must still
+    // count as the declaration (its children are then blocked, not "unknown").
+    const ids = blocks.map(() => input.newProposalId());
+    const duplicateRefs = new Set<number>();
+    blocks.forEach((block, index) => {
+        const ref = block.attrs['ref'];
+        if (ref === undefined || ref === '' || (block.type !== 'create_entry' && block.type !== 'create_folder')) {
+            return;
+        }
+        if (refs.has(ref)) {
+            duplicateRefs.add(index);
+            return;
+        }
+        refs.set(ref, {
+            proposalId: ids[index] ?? '',
+            kind: block.type === 'create_folder' ? 'folder' : 'entry',
+        });
+    });
+
+    /**
+     * `placement` = a parent of a creation or a move destination: any folder of the
+     * outline may receive new items (FR-021). Targets of edits, renames, moves and
+     * deletions must be inside the scope.
+     */
+    const resolve = (handle: string | undefined, placement: boolean): Resolved => {
         if (handle === undefined || handle === '') {
             return { error: 'missing target' };
         }
@@ -125,14 +150,14 @@ export function toProposals(
         if (nodeId === undefined) {
             return { error: `unknown handle "${handle}"` };
         }
-        if (!scope.has(nodeId)) {
+        if (!placement && !scope.has(nodeId)) {
             return { error: `"${handle}" is outside the context scope` };
         }
         return { nodeId };
     };
 
-    for (const block of blocks) {
-        const id = input.newProposalId();
+    for (const [index, block] of blocks.entries()) {
+        const id = ids[index] ?? input.newProposalId();
         const values = valuesOf(block);
         const dependsOn: string[] = [];
         let invalidReason: string | undefined;
@@ -142,7 +167,7 @@ export function toProposals(
 
         // Target (edit/rename/move/delete).
         if (NEEDS_TARGET.has(block.type)) {
-            const resolved = resolve(block.attrs['id']);
+            const resolved = resolve(block.attrs['id'], false);
             if (resolved.error !== undefined) {
                 invalidReason = resolved.error;
             } else if (resolved.ref !== undefined) {
@@ -169,7 +194,7 @@ export function toProposals(
 
         // Parent (create/move).
         if (block.type === 'create_entry' || block.type === 'create_folder' || block.type === 'move') {
-            const resolved = resolve(block.attrs['parent']);
+            const resolved = resolve(block.attrs['parent'], true);
             if (resolved.error !== undefined) {
                 invalidReason ??= resolved.error;
             } else if (resolved.ref !== undefined) {
@@ -273,20 +298,8 @@ export function toProposals(
         }
 
         const ref = block.attrs['ref'];
-        if (
-            invalidReason === undefined &&
-            ref !== undefined &&
-            ref !== '' &&
-            (block.type === 'create_entry' || block.type === 'create_folder')
-        ) {
-            if (refs.has(ref)) {
-                invalidReason = `ref "${ref}" was already used`;
-            } else {
-                refs.set(ref, {
-                    proposalId: id,
-                    kind: block.type === 'create_folder' ? 'folder' : 'entry',
-                });
-            }
+        if (invalidReason === undefined && duplicateRefs.has(index) && ref !== undefined) {
+            invalidReason = `ref "${ref}" was already used`;
         }
 
         const proposal: OperationProposal = {

@@ -43,7 +43,7 @@ export function BatchBar({
             </button>
             <input
                 value={feedback}
-                placeholder="Feedback for the whole batch…"
+                placeholder="Feedback for the whole batch — Enter to send"
                 onChange={(event) => setFeedback(event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter' && feedback.trim() !== '') {
@@ -52,6 +52,17 @@ export function BatchBar({
                     }
                 }}
             />
+            <button
+                type="button"
+                className="wiw-button"
+                disabled={feedback.trim() === '' || busy}
+                onClick={() => {
+                    onFeedback(feedback.trim());
+                    setFeedback('');
+                }}
+            >
+                <i className="fa-solid fa-paper-plane" /> Send feedback
+            </button>
             {undoable.map((applied) => (
                 <button
                     key={applied.id}

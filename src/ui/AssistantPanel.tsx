@@ -157,7 +157,9 @@ export function AssistantPanel({
                 onSend={(text) => void assistant.send(text)}
                 onStop={() => assistant.stop()}
                 onModeChange={(mode) => void assistant.setMode(mode)}
-                onOpenContext={() => setContextOpen(true)}
+                onOpenContext={() => {
+                    void assistant.ensureConversation().then(() => setContextOpen(true));
+                }}
             />
 
             {settingsOpen && (

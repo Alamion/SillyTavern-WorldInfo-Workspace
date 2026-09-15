@@ -199,3 +199,47 @@ describe('field validation', () => {
         expect(HANDLES['e1']).toBe(NODE_IDS.bristlemark);
     });
 });
+
+describe('owner report 2026-09-15 (regressions)', () => {
+    it('accepts an outline folder outside the scope as the parent of a new item (FR-021)', () => {
+        const { proposals } = proposalsOf(
+            '<op type="create_folder" parent="f1" ref="new1"><title>Taverns</title></op>',
+            { scopeIds: [NODE_IDS.hearth] }
+        );
+        expect(proposals[0]).toMatchObject({ decision: 'pending', parent: { nodeId: NODE_IDS.aldermeer } });
+    });
+
+    it('accepts an outline folder outside the scope as a move destination, but not an out-of-scope target', () => {
+        const inScopeTarget = proposalsOf('<op type="move" id="e1" parent="f3"></op>', {
+            scopeIds: [NODE_IDS.cities, NODE_IDS.bristlemark, NODE_IDS.taverns],
+        });
+        expect(inScopeTarget.proposals[0]?.decision).toBe('pending');
+        const outOfScopeTarget = proposalsOf('<op type="move" id="e1" parent="f3"></op>', {
+            scopeIds: [NODE_IDS.hearth],
+        });
+        expect(outOfScopeTarget.proposals[0]?.invalidReason).toBe('"e1" is outside the context scope');
+    });
+
+    it('resolves a ref declared later in the same reply', () => {
+        const { proposals } = proposalsOf(
+            [
+                '<op type="create_entry" parent="new1"><title>Keel</title><content>x</content></op>',
+                '<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>',
+            ].join('\n')
+        );
+        expect(proposals.map((proposal) => proposal.decision)).toEqual(['pending', 'pending']);
+        expect(proposals[0]?.dependsOn).toEqual([proposals[1]?.id]);
+    });
+
+    it('makes children depend on an invalid folder instead of reporting an unknown handle', () => {
+        const { proposals } = proposalsOf(
+            [
+                '<op type="create_folder" parent="e1" ref="new1"><title>Taverns</title></op>',
+                '<op type="create_entry" parent="new1"><title>Keel</title><content>x</content></op>',
+            ].join('\n')
+        );
+        expect(proposals[0]?.decision).toBe('invalid');
+        expect(proposals[1]?.invalidReason).toBeUndefined();
+        expect(proposals[1]?.dependsOn).toEqual([proposals[0]?.id]);
+    });
+});
