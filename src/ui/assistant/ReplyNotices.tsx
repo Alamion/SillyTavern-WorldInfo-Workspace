@@ -36,8 +36,9 @@ export function ReplyNotices({
             {included !== undefined && (
                 <div className="wiw-notice">
                     <span>
-                        Sent: {included.outline ? 'outline' : 'no outline'} ·{' '}
-                        {String(included.fullItems)} item(s) in full
+                        Sent: {included.outline ? `structure (${String(included.outlineItems)} items)` : 'no structure'} ·{' '}
+                        {String(included.fullItems)} with contents
+                        {included.triggeredItems > 0 ? ` (${String(included.triggeredItems)} by keys)` : ''}
                         {included.chatMessages > 0 ? ` · chat ${String(included.chatMessages)}` : ''}
                         {included.characterCard ? ' · character card' : ''}
                         {included.persona ? ' · persona' : ''}

@@ -151,7 +151,7 @@ export function AssistantPanel({
                 disabled={blocked}
                 contextSummary={
                     snapshot.activeConversation
-                        ? contextSummary(snapshot.activeConversation.context, state)
+                        ? contextSummary(snapshot.activeConversation.context, state, [...selectedIds])
                         : 'Context'
                 }
                 onSend={(text) => void assistant.send(text)}
@@ -180,6 +180,7 @@ export function AssistantPanel({
                 <ContextMenu
                     snapshot={snapshot}
                     state={state}
+                    selectedIds={[...selectedIds]}
                     onChange={(patch) => void assistant.updateConversationContext(patch)}
                     onSaveAsDefault={() => void assistant.saveContextAsDefault()}
                     onClose={() => setContextOpen(false)}

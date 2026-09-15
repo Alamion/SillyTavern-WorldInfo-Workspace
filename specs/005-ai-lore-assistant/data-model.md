@@ -22,14 +22,15 @@ schema v1 (`migrate` fills defaults; no version bump).
 | Field | Type | Default |
 |-------|------|---------|
 | `scope` | `{ kind: 'selection' } \| { kind: 'folders'; folderIds: string[] } \| { kind: 'workspace' }` | `selection` |
-| `includeOutline` | `boolean` | `true` |
+| `entryContents` | `'triggered' \| 'all'` | `'triggered'` — selected + key-triggered entries (FR-021a); `all` = every entry of the structure. Stored conversations without it read as `triggered` |
 | `chatMessages` | `number` (0 = off) | `0` |
 | `characterCard` | `boolean` | `false` |
 | `persona` | `boolean` | `false` |
 | `activatedEntries` | `boolean` | `false` |
 
 `selection` resolves at send time: selected folder, or the selected item's parent
-folder, or the workspace root when nothing is selected. Folder ids that no longer exist
+folder, or the workspace root when nothing is selected. Handles are assigned only to the
+structure and the folders above it, so the model cannot address anything else. Folder ids that no longer exist
 are dropped with a notice.
 
 ## Conversation (IndexedDB `conversations`, key `id`)
@@ -85,7 +86,7 @@ stays available.
 |-------|------|
 | `handles` | `Record<string, string>` — handle (`e12`) → node id (R5) |
 | `scopeNodeIds` | `string[]` — nodes valid as operation targets |
-| `included` | `{ outline: boolean; fullItems: number; chatMessages: number; characterCard: boolean; persona: boolean; activatedEntries: number }` |
+| `included` | `{ outline: boolean; outlineItems: number; fullItems: number; triggeredItems: number; chatMessages: number; characterCard: boolean; persona: boolean; activatedEntries: number }` |
 | `omitted` | `OmittedPart[]` — `{ what: 'item' \| 'outline-depth' \| 'chat' \| 'history'; label: string; count?: number }` (FR-023) |
 | `estimatedTokens` | `number` |
 | `requestMessages` | `LlmMessage[]` — the exact messages sent; "Regenerate with the same context" re-sends them unchanged and reuses `handles`/`scopeNodeIds` (FR-027) |

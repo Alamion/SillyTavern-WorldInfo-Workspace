@@ -12,11 +12,11 @@ system); icons Font Awesome 6 Free.
 │ conversation (scrolls)                                                │
 │   user bubble                                                         │
 │   assistant bubble: prose with [item refs] · Thinking (collapsed)     │
-│     context notice: "Sent: Cities (2 items) + outline. Omitted: …"    │
+│     context notice: "Sent: structure (12 items) · 3 with contents (2 by keys). Omitted: …"    │
 │     proposal list (per item) · batch bar · unparsed report            │
 │     footer: profile · model · status/elapsed or "1 240 chars…"        │
 │ composer: [Propose|Discuss] textarea  [Send] / [Stop]                 │
-│   context chip: "Scope: Cities · outline · chat off" (opens context)  │
+│   context chip: "Cities · by keys · chat 10" (opens context)  │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -35,7 +35,7 @@ system); icons Font Awesome 6 Free.
 | `assistant/ReplyNotices.tsx` | Context notice, truncated notice, broken-blocks notice (Show broken blocks, Regenerate with the same context, Ask to fix) | FR-004, FR-023, FR-027 |
 | `assistant/FailureCard.tsx` | Failure reason, retry countdown, Retry / Retry now / Cancel | FR-026 |
 | `assistant/SettingsMenu.tsx` | Profile select (with api + streaming badge), response/context limits, instructions editor with Reset | FR-018–FR-020, FR-024 |
-| `assistant/ContextMenu.tsx` | Scope (selection / chosen folders / whole workspace), outline, chat message count, character card, persona, activated entries, [Save as default for new conversations] | FR-021, FR-022, FR-035 |
+| `assistant/ContextMenu.tsx` | "Assistant context" dialog in three sections — Structure (Current folder following the selection with its live name and size / Chosen folders with an indented folder tree, children of a chosen folder shown as included / Whole workspace with its size), Entry contents (Selected and mentioned entries — recommended / All entries of the structure), Current chat (Recent messages + count, character card, persona, activated entries); footer [Use as default] … [Done] | FR-021, FR-021a, FR-022, FR-035 |
 | `DiffView.tsx` (existing) | Per-field before/after for edits and stale refresh | FR-008 |
 
 ## States and texts (English, source locale)

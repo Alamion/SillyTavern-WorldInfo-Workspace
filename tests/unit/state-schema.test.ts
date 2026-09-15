@@ -302,7 +302,7 @@ describe('assistant settings (spec 005 FR-035)', () => {
             instructions: 'Write like a bard.',
             defaultContext: {
                 scope: { kind: 'folders', folderIds: ['a', 'b'] },
-                includeOutline: false,
+                entryContents: 'all',
                 chatMessages: 10,
                 characterCard: true,
                 persona: true,

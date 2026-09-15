@@ -55,6 +55,14 @@ prepared by the owner for development and validation.
   folder (or the selected item's folder) in full plus a compact outline of the whole tree;
   current chat, character card, persona and activated entries are off and enabled per
   conversation.
+- Q: (owner review 2026-09-16) Is the whole tree outline and every in-scope entry's content
+  always needed? → A: No — workspaces can hold thousands of items. The assistant sees only
+  the structure the user chose (plus the folders above it for orientation), is told where
+  the user is (selected item, current folder for new items), and gets entry contents only
+  for selected entries and entries whose keys or title are mentioned in the request, the
+  chat or another sent entry, recursively until the context limit or nothing new matches.
+  Sending every entry of the structure stays available as an option. This supersedes the
+  2026-09-15 answer below about the outline of the whole tree.
 - Q: Which edits, besides deletions, need their own confirmation? → A: Edits that remove
   more than half of an entry's content, or remove any of its keywords; all other edits
   apply through the batch-level accept.
@@ -413,12 +421,18 @@ proposals are produced.
   be explained in the region without breaking the rest of the workspace.
 - **FR-020**: The user MUST be able to set the response length limit and the context size
   limit for assistant requests.
-- **FR-021**: The user MUST be able to choose the workspace context scope for a
-  conversation: the selected item/folder, chosen folders, or the whole workspace. Items
-  outside the scope MUST NOT be sent in full and MUST NOT be valid operation targets;
-  a compact outline of the tree MAY be sent so the assistant can place new items. A new
-  conversation defaults to the selected folder (or the selected item's folder) in full plus
-  the compact outline of the whole tree.
+- **FR-021**: The user MUST be able to choose the structure (context scope) for a
+  conversation: the current folder (following the selection), chosen folders, or the whole
+  workspace. Only the structure and the folders above it are shown to the assistant;
+  nothing outside it is sent, and only items inside it are valid operation targets (the
+  folders above it are valid places for new items). Every request MUST tell the assistant
+  what is selected and which folder is current, so new items land there unless the request
+  says otherwise. A new conversation defaults to the current folder.
+- **FR-021a**: Entry contents MUST be sent only for the selected entries plus entries
+  triggered by their keys or title appearing in the request, recent turns, enabled chat
+  sources or another sent entry — recursively, until nothing new matches or the context
+  limit is reached (default). The user MAY instead send the contents of every entry of the
+  structure. Other entries of the structure are listed by title and keys only.
 - **FR-022**: The user MUST be able to include or exclude the current chat (with a message
   count), the character card and the persona description, and the entries the app
   activated in the current chat. All of these are excluded by default in a new
@@ -533,9 +547,11 @@ proposals are produced.
   of acceptance (clarified 2026-09-15).
 - Default context (clarified 2026-09-15): the assistant is a lore tool, not a chat
   participant, so chat-related context is opt-in per conversation (FR-021, FR-022).
-- Default context trimming priority (most kept first): instructions and the current
-  request → recent conversation turns → in-scope items the user selected → other in-scope
-  items → tree outline → chat messages (oldest dropped first) → older conversation turns.
+- Default context trimming priority (most kept first, revised 2026-09-16): instructions,
+  the current request and where the user is → structure outline (collapsed below depth 2,
+  then folders only) → recent conversation turns → selected entries' contents →
+  key-triggered entries' contents (in trigger order) → chat sources (oldest messages
+  dropped first) → older conversation turns.
 - Undo covers applied assistant batches only (manual edits keep their existing behavior);
   undo records live with the conversation on the device (clarified 2026-09-15), so a
   batch applied on another device cannot be undone here.

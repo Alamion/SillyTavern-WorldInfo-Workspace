@@ -1223,3 +1223,150 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         max-height: 8rem;
     }
 }
+
+// Assistant context menu (spec 005 FR-021/FR-022): grouped sections, options as
+// one clickable row (control + title + hint), folder chooser as an indented tree.
+.wiw-context-menu {
+    width: min(520px, 94%);
+    max-height: 86%;
+
+    .wiw-context-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-md;
+    }
+}
+
+.wiw-context-body {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xl;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: $spacing-xs;
+}
+
+.wiw-context-section {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    h4 {
+        margin: 0 0 $spacing-xs;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--SmartThemeEmColor);
+    }
+
+    > .wiw-context-hint {
+        margin-bottom: $spacing-xs;
+    }
+}
+
+.wiw-context-hint {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.wiw-context-option {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-md;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid transparent;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: $transition-fast;
+
+    &:hover {
+        background: $surface-raised;
+    }
+
+    > input[type='radio'],
+    > input[type='checkbox'] {
+        flex: 0 0 auto;
+        width: 0.95rem;
+        height: 0.95rem;
+        margin: 0.22rem 0 0;
+        transform: none;
+        accent-color: var(--SmartThemeQuoteColor);
+    }
+}
+
+.wiw-context-option-checked {
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 55%);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 90%);
+}
+
+.wiw-context-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    min-width: 0;
+}
+
+.wiw-context-option-title {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    font-size: 0.92rem;
+}
+
+.wiw-assistant .wiw-context-count,
+.wiw-context-count {
+    width: 4.5rem;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    font: inherit;
+}
+
+.wiw-context-folders {
+    @extend .wiw-panel-body;
+    max-height: 14rem;
+    margin: 0 0 $spacing-xs 1.6rem;
+}
+
+.wiw-context-folder {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding-block: $spacing-xs;
+    border-radius: $radius-sm;
+    font-size: 0.88rem;
+    cursor: pointer;
+
+    &:hover {
+        background: $surface-raised;
+    }
+
+    > input {
+        margin: 0;
+        accent-color: var(--SmartThemeQuoteColor);
+    }
+
+    > i {
+        opacity: 0.6;
+    }
+}
+
+.wiw-context-folder-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wiw-context-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+    flex: 0 0 auto;
+}

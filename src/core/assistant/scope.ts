@@ -3,14 +3,33 @@ import type { ContextScope } from './types';
 
 /**
  * Resolves the conversation's context scope into concrete nodes (spec 005
- * FR-021). Only nodes inside the scope are sent in full and only they are valid
- * operation targets; folder ids that no longer exist are reported as dropped.
+ * FR-021). Only the nodes inside the scope are shown to the assistant (plus the
+ * folders above them, for orientation) and only they are valid operation
+ * targets; folder ids that no longer exist are reported as dropped.
  */
 
 export interface ResolvedScope {
     folderIds: string[];
     nodeIds: Set<string>;
     dropped: string[];
+    /** Folders above the scope folders (outline orientation, valid placements). */
+    ancestorIds: Set<string>;
+}
+
+function ancestorsOf(state: WorkspaceState, folderIds: readonly string[]): Set<string> {
+    const ancestors = new Set<string>();
+    for (const id of folderIds) {
+        let current = findNode(state, id);
+        while (current && current.parentId !== null) {
+            const parent = findNode(state, current.parentId);
+            if (!parent || parent.id === state.root.id) {
+                break;
+            }
+            ancestors.add(parent.id);
+            current = parent;
+        }
+    }
+    return ancestors;
 }
 
 function collect(folder: FolderNode, into: Set<string>): void {
@@ -25,7 +44,7 @@ function collect(folder: FolderNode, into: Set<string>): void {
 }
 
 /** The folder a selection stands for: the folder itself, or an item's parent. */
-function selectionFolder(state: WorkspaceState, selection: readonly string[]): FolderNode {
+export function selectionFolder(state: WorkspaceState, selection: readonly string[]): FolderNode {
     for (const id of selection) {
         const node = findNode(state, id);
         if (!node) {
@@ -50,12 +69,12 @@ export function resolveScope(
     const nodeIds = new Set<string>();
     if (scope.kind === 'workspace') {
         collect(state.root, nodeIds);
-        return { folderIds: [state.root.id], nodeIds, dropped: [] };
+        return { folderIds: [state.root.id], nodeIds, dropped: [], ancestorIds: new Set() };
     }
     if (scope.kind === 'selection') {
         const folder = selectionFolder(state, selection);
         collect(folder, nodeIds);
-        return { folderIds: [folder.id], nodeIds, dropped: [] };
+        return { folderIds: [folder.id], nodeIds, dropped: [], ancestorIds: ancestorsOf(state, [folder.id]) };
     }
     const folderIds: string[] = [];
     const dropped: string[] = [];
@@ -68,5 +87,5 @@ export function resolveScope(
             dropped.push(id);
         }
     }
-    return { folderIds, nodeIds, dropped };
+    return { folderIds, nodeIds, dropped, ancestorIds: ancestorsOf(state, folderIds) };
 }

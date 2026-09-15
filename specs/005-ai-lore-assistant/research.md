@@ -129,21 +129,28 @@ do not break them — staleness is checked separately, R8).
 
 1. System: instructions (user-editable, default template) + protocol description +
    mode rules (propose/discuss).
-2. Workspace outline: one line per node (`handle | kind | name [WI root: book] — keys`),
-   depth-indented; entries show keys only.
-3. In-scope items in full: entries as title, keys, non-default fields (names/enums from
-   the markdown convention field table, `core/md/convention.ts` `FIELD_SPECS`), content.
-4. Optional (per conversation, default off): character card fields, persona description,
+2. Where the user is: selected items and the current folder for new items (revised
+   2026-09-16 — without it models placed new folders wherever seemed convenient).
+3. Structure outline: one line per node of the chosen structure and the folders above
+   it (`handle | kind | name [WI root: book] — keys`), depth-indented; nothing else of
+   the tree is sent or handled.
+4. Entries in full: the selection, then entries triggered by their primary keys or
+   title (`core/assistant/triggers.ts`: plain keys as whole words, case-insensitive;
+   `/regex/flags` keys as patterns) in the request, the last two turns, enabled chat
+   sources and the contents of already-triggered entries, breadth-first until nothing new
+   matches; or every entry with `entryContents: 'all'`. Entries show title, keys,
+   non-default fields (`FIELD_SPECS` names/enums) and content.
+5. Optional (per conversation, default off): character card fields, persona description,
    last N chat messages, entries activated in the current chat.
-5. Conversation history (user/assistant turns) with decision summaries (R9).
-6. Current user request.
+6. Conversation history (user/assistant turns) with decision summaries (R9).
+7. Current user request.
 
 **Budget**: token estimation by characters (≈ 3.5 chars/token, conservative) against the
 user's context limit minus the response length. Trimming order, most kept first
-(spec Assumptions): system + current request → recent conversation turns → user-selected
-in-scope items → other in-scope items (largest first dropped to outline-only) → outline
-(collapsed below depth 2, then folders only) → chat messages (oldest first) → older
-conversation turns. The builder returns an `omitted` list rendered as the notice
+(spec Assumptions, revised 2026-09-16): system + current request + location → structure
+outline (≤ 45 % of the budget, else collapsed below depth 2, then folders only) → recent
+conversation turns (≤ 60 %) → selected entries → triggered entries in trigger order
+(≤ 90 %) → chat sources (oldest messages first) → older conversation turns. The builder returns an `omitted` list rendered as the notice
 (FR-023). Exact tokenizer counts are not used: `getTokenCountAsync` follows the *main*
 API's tokenizer, not the assistant profile's (`tokenizers.js:443`).
 

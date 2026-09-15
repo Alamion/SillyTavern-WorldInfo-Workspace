@@ -20,15 +20,22 @@ export type OperationType =
 
 export type AssistantMode = 'propose' | 'discuss';
 
-/** Scope of the workspace the assistant may see and target (FR-021). */
+/** Part of the tree the assistant sees and may change (FR-021). */
 export type ContextScope =
     | { kind: 'selection' }
     | { kind: 'folders'; folderIds: string[] }
     | { kind: 'workspace' };
 
+/**
+ * Which entries are sent with their full content (FR-021a): `triggered` = the
+ * selected entries plus entries whose keys or title appear in the request, the
+ * chat or other sent entries, recursively; `all` = every entry of the structure.
+ */
+export type EntryContents = 'triggered' | 'all';
+
 export interface ContextSettings {
     scope: ContextScope;
-    includeOutline: boolean;
+    entryContents: EntryContents;
     /** 0 = do not send chat messages. */
     chatMessages: number;
     characterCard: boolean;
@@ -52,7 +59,7 @@ export const CONTEXT_HEADROOM_TOKENS = 500;
 
 export const DEFAULT_CONTEXT_SETTINGS: ContextSettings = {
     scope: { kind: 'selection' },
-    includeOutline: true,
+    entryContents: 'triggered',
     chatMessages: 0,
     characterCard: false,
     persona: false,
@@ -125,7 +132,11 @@ export interface OmittedPart {
 
 export interface ContextIncluded {
     outline: boolean;
+    /** Items of the structure listed in the outline. */
+    outlineItems: number;
     fullItems: number;
+    /** Of `fullItems`: entries sent because their keys or title were mentioned. */
+    triggeredItems: number;
     chatMessages: number;
     characterCard: boolean;
     persona: boolean;

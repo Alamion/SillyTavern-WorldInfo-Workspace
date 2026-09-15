@@ -343,8 +343,8 @@ describe('failure recovery (US4)', () => {
 describe('propose mode (US1)', () => {
     const REPLY = [
         'Two new taverns for Hearth & Home.',
-        '<op type="create_entry" parent="f3" ref="new1"><title>The Salty Keel</title><keys>keel</keys><content>Ale and stew.</content></op>',
-        '<op type="create_entry" parent="f3"><title>The Hearthfire Inn</title><keys>hearthfire</keys><content>Quiet rooms.</content></op>',
+        '<op type="create_entry" parent="f2" ref="new1"><title>The Salty Keel</title><keys>keel</keys><content>Ale and stew.</content></op>',
+        '<op type="create_entry" parent="f2"><title>The Hearthfire Inn</title><keys>hearthfire</keys><content>Quiet rooms.</content></op>',
     ].join('\n\n');
 
     async function conversationWith(reply: string, options: { selection?: string[] } = {}) {
@@ -360,7 +360,7 @@ describe('propose mode (US1)', () => {
     it('sends the workspace context and turns blocks into pending proposals', async () => {
         const harness = await conversationWith(REPLY);
         const request = harness.llm.requests[0];
-        expect(request?.messages.some((message) => message.content.includes('## Workspace outline'))).toBe(
+        expect(request?.messages.some((message) => message.content.includes('## Workspace structure'))).toBe(
             true
         );
         const message = harness.controller.getSnapshot().messages.at(-1);
@@ -448,7 +448,7 @@ describe('propose mode (US1)', () => {
     it('blocks proposals whose dependency was denied', async () => {
         const harness = await conversationWith(
             [
-                '<op type="create_folder" parent="f3" ref="new1"><title>Taverns</title></op>',
+                '<op type="create_folder" parent="f2" ref="new1"><title>Taverns</title></op>',
                 '<op type="create_entry" parent="new1"><title>Keel</title><content>x</content></op>',
             ].join('\n')
         );
@@ -485,12 +485,12 @@ describe('propose mode (US1)', () => {
             [
                 'Here you go.',
                 '<op type="teleport" id="e1"></op>',
-                '<op type="create_entry" parent="f3"><title>Ok</title><content>x</content></op>',
+                '<op type="create_entry" parent="f2"><title>Ok</title><content>x</content></op>',
             ].join('\n')
         );
         const message = harness.controller.getSnapshot().messages.at(-1);
         expect(message?.batch?.unparsed).toHaveLength(1);
-        harness.llm.reply('<op type="create_entry" parent="f3"><title>Fixed</title><content>y</content></op>');
+        harness.llm.reply('<op type="create_entry" parent="f2"><title>Fixed</title><content>y</content></op>');
         await harness.controller.askToFix(message?.seq ?? 1);
         const request = harness.llm.requests.at(-1);
         expect(request?.messages.at(-1)?.content).toContain('unknown operation type');
@@ -498,11 +498,11 @@ describe('propose mode (US1)', () => {
 
     it('continues a cut-off reply and reports the truncation', async () => {
         const harness = await conversationWith(
-            '<op type="create_entry" parent="f3"><title>Half</title><content>text</content></op>\n\n<op type="create_entry parent'
+            '<op type="create_entry" parent="f2"><title>Half</title><content>text</content></op>\n\n<op type="create_entry parent'
         );
         const message = harness.controller.getSnapshot().messages.at(-1);
         expect(message?.batch?.unparsed[0]?.kind).toBe('truncated');
-        harness.llm.reply('<op type="create_entry" parent="f3"><title>Rest</title><content>z</content></op>');
+        harness.llm.reply('<op type="create_entry" parent="f2"><title>Rest</title><content>z</content></op>');
         await harness.controller.continueReply(message?.seq ?? 1);
         const request = harness.llm.requests.at(-1);
         expect(request?.messages.at(-1)?.role).toBe('assistant');
@@ -513,7 +513,7 @@ describe('propose mode (US1)', () => {
         const harness = await conversationWith(REPLY);
         const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
         const sentFirst = harness.llm.requests[0]?.messages;
-        harness.llm.reply('<op type="create_entry" parent="f3"><title>Second try</title><content>x</content></op>');
+        harness.llm.reply('<op type="create_entry" parent="f2"><title>Second try</title><content>x</content></op>');
         await harness.controller.regenerate(seq, { sameContext: true });
         expect(harness.llm.requests[1]?.messages).toEqual(sentFirst);
         const message = harness.controller.getSnapshot().messages.at(-1);
@@ -610,7 +610,7 @@ describe('reorganization and undo (US2)', () => {
         const first = createHarness({ store });
         await ready(first);
         first.controller.setSelection([NODE_IDS.hearth]);
-        first.llm.reply('<op type="create_entry" parent="f3"><title>Kept</title><content>x</content></op>');
+        first.llm.reply('<op type="create_entry" parent="f2"><title>Kept</title><content>x</content></op>');
         await first.controller.createConversation();
         await first.controller.send('add');
         const seq = first.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
@@ -631,8 +631,8 @@ describe('conversations (US5)', () => {
         harness.controller.setSelection([NODE_IDS.hearth]);
         harness.llm.reply(
             [
-                '<op type="create_entry" parent="f3"><title>The Salty Keel</title><content>a</content></op>',
-                '<op type="create_entry" parent="f3"><title>The Hearthfire Inn</title><content>b</content></op>',
+                '<op type="create_entry" parent="f2"><title>The Salty Keel</title><content>a</content></op>',
+                '<op type="create_entry" parent="f2"><title>The Hearthfire Inn</title><content>b</content></op>',
             ].join('\n')
         );
         await harness.controller.createConversation();

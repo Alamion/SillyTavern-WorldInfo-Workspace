@@ -124,7 +124,9 @@ function emptySnapshot(requestMessages: LlmMessage[]): NonNullable<Message['cont
         scopeNodeIds: [],
         included: {
             outline: false,
+            outlineItems: 0,
             fullItems: 0,
+            triggeredItems: 0,
             chatMessages: 0,
             characterCard: false,
             persona: false,

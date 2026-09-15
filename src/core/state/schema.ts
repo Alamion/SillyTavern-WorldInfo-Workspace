@@ -307,7 +307,7 @@ function repairContextSettings(value: unknown): ContextSettings {
         typeof raw[key] === 'boolean' ? (raw[key] as boolean) : fallbackValue;
     return {
         scope: repairScope(raw.scope),
-        includeOutline: bool('includeOutline', DEFAULT_CONTEXT_SETTINGS.includeOutline),
+        entryContents: raw.entryContents === 'all' ? 'all' : DEFAULT_CONTEXT_SETTINGS.entryContents,
         chatMessages: repairInt(raw.chatMessages, DEFAULT_CONTEXT_SETTINGS.chatMessages, 0, 200),
         characterCard: bool('characterCard', DEFAULT_CONTEXT_SETTINGS.characterCard),
         persona: bool('persona', DEFAULT_CONTEXT_SETTINGS.persona),

@@ -279,9 +279,12 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   per-request handles (`f1`, `e12`, `i3`) and refs (`new1`). The parser is tolerant and
   incremental (called on every stream chunk); broken blocks are counted, shown on request,
   and "Regenerate with the same context" re-sends the stored `requestMessages`.
-- **Context** (`core/assistant/context.ts`): instructions, outline, in-scope items in full,
-  optional chat/card/persona/activated entries, history with decision notes; budget by
-  ~3.5 chars/token; everything left out is reported.
+- **Context** (`core/assistant/context.ts`): instructions, where the user is (selection +
+  current folder), outline of the chosen structure only (handles exist only for it and the
+  folders above it), entry contents for selected + key-triggered entries
+  (`core/assistant/triggers.ts`, recursive) or all entries, optional chat/card/persona/
+  activated entries, history with decision notes; budget by ~3.5 chars/token; everything
+  left out is reported.
 - **Proposals**: validated against scope and Phase 1 field rules; destructive = deletion,
   > 50 % of content removed (word-level), or any keyword removed → own confirmation, never
   via Accept all. Stale targets (changed since parse) need a fresh review. Applying goes

@@ -2,7 +2,8 @@ import { createDefaultNativeEntry, findNode, type EntryNode, type FolderNode, ty
 import { FIELD_SPECS, OWNED_PREFIX } from '../md/convention';
 import { buildHandleMap, type HandleMap } from './handles';
 import { decisionNote, systemPrompt } from './prompts';
-import { resolveScope } from './scope';
+import { resolveScope, selectionFolder } from './scope';
+import { expandTriggers } from './triggers';
 import type {
     ActivatedEntryRef,
     CharacterCardView,
@@ -19,10 +20,12 @@ import type {
 } from './types';
 
 /**
- * Builds the request the model sees (research R6): instructions, the tree
- * outline, the in-scope items in full, optional chat sources, conversation
- * history, and the user's request — trimmed to the user's context budget in a
- * documented priority order, with everything left out reported (FR-023).
+ * Builds the request the model sees (research R6): instructions, where the user
+ * is in the tree, the outline of the chosen structure, the entries sent in full
+ * (selected + key-triggered, or all of them), optional chat sources,
+ * conversation history, and the user's request — trimmed to the user's context
+ * budget in a documented priority order, with everything left out reported
+ * (FR-023).
  */
 
 /** Conservative characters-per-token estimate (the app tokenizer follows the MAIN api). */
@@ -109,14 +112,16 @@ interface OutlineRow {
     kind: TreeNode['kind'];
 }
 
+/** Rows of the handled nodes only: the structure and the folders above it. */
 function outlineRows(state: WorkspaceState, map: HandleMap): OutlineRow[] {
     const rows: OutlineRow[] = [];
     const walk = (folder: FolderNode, depth: number): void => {
         for (const child of folder.children) {
             const handle = map.byNode.get(child.id);
-            if (handle !== undefined) {
-                rows.push({ text: outlineLine(child, handle, depth), depth, kind: child.kind });
+            if (handle === undefined) {
+                continue;
             }
+            rows.push({ text: outlineLine(child, handle, depth), depth, kind: child.kind });
             if (child.kind === 'folder') {
                 walk(child, depth + 1);
             }
@@ -162,10 +167,50 @@ function chatBlock(messages: ChatMessageView[]): string {
     return ['## Current chat', ...messages.map((message) => `${message.name}: ${message.text}`)].join('\n');
 }
 
+/** Tells the model where the user is, so new items land in the right folder. */
+function locationBlock(
+    state: WorkspaceState,
+    map: HandleMap,
+    selection: readonly string[],
+    fallbackFolderId: string | undefined
+): string {
+    const lines = ['## Where the user is'];
+    const describe = (node: TreeNode): string => {
+        const handle = map.byNode.get(node.id);
+        const path = pathOf(state, node.id);
+        return handle !== undefined ? `${handle} (${node.kind}: ${path})` : `${node.kind}: ${path}`;
+    };
+    const selected = selection
+        .map((id) => findNode(state, id))
+        .filter((node): node is TreeNode => node !== undefined && node.id !== state.root.id);
+    lines.push(
+        selected.length > 0
+            ? `Selected in the tree: ${selected.map(describe).join(', ')}`
+            : 'Nothing is selected in the tree.'
+    );
+    const folder = selected.length > 0 ? selectionFolder(state, selection) : undefined;
+    const currentId =
+        folder !== undefined && folder.id !== state.root.id && map.byNode.has(folder.id)
+            ? folder.id
+            : fallbackFolderId;
+    const current = currentId !== undefined ? findNode(state, currentId) : undefined;
+    const handle = current ? map.byNode.get(current.id) : undefined;
+    if (current && handle !== undefined) {
+        lines.push(
+            `Current folder: ${handle} (${pathOf(state, current.id)}). Put new items here unless the request names another place or a subfolder of it clearly fits better.`
+        );
+    } else {
+        lines.push('No current folder: put new items in the folder of the structure that fits best.');
+    }
+    return lines.join('\n');
+}
+
 export function buildRequest(input: BuildRequestInput): BuiltRequest {
     const { state, context } = input;
     const scope = resolveScope(state, context.scope, input.selection);
-    const map = buildHandleMap(state);
+    // Only the chosen structure (and the folders above it) gets handles: the
+    // assistant never sees — and so never places or targets — the rest.
+    const map = buildHandleMap(state, new Set([...scope.nodeIds, ...scope.ancestorIds]));
     const omitted: OmittedPart[] = [];
     if (scope.dropped.length > 0) {
         omitted.push({
@@ -175,29 +220,54 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         });
     }
 
-    // In-scope items, user-selected first (they are the last to be trimmed).
-    const selected = new Set(input.selection);
-    const inScope: TreeNode[] = [];
-    const collect = (folder: FolderNode): void => {
-        for (const child of folder.children) {
-            if (scope.nodeIds.has(child.id)) {
-                inScope.push(child);
-            }
-            if (child.kind === 'folder') {
-                collect(child);
-            }
-        }
-    };
-    collect(state.root);
-    const ordered = [
-        ...inScope.filter((node) => selected.has(node.id)),
-        ...inScope.filter((node) => !selected.has(node.id)),
-    ].filter((node) => node.kind !== 'folder');
-
     const budgetTokens = Math.max(500, input.contextTokens - input.responseTokens);
     const systemText = systemPrompt(input.mode, input.instructions);
     const requestText = input.request;
     let used = estimateTokens(systemText) + estimateTokens(requestText);
+
+    // Where the user is — tiny and always sent.
+    const fallbackFolder = scope.folderIds.find((id) => id !== state.root.id);
+    const locationText = locationBlock(state, map, input.selection, fallbackFolder);
+    used += estimateTokens(locationText);
+
+    // Structure outline — collapsed by depth, then folders only, when it is too big.
+    let outlineText = '';
+    let outlineIncluded = false;
+    let outlineItems = 0;
+    const rows = outlineRows(state, map);
+    const variants: Array<{ rows: OutlineRow[]; omit?: OmittedPart }> = [
+        { rows },
+        {
+            rows: rows.filter((row) => row.depth <= 1),
+            omit: { what: 'outline-depth', label: 'structure collapsed below depth 2' },
+        },
+        {
+            rows: rows.filter((row) => row.kind === 'folder'),
+            omit: { what: 'outline-depth', label: 'structure reduced to folders' },
+        },
+    ];
+    for (const [index, variant] of variants.entries()) {
+        const text = [
+            '## Workspace structure',
+            '(handle | kind | name — extra; only these items exist for you)',
+            ...variant.rows.map((row) => row.text),
+        ].join('\n');
+        const cost = estimateTokens(text);
+        const last = index === variants.length - 1;
+        if (used + cost <= budgetTokens * 0.45 || (last && used + cost <= budgetTokens)) {
+            used += cost;
+            outlineText = text;
+            outlineIncluded = true;
+            outlineItems = variant.rows.length;
+            if (variant.omit) {
+                omitted.push(variant.omit);
+            }
+            break;
+        }
+    }
+    if (!outlineIncluded) {
+        omitted.push({ what: 'outline-depth', label: 'structure omitted' });
+    }
 
     // History: most recent first, older turns are trimmed first.
     const historyMessages: LlmMessage[] = [];
@@ -210,7 +280,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         const role = message.role === 'assistant' ? 'assistant' : message.role === 'note' ? 'system' : 'user';
         const note = message.role === 'assistant' ? decisionNote(message.batch) : null;
         const cost = estimateTokens(message.text) + (note !== null ? estimateTokens(note) : 0);
-        if (used + cost > budgetTokens * 0.5) {
+        if (used + cost > budgetTokens * 0.6) {
             historyDropped += 1;
             continue;
         }
@@ -225,65 +295,93 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         omitted.push({ what: 'history', label: 'older conversation turns', count: historyDropped });
     }
 
-    // Items in full — largest dropped first once the budget is reached.
-    const itemBlocks: string[] = [];
-    let itemsDropped = 0;
-    for (const node of ordered) {
-        const handle = map.byNode.get(node.id);
-        if (handle === undefined) {
-            continue;
+    // Entries in full: the selection first, then key-triggered entries layer by
+    // layer (FR-021a) — or, with `all`, every entry of the structure.
+    const chat = input.chat;
+    const candidates: EntryNode[] = [];
+    const collect = (folder: FolderNode): void => {
+        for (const child of folder.children) {
+            if (child.kind === 'entry' && scope.nodeIds.has(child.id)) {
+                candidates.push(child);
+            }
+            if (child.kind === 'folder') {
+                collect(child);
+            }
         }
-        const block = itemBlock(node, handle);
+    };
+    collect(state.root);
+    const selected = new Set(input.selection);
+    const activated =
+        chat && context.activatedEntries
+            ? chat.activated.map((ref) => ({
+                  ref,
+                  node: candidates.find((entry) => entry.sync.books[ref.bookName]?.uid === ref.uid),
+              }))
+            : [];
+    const seeds = [
+        ...candidates.filter((entry) => selected.has(entry.id)),
+        ...activated
+            .map((item) => item.node)
+            .filter((node): node is EntryNode => node !== undefined && !selected.has(node.id)),
+    ];
+    let triggered: EntryNode[];
+    if (context.entryContents === 'all') {
+        const seedIds = new Set(seeds.map((entry) => entry.id));
+        triggered = candidates.filter((entry) => !seedIds.has(entry.id));
+    } else {
+        const seedTexts = [requestText, ...input.history.slice(-2).map((message) => message.text)];
+        if (chat) {
+            if (context.chatMessages > 0) {
+                seedTexts.push(...chat.messages.map((message) => message.text));
+            }
+            if (context.characterCard && chat.card) {
+                seedTexts.push(chat.card.description, chat.card.personality, chat.card.scenario);
+            }
+            if (context.persona && chat.persona) {
+                seedTexts.push(chat.persona.description);
+            }
+        }
+        triggered = expandTriggers(candidates, seedTexts, seeds).flatMap((layer) => layer.entries);
+    }
+    const itemBlocks: string[] = [];
+    let seedsDropped = 0;
+    let triggeredDropped = 0;
+    let triggeredIncluded = 0;
+    const sendInFull = (entry: EntryNode, isSeed: boolean): void => {
+        const handle = map.byNode.get(entry.id);
+        if (handle === undefined) {
+            return;
+        }
+        const block = itemBlock(entry, handle);
         const cost = estimateTokens(block);
-        if (used + cost > budgetTokens * 0.85) {
-            itemsDropped += 1;
-            continue;
+        if (used + cost > budgetTokens * 0.9) {
+            if (isSeed) {
+                seedsDropped += 1;
+            } else {
+                triggeredDropped += 1;
+            }
+            return;
         }
         used += cost;
         itemBlocks.push(block);
+        if (!isSeed) {
+            triggeredIncluded += 1;
+        }
+    };
+    seeds.forEach((entry) => sendInFull(entry, true));
+    triggered.forEach((entry) => sendInFull(entry, false));
+    if (seedsDropped > 0) {
+        omitted.push({ what: 'item', label: 'selected entries sent without content', count: seedsDropped });
     }
-    if (itemsDropped > 0) {
+    if (triggeredDropped > 0) {
         omitted.push({
             what: 'item',
-            label: 'in-scope items sent as outline only',
-            count: itemsDropped,
+            label:
+                context.entryContents === 'all'
+                    ? 'entries sent without content'
+                    : 'mentioned entries sent without content',
+            count: triggeredDropped,
         });
-    }
-
-    // Outline — collapsed by depth, then folders only, when the budget is tight.
-    let outlineText = '';
-    let outlineIncluded = false;
-    if (context.includeOutline) {
-        const rows = outlineRows(state, map);
-        const variants: Array<{ rows: OutlineRow[]; omit?: OmittedPart }> = [
-            { rows },
-            {
-                rows: rows.filter((row) => row.depth <= 1),
-                omit: { what: 'outline-depth', label: 'outline collapsed below depth 2' },
-            },
-            {
-                rows: rows.filter((row) => row.kind === 'folder'),
-                omit: { what: 'outline-depth', label: 'outline reduced to folders' },
-            },
-        ];
-        for (const variant of variants) {
-            const text = ['## Workspace outline', '(handle | kind | name — extra)', ...variant.rows.map((row) => row.text)].join('\n');
-            const cost = estimateTokens(text);
-            if (used + cost <= budgetTokens * 0.95 || variant === variants[variants.length - 1]) {
-                if (used + cost <= budgetTokens) {
-                    used += cost;
-                    outlineText = text;
-                    outlineIncluded = true;
-                    if (variant.omit) {
-                        omitted.push(variant.omit);
-                    }
-                }
-                break;
-            }
-        }
-        if (!outlineIncluded) {
-            omitted.push({ what: 'outline-depth', label: 'outline omitted' });
-        }
     }
 
     // Optional chat sources — the first thing to go when the budget is tight.
@@ -292,7 +390,6 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     let cardIncluded = false;
     let personaIncluded = false;
     let activatedIncluded = 0;
-    const chat = input.chat;
     if (chat) {
         if (context.characterCard && chat.card) {
             const block = [
@@ -324,14 +421,11 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 omitted.push({ what: 'chat', label: 'persona description' });
             }
         }
-        if (context.activatedEntries && chat.activated.length > 0) {
+        if (context.activatedEntries && activated.length > 0) {
             const handles: string[] = [];
             let unmatched = 0;
-            for (const ref of chat.activated) {
-                const node = ordered.find(
-                    (item) => item.kind === 'entry' && item.sync.books[ref.bookName]?.uid === ref.uid
-                );
-                const handle = node ? map.byNode.get(node.id) : undefined;
+            for (const item of activated) {
+                const handle = item.node ? map.byNode.get(item.node.id) : undefined;
                 if (handle !== undefined) {
                     handles.push(handle);
                 } else {
@@ -350,7 +444,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             if (unmatched > 0) {
                 omitted.push({
                     what: 'chat',
-                    label: 'activated entries not in the workspace',
+                    label: 'activated entries outside the structure',
                     count: unmatched,
                 });
             }
@@ -376,8 +470,15 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     }
 
     const workspaceParts = [
+        locationText,
         outlineText,
-        itemBlocks.length > 0 ? ['## Items in scope', ...itemBlocks].join('\n\n') : '',
+        itemBlocks.length > 0
+            ? [
+                  '## Entries in full',
+                  '(entries of the structure not listed here were not sent with their content: do not rewrite their content)',
+                  ...itemBlocks,
+              ].join('\n\n')
+            : '',
         ...optional,
     ].filter((part) => part !== '');
 
@@ -395,7 +496,9 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         scopeNodeIds: [...scope.nodeIds],
         included: {
             outline: outlineIncluded,
+            outlineItems,
             fullItems: itemBlocks.length,
+            triggeredItems: triggeredIncluded,
             chatMessages: chatIncluded,
             characterCard: cardIncluded,
             persona: personaIncluded,
