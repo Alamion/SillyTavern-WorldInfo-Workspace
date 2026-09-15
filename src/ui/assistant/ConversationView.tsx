@@ -1,5 +1,6 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../core/preview';
+import { displayText, statusText } from '../../core/assistant/display';
 import type { Message } from '../../core/assistant/types';
 import { FailureCard } from './FailureCard';
 
@@ -13,21 +14,6 @@ export interface MessageActions {
     onRetryNow: (seq: number) => void;
     onCancelRetry: () => void;
     onOpenItem: (handle: string, snapshotHandles: Record<string, string>) => void;
-}
-
-function statusLine(message: Message): string | null {
-    if (message.status === 'pending') {
-        const started = message.startedAt !== undefined ? Date.parse(message.startedAt) : Date.now();
-        const seconds = Math.max(0, Math.round((Date.now() - started) / 1000));
-        return `Waiting for the model… ${String(seconds)} s`;
-    }
-    if (message.status === 'receiving') {
-        return `Receiving… ${String(message.text.length)} chars`;
-    }
-    if (message.status === 'stopped') {
-        return 'Stopped.';
-    }
-    return null;
 }
 
 /** Splits prose into text and `[[handle]]` references (FR-005). */
@@ -71,11 +57,21 @@ const MessageRow = memo(function MessageRow({
     actions: MessageActions;
     children?: React.ReactNode;
 }): JSX.Element {
-    const status = statusLine(message);
+    // The elapsed-time counter ticks on its own while waiting for the first chunk.
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        if (message.status !== 'pending') {
+            return;
+        }
+        const timer = setInterval(() => setTick((value) => value + 1), 1000);
+        return () => clearInterval(timer);
+    }, [message.status]);
+    const status = statusText(message);
+    const shown = displayText(message);
     const handles = message.context?.handles ?? {};
     return (
         <div className={`wiw-bubble wiw-bubble-${message.role}`}>
-            {message.text !== '' && renderProse(message.text, handles, actions.onOpenItem)}
+            {shown !== '' && renderProse(shown, handles, actions.onOpenItem)}
             {message.reasoning !== undefined && message.reasoning !== '' && (
                 <details className="wiw-collapsible">
                     <summary>Thinking</summary>

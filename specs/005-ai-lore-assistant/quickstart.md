@@ -56,3 +56,29 @@ SC-001 → A2+A4 timing on the router profile · SC-002 → A4–A6, A11–A13 (
 across all op types) · SC-003 → A6, A13 · SC-004 → A7–A9, A17 · SC-005 → 10 typical
 requests across both profiles (log valid-proposal rate) · SC-006 → A15 · SC-007 → A19 +
 typing during A2 · SC-008 → A16 · SC-009 → owner session.
+
+## Validation runs
+
+### 2026-09-15 — automated live run (headless Chromium, `dev` account, build 0.4.0)
+
+| # | Result | Notes |
+|---|--------|-------|
+| A0 | PASS | No profile → "Choose a connection profile" banner, composer disabled |
+| A1 | PASS | Router profile selected in AI settings; streaming badge read from the preset; main chat profile unchanged (`selectedProfile` identical before/after); settings persisted |
+| A2 | PASS | First chunk after ~2 s; two valid `create_entry` proposals placed in Sandbox (handle `f9`) |
+| A4 | PASS | Accept one / deny one → only the accepted entry created |
+| A7 | PASS | Gemma free → 429 classified as rate limit, visible countdown (10 s, then 30 s), provider detail "Got response status 429", Cancel stops retries, request text kept, Retry offered |
+| A9 | INCONCLUSIVE | Response length 150 was not enforced by the routed free model (full five-entry reply in 86 s); truncation handling is covered by unit/integration tests |
+| A14 | PASS | Undo batch removed the created entry; proposal marked reverted; Sandbox back to its original 32 items |
+| A15 | PASS | Conversation, proposals and decisions restored after a page reload (IndexedDB) |
+| A3, A5, A6, A8, A10–A13, A16–A21 | NOT RUN | Left for the owner walkthrough |
+
+Defects found and fixed in this run (regression tests in `tests/unit/assistant-display.test.ts`):
+
+- The reply bubble showed raw `<op>` blocks instead of the prose.
+- Reasoning models streamed ~23 s of thinking while the counter showed "Receiving… 0 chars";
+  the status now reads "Thinking… N chars" until the answer starts. The waiting timer now
+  ticks every second on its own.
+
+Observation: with nothing selected in the tree the scope falls back to the whole workspace
+(spec FR-021 default), so the context notice can list every entry of the workspace.
