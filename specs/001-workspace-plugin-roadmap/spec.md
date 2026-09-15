@@ -174,6 +174,36 @@ exporting it back, and comparing the round-trip result for completeness.
 
 ---
 
+### User Story 7 - AI Image Generation and Captioning (Priority: P3)
+
+*(Added 2026-09-14 by owner decision.)* Inside the workspace, the user generates images
+with AI as image items of the tree (e.g., a portrait for a character entry, a map for a
+region folder), placing them in any folder like hand-added images. As a separate action
+within the same phase, the user asks AI to write the caption (image description) of any
+image item — generated or hand-added — so the image's meaning is available as text.
+
+**Why this priority**: Enriches lore with visuals and makes images usable as text for the
+AI; valuable, but independent of the core lore flows and built on the existing image item
+kind (spec 003).
+
+**Independent Test**: Can be fully tested by generating an image from a prompt into a
+chosen folder, verifying it appears and persists as a regular image item, then requesting
+an AI caption for it and for a hand-added image and verifying the captions are stored and
+editable.
+
+**Acceptance Scenarios**:
+
+1. **Given** an open workspace, **When** the user requests an image from a text prompt
+   (optionally seeded from the selected entry), **Then** a preview is shown and, on
+   confirmation, the image is added as an image item in the chosen folder.
+2. **Given** any image item, **When** the user requests an AI caption, **Then** a
+   proposed caption is shown and, on confirmation, stored as the item's caption, which
+   remains user-editable.
+3. **Given** a generation or captioning request fails, **When** the failure occurs,
+   **Then** the user sees a clear error and nothing in the tree changes.
+
+---
+
 ### Edge Cases
 
 - What happens when a card is moved out from under a designated World Info root — does the
@@ -266,6 +296,17 @@ exporting it back, and comparing the round-trip result for completeness.
 - **FR-024**: System MUST expose a small set of namespaced events/hooks so other
   extensions can react to workspace changes (e.g., entry updated, structure changed).
 
+**AI images** *(added 2026-09-14)*
+
+- **FR-025**: System MUST let the user generate images with AI and add them as image
+  items in any folder of the workspace, previewed and added only on confirmation.
+- **FR-026**: System MUST let the user request an AI-written caption for any image item
+  (generated or hand-added) as a separate action; the proposed caption is previewed,
+  stored on confirmation, and stays user-editable.
+- **FR-027**: Image generation and captioning MUST use the image-generation and
+  image-captioning connections already configured in the app where available; the user
+  MUST NOT need to manage separate credentials (consistent with FR-017).
+
 ### Delivery Phases (Proposed Roadmap)
 
 | Phase | Scope | Gate / Acceptance |
@@ -275,8 +316,18 @@ exporting it back, and comparing the round-trip result for completeness.
 | 2 — AI Assistant | In-workspace assistant, recommendations, confirmation flow (US5) | Confirmed assistant operations land correctly in tree and native WI |
 | 3 — Markdown Conversion | Bidirectional md import/export, documented mapping (US6) | Round-trip fidelity verified on a sample library |
 | 4 — Hardening & Interop | Large-book performance, extension hooks, polish, documentation | Meets success criteria at scale; hooks documented |
+| 5 — AI Images | AI image generation as workspace image items; AI captioning of image items as a separate action (US7) | Generated images and confirmed captions land as regular, persisted image items |
 
 Phase order is a proposal; the owner confirms or reshuffles it during review/clarification.
+
+**Order amendments**:
+
+- 2026-09-15: Phase 3 (Markdown) delivered and closed by the owner (spec 004).
+- 2026-09-14: Phases 0 and 1 delivered (specs 002, 003). Phase 3 (Markdown) is delivered
+  next, before Phase 2 (AI Assistant) — spec 004. Phase 5 (AI Images) added by the owner;
+  its position relative to Phases 2 and 4 is decided when it is specified (the owner
+  will provide reference projects then). Day-to-day usage testing is deferred until all
+  main phases are delivered.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -293,6 +344,8 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
   output is a set of proposed operations.
 - **Conversion Mapping**: The documented rules linking markdown conventions to workspace
   entities and card fields.
+- **Image Item** *(added 2026-09-14; kind introduced by spec 003)*: An image in the tree
+  with a caption; may be AI-generated, and its caption may be AI-written (US7).
 
 ## Success Criteria *(mandatory)*
 
