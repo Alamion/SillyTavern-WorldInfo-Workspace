@@ -8,7 +8,7 @@ workspace-authoritative sync into the native World Info format via designated "W
 Info" root folders, an in-workspace AI lore assistant, and bidirectional markdown
 conversion. Roadmap and full requirements: `specs/001-workspace-plugin-roadmap/`.
 
-**Current increment (spec 003)**: Phase 1 Core Workspace MVP implemented and validated
+**Previous increment (spec 003)**: Phase 1 Core Workspace MVP implemented and validated
 (owner walkthrough S1–S13, 2026-09-14; results in `quickstart.md`):
 the workspace runs on real persisted data (`extensionSettings['WorldInfoWorkspace']`,
 schema v1 with migration/recovery), full tree CRUD with multi-select bulk actions and a
@@ -21,7 +21,11 @@ flattened pushes with divergence guards in both directions, orphan retention/res
 resolution, and the Lorebooks panel (all native books: activation, import next to the
 tree selection / update from native, delete — search, filters, pagination). Design contracts:
 `specs/003-core-workspace-mvp/` (research/data-model/contracts/quickstart/tasks).
-Next: Phase 2 (AI assistant) per the roadmap.
+**Current increment (spec 004, implemented and owner-validated 2026-09-15)**: roadmap Phase 3 — Markdown Folder Sync (roadmap order
+amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and import of
+any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
+hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
+UI contract, quickstart S0–S14). Next: Phase 2 (AI assistant).
 
 ## Key Reference
 
@@ -70,14 +74,21 @@ needs them.
 src/
 ├── core/                # Pure logic (Vitest-first, no app imports)
 │   ├── state/           # schema.ts (WorkspaceState v1 + migrate), store.ts
-│   ├── tree/            # operations.ts, browse.ts, validation.ts
+│   ├── tree/            # operations.ts, browse.ts, validation.ts, imageLinks.ts (image
+│   │                    #   references in content: img:<id>, names, paths, ![[…]], URLs)
 │   ├── sync/            # flatten.ts, fingerprint.ts, divergence.ts, import.ts,
 │   │                    #   bookNaming.ts
 │   ├── books/           # listing.ts (book search/filters/pagination for book lists)
+│   ├── md/              # Markdown folders (spec 004): ports.ts (DiskFolder/access/yaml/
+│   │                    #   image store ports), convention.ts (field table, entry files,
+│   │                    #   folder records), naming.ts, scan.ts, exportPlan.ts,
+│   │                    #   importPlan.ts, reconcile.ts (three-way), linkRender.ts,
+│   │                    #   applyPull.ts, imageRefs.ts, reference.ts, report.ts, hash.ts,
+│   │                    #   dataUri.ts
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
 │   ├── fieldSchema.ts   # Typed field schema + drawer layout (from Phase 0)
 │   ├── preview.ts       # Markdown renderer + placeholder hook (FR-010)
-│   └── assistant/       # diff.ts (assistant mock, Phase 2 scope)
+│   └── diff/            # lineDiff.ts — shared LCS line diff (any before/after view)
 ├── adapters/            # App boundary — the ONLY host-facing modules
 │   ├── shell.ts             # Host drawer composition (#WorldInfo mount)
 │   ├── appApi.ts            # getAppContext() (memoized API) + getLiveAppContext()
@@ -88,6 +99,13 @@ src/
 │   ├── bookStates.ts        # Book facts: global activation, character/chat binding, bound folder
 │   ├── syncEngine.ts        # Push pipeline, divergence reports, orphan/import flows
 │   ├── saveEvents.ts        # Save outcome events (failure banner, FR-009)
+│   ├── workspaceActions.ts  # Tree change + sync-engine notification; restored WI roots
+│   ├── fsaDisk.ts           # File System Access folder port + IndexedDB link store
+│   ├── yamlCodec.ts         # YAML via SillyTavern.libs.yaml (never bundled)
+│   ├── imageStore.ts        # App image storage (user/images/WorldInfoWorkspace/)
+│   ├── mdExport.ts / mdImport.ts  # One-off export / import runners
+│   ├── mdLink.ts            # Linked folder: pull, debounced auto-push, conflicts, reconnect
+│   ├── mdController.ts      # UI-facing markdown surface (busy, reports, decisions)
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
@@ -101,6 +119,11 @@ src/
 │   ├── Sheet.tsx            # Mobile bottom sheet
 │   ├── fieldGroups/FieldGroups.tsx  # Essentials/Content/Advanced rows (store-bound)
 │   ├── fieldGroups/MultiSelect.tsx  # Chip multi-select; CharacterFilterControl (chars + tags)
+│   ├── MarkdownControl.tsx  # Header chip + menu: link/sync/export/import/reference
+│   ├── DiffView.tsx         # SHARED side-by-side diff (assistant proposals, conflicts, …)
+│   ├── ConflictDialog.tsx   # Per-item keep workspace / keep file / skip
+│   ├── OperationReport.tsx  # Import/export/sync report modal
+│   ├── MappingReference.tsx # Convention tables + sample entry
 │   ├── AssistantPanel.tsx   # Batch-proposal mock (Phase 2 scope)
 │   └── mount.tsx            # React root creation
 ├── styles/
@@ -112,8 +135,13 @@ src/
 └── index.ts             # Entry: init state+services, shell mount on APP_READY
 tests/
 ├── manifest.test.ts     # Manifest contract test (spec 001)
+├── support/             # memoryDisk.ts (in-memory DiskFolder + fault injection, node
+│                        #   digest/yaml, MemoryImageStore), mdFixtures.ts
 ├── contract/
-│   └── native-wi.test.ts        # Adapter usage vs app contract (jsdom)
+│   ├── native-wi.test.ts        # Adapter usage vs app contract (jsdom)
+│   ├── disk-port.test.ts        # DiskFolder guarantees (runDiskPortSuite)
+│   ├── yaml-codec.test.ts       # libs.yaml delegation
+│   └── hooks.test.ts            # wi-workspace:md-* event payloads
 ├── integration/
 │   └── sync-engine.test.ts      # REAL engine + adapters vs FakeHost mirroring the app's
 │                                #   save/cache/event mechanics; scenarios A–W (every live
@@ -121,7 +149,7 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.2.0)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.3.0)
 ```
 
 ## Settings
@@ -167,6 +195,46 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   decision 2026-09-08; the former wiw-marker image encoding is retired). Sync state is
   PER BOOK (`sync.books[bookName] = { uid, hash, status }`) — nested WI roots give an
   entity independent uids in several books.
+
+## Markdown folders (spec 004)
+
+- **Access**: browser File System Access API only (desktop Chromium + secure page:
+  HTTPS or localhost); elsewhere the header control is disabled with an explanation.
+  The link (directory handle + baseline) lives in IndexedDB `WorldInfoWorkspace-md`
+  (store `links`, key `default`) — per browser profile, never in extension settings.
+  Alternatives (server plugin, upload/download) are recorded in the spec; all logic sits
+  behind `core/md/ports.ts` so another access port can be added.
+- **Convention** (`contracts/markdown-convention.md`): directory = folder, `.md` = entry
+  (YAML front matter with `wi_`-prefixed keys + verbatim body), image files = image
+  items, hidden `.wiw-folder.yaml` = folder record. Minimal metadata: every key optional,
+  defaults never written, ids never written, records only for non-default folders;
+  foreign keys (`tags`, `aliases`) and unknown `wi_*` keys are preserved (`node.md`).
+- **Import**: the picked folder becomes one workspace folder, or — via the selection
+  dialog — only chosen top-level folders/files, each as its own item
+  (`core/md/folderViews.ts`: `wrapAsDirectory` / `selectTopLevel` over the picked folder);
+  "Import files…" (`showOpenFilePicker`, `core/md/filesFolder.ts`) imports single
+  notes/images through the same pipeline.
+- **Typing performance**: `ui/mount.tsx` stops editing events (keydown/input/…, except
+  Escape) at the workspace container — the app's document-level delegated jQuery handlers
+  otherwise matched selectors on every keystroke.
+- **Identity**: optional `wi_id` hint → path → folder move → unique content hash; rename +
+  edit on disk in one interval = confirmed deletion + creation.
+- **Hybrid sync** (`mdLink.ts`): workspace edits auto-push (1000 ms debounce) and are
+  HELD BACK when the file changed on disk since the baseline; disk changes are pulled on
+  Sync and when the workspace is shown (`shell.onWorkspaceShown`, inside the click for
+  permission prompts). Conflicts: keep workspace / keep file / skip; disk deletions need
+  confirmation (decline = files written again). Pulled changes go through the Phase 1
+  tree ops + `workspaceActions.applyTreeChange`, so native books update as usual.
+- **Images**: imported/uploaded images go to the app image storage via
+  `/api/images/upload` (`user/images/WorldInfoWorkspace/`, formats bmp/png/jpg/jpeg/jfif/
+  gif/webp; SVG/AVIF stay `data:` URIs); owned files are deleted when no image item
+  references them any more (`core/md/imageRefs.ts`, wired in `settingsStore.ts`).
+- **Hooks** (additive, constitution VII): `wi-workspace:md-link-changed`
+  `{ state: 'none'|'loading'|'needs-reconnect'|'unavailable'|'linked', folderName }`,
+  `wi-workspace:md-synced` `{ report: OperationReport }`.
+- **Live automation**: Playwright cannot drive the native picker — substitute
+  `window.showDirectoryPicker = () => navigator.storage.getDirectory()` via
+  `page.addInitScript` (OPFS handle, same interface).
 
 ## SillyTavern Integration
 

@@ -20,6 +20,11 @@ export interface ItemEditorProps {
     onDuplicate: (id: string) => void;
     onDelete: (id: string) => void;
     onToggleWiRoot: (id: string) => void;
+    /**
+     * Stores a picked image file in the app image storage (spec 004 FR-024) and
+     * returns its `src`; null when the format is not accepted (then embedded).
+     */
+    uploadImage?: (file: File) => Promise<string | null>;
     folderExtras?: (folder: Extract<TreeNode, { kind: 'folder' }>) => ReactNode;
 }
 
@@ -35,6 +40,7 @@ export function ItemEditor({
     onDuplicate,
     onDelete,
     onToggleWiRoot,
+    uploadImage,
     folderExtras,
 }: ItemEditorProps): JSX.Element {
     if (!node) {
@@ -75,6 +81,7 @@ export function ItemEditor({
                 banner={banner}
                 onCommitName={(value) => onCommitName(node.id, value)}
                 onCommitImage={onCommitImage}
+                uploadImage={uploadImage}
                 onDuplicate={() => onDuplicate(node.id)}
                 onDelete={() => onDelete(node.id)}
             />
@@ -97,6 +104,7 @@ export function ItemEditor({
 type ImageSourceMode = 'url' | 'svg' | 'file';
 
 const SVG_DATA_PREFIX = 'data:image/svg+xml,';
+const STORED_IMAGE_PREFIX = 'user/images/WorldInfoWorkspace/';
 
 function svgToDataUri(svg: string): string {
     return `${SVG_DATA_PREFIX}${encodeURIComponent(svg)}`;
@@ -114,7 +122,7 @@ function detectImageMode(src: string): ImageSourceMode {
     if (src.startsWith(SVG_DATA_PREFIX)) {
         return 'svg';
     }
-    if (src.startsWith('data:')) {
+    if (src.startsWith('data:') || src.replace(/^\/+/, '').startsWith(STORED_IMAGE_PREFIX)) {
         return 'file';
     }
     return 'url';
@@ -125,6 +133,7 @@ function ImageEditor({
     banner,
     onCommitName,
     onCommitImage,
+    uploadImage,
     onDuplicate,
     onDelete,
 }: {
@@ -132,6 +141,7 @@ function ImageEditor({
     banner?: ReactNode;
     onCommitName(name: string): void;
     onCommitImage: ItemEditorProps['onCommitImage'];
+    uploadImage?: ItemEditorProps['uploadImage'];
     onDuplicate(): void;
     onDelete(): void;
 }): JSX.Element {
@@ -156,7 +166,9 @@ function ImageEditor({
         }
     };
 
-    const pickFile = (file: File): void => {
+    const [uploading, setUploading] = useState(false);
+
+    const embedFile = (file: File): void => {
         const reader = new FileReader();
         reader.onload = () => {
             if (typeof reader.result === 'string') {
@@ -164,6 +176,25 @@ function ImageEditor({
             }
         };
         reader.readAsDataURL(file);
+    };
+
+    const pickFile = (file: File): void => {
+        if (!uploadImage) {
+            embedFile(file);
+            return;
+        }
+        setUploading(true);
+        void uploadImage(file)
+            .then((src) => {
+                if (src === null) {
+                    embedFile(file);
+                } else {
+                    onCommitImage(image.id, { src });
+                }
+            })
+            // The caller reports the failure; the previous source stays.
+            .catch(() => undefined)
+            .finally(() => setUploading(false));
     };
 
     return (
@@ -221,13 +252,17 @@ function ImageEditor({
                 )}
                 {mode === 'file' && (
                     <div className="wiw-field wiw-field-wide" style={{ gridColumn: 'span 12' }}>
-                        <span className="wiw-field-label">Pick an image file (stored as a data URI)</span>
-                        <label className="wiw-button wiw-file-button">
-                            <i className="fa-solid fa-folder-open" /> Choose file…
+                        <span className="wiw-field-label">
+                            Pick an image file (stored in the app image storage; SVG/AVIF are embedded)
+                        </span>
+                        <label className="wiw-button wiw-file-button" aria-disabled={uploading}>
+                            <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-folder-open'}`} />{' '}
+                            {uploading ? 'Uploading…' : 'Choose file…'}
                             <input
                                 type="file"
                                 accept="image/*"
                                 hidden
+                                disabled={uploading}
                                 onChange={(event) => {
                                     const file = event.target.files?.[0];
                                     event.target.value = '';

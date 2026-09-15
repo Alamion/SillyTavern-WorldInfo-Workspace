@@ -592,3 +592,267 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     justify-content: center;
     gap: $spacing-md;
 }
+
+// ---------------------------------------------------------------------------
+// Markdown folders (spec 004): status chip, operation report, conflict diff,
+// mapping reference. Shared primitives — reuse, never restyle per component.
+// ---------------------------------------------------------------------------
+
+.wiw-panel-wide {
+    width: min(760px, 96%);
+    max-height: 86%;
+}
+
+.wiw-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-sm;
+    max-width: 260px;
+    padding: $spacing-xs $spacing-md;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 999px;
+    background: $surface-sunken;
+    color: var(--SmartThemeBodyColor);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: $transition-fast;
+
+    span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &:hover {
+        border-color: var(--SmartThemeEmColor);
+    }
+}
+
+.wiw-chip-warn {
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 35%);
+
+    i {
+        color: var(--SmartThemeQuoteColor);
+    }
+}
+
+.wiw-chip-count {
+    min-width: 18px;
+    padding: 0 $spacing-sm;
+    border-radius: 999px;
+    background: var(--SmartThemeQuoteColor);
+    color: var(--SmartThemeBlurTintColor);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.wiw-dropdown {
+    @extend .wiw-tree-menu;
+    min-width: 210px;
+}
+
+.wiw-dropdown-note {
+    padding: $spacing-sm $spacing-md;
+    font-size: 0.78rem;
+    opacity: 0.75;
+    max-width: 280px;
+}
+
+.wiw-report-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs $spacing-sm;
+}
+
+.wiw-report-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: $spacing-sm;
+    padding: $spacing-xs $spacing-sm;
+    font-size: 0.8rem;
+
+    code {
+        overflow-wrap: anywhere;
+    }
+
+    small {
+        grid-column: 2;
+        opacity: 0.75;
+    }
+}
+
+.wiw-outcome-bad {
+    color: var(--SmartThemeBadColor);
+}
+
+.wiw-outcome-warn {
+    color: var(--SmartThemeQuoteColor);
+}
+
+.wiw-outcome-ok {
+    color: var(--SmartThemeEmColor);
+}
+
+.wiw-diff-row {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    padding: $spacing-sm;
+    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor), transparent 55%);
+
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+.wiw-diff-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-sm;
+    font-size: 0.82rem;
+
+    code {
+        margin-right: auto;
+        overflow-wrap: anywhere;
+    }
+}
+
+// Selected option of a choice group. QuoteColor is the accent the WI badges use; EmColor
+// is grey in several themes and was indistinguishable from hover.
+.wiw-button.wiw-choice-active,
+.wiw-button.wiw-choice-active:hover {
+    border-color: var(--SmartThemeQuoteColor);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 70%);
+    color: var(--SmartThemeBodyColor);
+    box-shadow: 0 0 0 1px var(--SmartThemeQuoteColor) inset;
+    transition: none;
+
+    i {
+        color: var(--SmartThemeQuoteColor);
+    }
+}
+
+.wiw-diff-row-decided {
+    border-left: 3px solid var(--SmartThemeQuoteColor);
+}
+
+.wiw-ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+
+    th,
+    td {
+        padding: $spacing-xs $spacing-sm;
+        border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor), transparent 55%);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        font-weight: 600;
+    }
+
+    code {
+        overflow-wrap: anywhere;
+    }
+}
+
+.wiw-ref-section {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+
+    // Scroll wrappers (tables) must not be squeezed to zero height by the flex column.
+    > * {
+        flex-shrink: 0;
+    }
+
+    h4 {
+        margin: $spacing-md 0 0;
+        font-size: 0.9rem;
+    }
+
+    ul {
+        margin: 0;
+        padding-left: 1.2em;
+        font-size: 0.8rem;
+    }
+
+    pre {
+        margin: 0;
+        padding: $spacing-sm;
+        border-radius: $radius-sm;
+        background: $surface-sunken;
+        font-size: 0.75rem;
+        white-space: pre-wrap;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Diff view — the shared before/after comparison (ui/DiffView.tsx).
+// ---------------------------------------------------------------------------
+
+.wiw-diff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.wiw-diff-pane {
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    overflow-y: auto;
+    min-width: 0;
+}
+
+.wiw-diff-pane-title {
+    position: sticky;
+    top: 0;
+    padding: 0.15rem 0.5rem;
+    background: var(--SmartThemeBlurTintColor);
+    font-size: 0.78em;
+    font-weight: 600;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+.wiw-diff-line {
+    min-height: 1.1em;
+
+    pre {
+        margin: 0;
+        padding: 0.05rem 0.5rem;
+        font-family: var(--monoFontFamily, monospace);
+        font-size: 0.8em;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    &.wiw-diff-removed pre {
+        background: var(--crimson70a);
+    }
+
+    &.wiw-diff-added pre {
+        background: var(--okGreen70a);
+    }
+
+    &.wiw-diff-empty pre {
+        opacity: 0.3;
+    }
+}
+
+.wiw-diff-compact {
+    flex: 0 0 auto;
+    max-height: 260px;
+}
+
+@media (max-width: 900px) {
+    .wiw-diff {
+        grid-template-columns: 1fr;
+    }
+}

@@ -17,7 +17,8 @@ export type TreeMenuAction =
     | 'move-up'
     | 'move-down'
     | 'duplicate'
-    | 'delete';
+    | 'delete'
+    | 'export-md';
 
 export interface TreeMenuState {
     id: string;
@@ -75,14 +76,29 @@ const KIND_TITLES: Record<BrowseFilter, string> = {
     images: 'Images',
 };
 
-const MENU_ITEMS: ReadonlyArray<{ action: TreeMenuAction; icon: string; label: string }> = [
+const MENU_ITEMS: ReadonlyArray<{ action: TreeMenuAction; icon: string; label: string; folderOnly?: boolean }> = [
     { action: 'rename', icon: 'fa-pen', label: 'Rename' },
     { action: 'move-to', icon: 'fa-folder-open', label: 'Move to…' },
     { action: 'move-up', icon: 'fa-arrow-up', label: 'Move up' },
     { action: 'move-down', icon: 'fa-arrow-down', label: 'Move down' },
     { action: 'duplicate', icon: 'fa-clone', label: 'Duplicate' },
+    { action: 'export-md', icon: 'fa-file-export', label: 'Export folder to markdown…', folderOnly: true },
     { action: 'delete', icon: 'fa-trash-can', label: 'Delete' },
 ];
+
+function isFolderId(root: FolderNode, id: string): boolean {
+    const stack: TreeNode[] = [root];
+    while (stack.length > 0) {
+        const node = stack.pop()!;
+        if (node.id === id) {
+            return node.kind === 'folder';
+        }
+        if (node.kind === 'folder') {
+            stack.push(...node.children);
+        }
+    }
+    return false;
+}
 
 const STICKY_MENU_ACTIONS: ReadonlySet<TreeMenuAction> = new Set(['move-up', 'move-down']);
 
@@ -457,7 +473,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
                     style={{ left: menu.x, top: menu.y }}
                     onClick={(event) => event.stopPropagation()}
                 >
-                    {MENU_ITEMS.map((item) => (
+                    {MENU_ITEMS.filter((item) => !item.folderOnly || isFolderId(props.root, menu.id)).map((item) => (
                         <button
                             key={item.action}
                             type="button"

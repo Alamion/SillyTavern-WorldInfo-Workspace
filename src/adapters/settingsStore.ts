@@ -12,6 +12,10 @@ import { WorkspaceStore } from '../core/state/store';
 import { createWorldInfoAdapter, type WorldInfoAdapter } from './worldInfoAdapter';
 import { createActiveBooksAdapter, type ActiveBooksAdapter } from './activeBooksAdapter';
 import { createSyncEngine, type SyncEngine } from './syncEngine';
+import { createMdController, type MdController } from './mdController';
+import { fsaAccess } from './fsaDisk';
+import { createImageStore } from './imageStore';
+import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
 
 /**
  * Bridges the pure workspace state into the app's persistence: reads
@@ -25,6 +29,7 @@ export interface WorkspaceStateServices {
     worldInfo: WorldInfoAdapter;
     activeBooks: ActiveBooksAdapter;
     sync: SyncEngine;
+    md: MdController;
 }
 
 let services: WorkspaceStateServices | null = null;
@@ -65,7 +70,33 @@ export function initWorkspaceState(): WorkspaceStateServices {
     const activeBooks = createActiveBooksAdapter();
     const sync = createSyncEngine({ ctx, store, worldInfo });
 
-    services = { store, worldInfo, activeBooks, sync };
+    const imageStore = createImageStore({ getRequestHeaders: () => ctx.getRequestHeaders() });
+    const md = createMdController({
+        store,
+        sync,
+        newId: () => ctx.uuidv4(),
+        access: fsaAccess,
+        imageStore,
+        emit: (event, payload) => void ctx.eventSource.emit(event, payload),
+    });
+    // FR-024: owned stored images nothing references any more are deleted.
+    let previousState = store.getState();
+    store.subscribe(() => {
+        const next = store.getState();
+        const released = ownedSrcsReleasedBy(previousState, next, imageStore.isOwned);
+        previousState = next;
+        for (const src of released) {
+            imageStore.remove(src).catch((error: unknown) => {
+                notifyWarning(`A stored image could not be deleted (${src}): ${String(error)}`);
+            });
+        }
+    });
+
+    if (fsaAccess.isSupported()) {
+        void md.link.init();
+    }
+
+    services = { store, worldInfo, activeBooks, sync, md };
     return services;
 }
 

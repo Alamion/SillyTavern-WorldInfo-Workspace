@@ -1,3 +1,4 @@
+/** Line diff (LCS) shared by every before/after view: assistant proposals, markdown conflicts, … */
 export type DiffOpType = 'same' | 'removed' | 'added';
 
 export interface DiffOp {

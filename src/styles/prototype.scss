@@ -736,57 +736,6 @@ body.wiw-active #WorldInfo > .wiw-root {
     font-weight: 600;
 }
 
-.wiw-diff {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
-    flex: 1 1 auto;
-    min-height: 0;
-}
-
-.wiw-diff-pane {
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 6px;
-    overflow-y: auto;
-    min-width: 0;
-}
-
-.wiw-diff-pane-title {
-    position: sticky;
-    top: 0;
-    padding: 0.15rem 0.5rem;
-    background: var(--SmartThemeBlurTintColor);
-    font-size: 0.78em;
-    font-weight: 600;
-    text-transform: uppercase;
-    z-index: 1;
-}
-
-.wiw-diff-line {
-    min-height: 1.1em;
-
-    pre {
-        margin: 0;
-        padding: 0.05rem 0.5rem;
-        font-family: var(--monoFontFamily, monospace);
-        font-size: 0.8em;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    &.wiw-diff-removed pre {
-        background: var(--crimson70a);
-    }
-
-    &.wiw-diff-added pre {
-        background: var(--okGreen70a);
-    }
-
-    &.wiw-diff-empty pre {
-        opacity: 0.3;
-    }
-}
-
 .wiw-sheet {
     position: absolute;
     left: 0;
@@ -911,10 +860,6 @@ body.wiw-active #WorldInfo > .wiw-root {
 
     .wiw-field.wiw-field-wide {
         grid-column: span 2 !important;
-    }
-
-    .wiw-diff {
-        grid-template-columns: 1fr;
     }
 
     .wiw-guide {

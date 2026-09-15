@@ -57,5 +57,28 @@ export function createDemoState(newId: () => string): WorkspaceState {
         }
     };
     state.root.children = SAMPLE_DATASET.root.children.map((child) => convert(child, state.root.id));
+    // Sample content references images by sample id (`img:img-map`), but ids are
+    // regenerated above: rewrite them to name references, which survive new ids and
+    // markdown export.
+    const imageNames = new Map<string, string>();
+    const collect = (node: SampleNode): void => {
+        if (node.kind === 'image') {
+            imageNames.set(node.id, node.name);
+        } else if (node.kind === 'folder') {
+            node.children.forEach(collect);
+        }
+    };
+    SAMPLE_DATASET.root.children.forEach(collect);
+    const rewrite = (node: TreeNode): void => {
+        if (node.kind === 'entry') {
+            node.native.content = node.native.content.replace(/\(img:([^)\s]+)\)/g, (match, id: string) => {
+                const name = imageNames.get(id);
+                return name === undefined ? match : `(<${name}>)`;
+            });
+        } else if (node.kind === 'folder') {
+            node.children.forEach(rewrite);
+        }
+    };
+    state.root.children.forEach(rewrite);
     return state;
 }

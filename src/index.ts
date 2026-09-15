@@ -25,6 +25,12 @@ function initSurface(services: WorkspaceStateServices): void {
     // FR-009 flush point: pending book pushes complete before the panel closes.
     shell.onClose(() => {
         void services.sync.pushPendingNow('panel-close');
+        void services.md.link.flush();
+    });
+    // Spec 004 FR-010: changes made in the linked folder are pulled when the
+    // workspace is shown (the handler runs inside the click, keeping user activation).
+    shell.onWorkspaceShown(() => {
+        void services.md.link.onWorkspaceOpened({ userActivation: navigator.userActivation?.isActive ?? true });
     });
 }
 
@@ -42,7 +48,7 @@ export function initWorkspace(): void {
 
     const ctx = getAppContext();
     ctx.eventSource.on(ctx.eventTypes.APP_READY, () => {
-        debugLog(`workspace v${'0.2.0'} ready`);
+        debugLog(`workspace v${'0.3.0'} ready`);
         const services = initWorkspaceState();
         initSurface(services);
     });

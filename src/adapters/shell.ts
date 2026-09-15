@@ -30,6 +30,12 @@ export interface WorkspaceShell {
     setWorkspaceMode(on: boolean): void;
     onOpen(handler: () => void): void;
     onClose(handler: () => void): void;
+    /**
+     * Called whenever the workspace surface becomes visible: synchronously inside the
+     * "Workspace" button click (user activation available — spec 004 research R2) and
+     * when the drawer opens in workspace mode.
+     */
+    onWorkspaceShown(handler: () => void): void;
 }
 
 function isDrawerOpen(drawer: Element): boolean {
@@ -86,12 +92,18 @@ export function mountWorkspaceShell(): WorkspaceShell | null {
     // Default mode is the native Worlds/Lorebooks editor (owner decision).
     applyMode(false);
 
+    const shownHandlers: Array<() => void> = [];
+    const notifyShown = (): void => shownHandlers.forEach((handler) => handler());
+
     // Insert the mode toggle into the native editor's book row.
     const holder = document.querySelector(HOLDER_SELECTOR);
     const createButton = document.querySelector(CREATE_BUTTON_SELECTOR);
     const anchor: Element | null = createButton ?? holder;
     if (anchor?.parentElement) {
-        const toggle = buildNativeToggleButton(() => applyMode(true));
+        const toggle = buildNativeToggleButton(() => {
+            applyMode(true);
+            notifyShown();
+        });
         anchor.parentElement.insertBefore(toggle, anchor);
     } else {
         notifyWarning('native book row not found; the Workspace switch is unavailable');
@@ -109,6 +121,9 @@ export function mountWorkspaceShell(): WorkspaceShell | null {
         open = nowOpen;
         const handlers = nowOpen ? openHandlers : closeHandlers;
         handlers.forEach((handler) => handler());
+        if (nowOpen && activeMode === 'workspace') {
+            notifyShown();
+        }
     });
     observer.observe(drawer, { attributes: true, attributeFilter: ['class', 'style'] });
     window.addEventListener('beforeunload', () => observer.disconnect(), { once: true });
@@ -120,6 +135,7 @@ export function mountWorkspaceShell(): WorkspaceShell | null {
         setWorkspaceMode: (on: boolean) => applyMode(on),
         onOpen: (handler) => openHandlers.push(handler),
         onClose: (handler) => closeHandlers.push(handler),
+        onWorkspaceShown: (handler) => shownHandlers.push(handler),
     };
 }
 

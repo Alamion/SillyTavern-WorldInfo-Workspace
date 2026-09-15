@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffLines, pairDiffRows } from '../../src/core/assistant/diff';
+import { diffLines, pairDiffRows } from '../../src/core/diff/lineDiff';
 
 describe('diffLines', () => {
     it('detects unchanged lines', () => {

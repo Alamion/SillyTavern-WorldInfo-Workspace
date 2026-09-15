@@ -644,7 +644,9 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             if (mode === 'adopt' && bookName) {
                 boundName = bookName;
             } else {
-                const created = await worldInfo.createBook(folder.name);
+                // `bookName` in create mode is only a proposal (markdown import
+                // restores the recorded book name); collisions still resolve.
+                const created = await worldInfo.createBook(bookName ?? folder.name);
                 if (!created) {
                     return;
                 }

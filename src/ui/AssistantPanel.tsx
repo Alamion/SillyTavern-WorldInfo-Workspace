@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { diffLines, pairDiffRows, type DiffRow } from '../core/assistant/diff';
+import { useState } from 'react';
+import { DiffView } from './DiffView';
 
 const BEFORE =
     'Capital of Aldermeer, built on the confluence of the Lira and the Ossen.\nThe harbor district never sleeps; grain, wool, and resin come down the rivers.\nSells charcoal. The Bridgehold watch answers to the guilds.';
@@ -75,7 +75,6 @@ function DiffModal({
     after: string;
     onClose: () => void;
 }): JSX.Element {
-    const rows: DiffRow[] = useMemo(() => pairDiffRows(diffLines(before, after)), [before, after]);
     return (
         <div className="wiw-modal">
             <div className="wiw-modal-card">
@@ -85,42 +84,7 @@ function DiffModal({
                         <i className="fa-solid fa-xmark" /> Close
                     </button>
                 </header>
-                <div className="wiw-diff">
-                    <div className="wiw-diff-pane">
-                        <div className="wiw-diff-pane-title">Before</div>
-                        {rows.map((row, index) => (
-                            <div
-                                key={index}
-                                className={`wiw-diff-line${
-                                    row.left === null
-                                        ? ' wiw-diff-empty'
-                                        : row.state === 'same'
-                                          ? ''
-                                          : ' wiw-diff-removed'
-                                }`}
-                            >
-                                <pre>{row.left ?? ''}</pre>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="wiw-diff-pane">
-                        <div className="wiw-diff-pane-title">After</div>
-                        {rows.map((row, index) => (
-                            <div
-                                key={index}
-                                className={`wiw-diff-line${
-                                    row.right === null
-                                        ? ' wiw-diff-empty'
-                                        : row.state === 'same'
-                                          ? ''
-                                          : ' wiw-diff-added'
-                                }`}
-                            >
-                                <pre>{row.right ?? ''}</pre>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <DiffView before={before} after={after} />
             </div>
         </div>
     );

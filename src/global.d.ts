@@ -163,12 +163,49 @@ export interface SillyTavernContext {
     chatMetadata?: Record<string, unknown>;
 }
 
+/**
+ * App-bundled libraries (`public/lib.js` → `globalThis.SillyTavern.libs`). Only the
+ * members this plugin uses are typed (spec 004 research R3: `yaml@2`).
+ */
+export interface SillyTavernLibs {
+    yaml: {
+        parse(text: string): unknown;
+        stringify(value: unknown, options?: { lineWidth?: number }): string;
+    };
+}
+
+export interface SillyTavernGlobal {
+    getContext(): SillyTavernContext;
+    libs?: SillyTavernLibs;
+}
+
+/** File System Access API members missing from TypeScript's lib.dom (spec 004 R1). */
+export interface DirectoryPickerOptions {
+    id?: string;
+    mode?: 'read' | 'readwrite';
+    startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads';
+}
+
 declare global {
     interface Window {
-        SillyTavern?: { getContext(): SillyTavernContext };
+        SillyTavern?: SillyTavernGlobal;
         toastr?: SillyTavernToastr;
+        showDirectoryPicker?: (options?: DirectoryPickerOptions) => Promise<FileSystemDirectoryHandle>;
+        showOpenFilePicker?: (options?: {
+            id?: string;
+            multiple?: boolean;
+            excludeAcceptAllOption?: boolean;
+            types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+        }) => Promise<FileSystemFileHandle[]>;
     }
-    var SillyTavern: { getContext(): SillyTavernContext } | undefined;
+    interface FileSystemHandle {
+        queryPermission?(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
+        requestPermission?(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
+    }
+    interface FileSystemDirectoryHandle {
+        values(): AsyncIterableIterator<FileSystemFileHandle | FileSystemDirectoryHandle>;
+    }
+    var SillyTavern: SillyTavernGlobal | undefined;
     var toastr: SillyTavernToastr | undefined;
 }
 

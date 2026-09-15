@@ -83,6 +83,19 @@ describe('migrate', () => {
         expect(deepValidateState(state)).toEqual([]);
     });
 
+    it('loads nodes carrying markdown extras without recovery (spec 004)', () => {
+        const raw: Record<string, unknown> = JSON.parse(JSON.stringify(createDefaultState()));
+        const entry = createEntryNode({ id: 'e1', parentId: 'workspace-root', name: 'x', now: NOW, nativeUid: 1 });
+        entry.md = { foreign: { tags: ['a'] }, unknownOwned: { wi_future: 1 }, rawOnParseError: true };
+        const folder = createFolderNode({ id: 'f1', parentId: 'workspace-root', name: 'F', now: NOW });
+        folder.md = { foreign: { cssclass: 'lore' } };
+        (raw.root as Record<string, unknown>).children = JSON.parse(JSON.stringify([entry, folder]));
+        const state = migrate(raw);
+        expect(state._recovered).toBeUndefined();
+        expect(findNode(state, 'e1')?.md).toEqual(entry.md);
+        expect(findNode(state, 'f1')?.md).toEqual(folder.md);
+    });
+
     it('recovers garbage input into a default state with the payload retained', () => {
         const state = migrate('not-a-workspace');
         expect(state.version).toBe(1);

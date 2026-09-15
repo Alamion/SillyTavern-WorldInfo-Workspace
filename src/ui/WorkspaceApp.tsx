@@ -6,6 +6,7 @@ import { onSaveEvent } from '../adapters/saveEvents';
 import { openNativeMode } from '../adapters/shell';
 import { notifyError, notifySuccess } from '../adapters/logger';
 import { discardRecovered, restoreRecovered, type WorkspaceStateServices } from '../adapters/settingsStore';
+import { applyTreeChange, collectEntityDeletions } from '../adapters/workspaceActions';
 import type { NativeWorldInfoEntry } from '../global';
 import { createDemoState } from '../core/demo/dataset';
 import {
@@ -29,8 +30,10 @@ import {
     type CreateKind,
 } from '../core/tree/operations';
 import { validateNode } from '../core/tree/validation';
+import { resolveImageReference } from '../core/tree/imageLinks';
 import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
+import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
 import Sheet from './Sheet';
 import { StructureTree, type TreeMenuAction, type TreeMenuState } from './StructureTree';
@@ -249,9 +252,9 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         // does not follow an unrelated drag.
         if (selectedIds.size > 1) {
             const ids = [...selectedIds, nodeId];
-            applyOperation((current) => bulkMoveNodes(current, ids, parentId, indexInParent));
+            applyTreeChange(services, (current) => bulkMoveNodes(current, ids, parentId, indexInParent));
         } else {
-            applyOperation((current) => moveNode(current, nodeId, parentId, indexInParent));
+            applyTreeChange(services, (current) => moveNode(current, nodeId, parentId, indexInParent));
         }
         sync.refreshStructure();
     };
@@ -318,29 +321,20 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                   (targets.some((node) => entityBooks(node).length > 0)
                       ? ' Native book copies of synced items will be removed at the next sync.'
                       : '');
-        const confirmed = options.preconfirmed === true || (await confirmDialog(label));
+        const tracked = services.md.link.getStatus().trackedIds;
+        const linkedFiles = targets.some((node) => {
+            const ids = buildNodeIndex(node).keys();
+            return [...ids].some((id) => tracked.has(id));
+        });
+        const confirmed =
+            options.preconfirmed === true ||
+            (await confirmDialog(linkedFiles ? `${label} Its file(s) in the linked folder will be removed.` : label));
         if (!confirmed) {
             return;
         }
-        const affectedBooks = new Set<string>();
-        const deletions: Array<{ bookName: string; uid: number }> = [];
-        // Deletion of a FOLDER removes its whole subtree: collect per-book uids
-        // recursively, otherwise copies inside parent WI books survive.
-        const collectDeletions = (node: TreeNode): void => {
-            if (node.kind === 'entry') {
-                for (const [bookName, bookSync] of Object.entries(node.sync.books)) {
-                    affectedBooks.add(bookName);
-                    if (bookSync.uid !== null) {
-                        deletions.push({ bookName, uid: bookSync.uid });
-                    }
-                }
-                return;
-            }
-            if (node.kind === 'folder') {
-                node.children.forEach(collectDeletions);
-            }
-        };
-        targets.forEach(collectDeletions);
+        // Deletion of a FOLDER removes its whole subtree: per-book uids are
+        // collected recursively, otherwise copies inside parent WI books survive.
+        const { deletions, books: affectedBooks } = collectEntityDeletions(targets);
         if (deletions.length > 0) {
             // FR-021 removal intent: tombstones keep the auto-merge from
             // resurrecting what the user explicitly deleted.
@@ -360,13 +354,10 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         // Record tombstones FIRST, then delete against the CURRENT state so the
         // tombstones survive (a stale replace would erase them and the next
         // auto-merge would resurrect the deleted entities).
-        if (deletions.length > 0) {
-            sync.recordEntityDeletions(deletions);
-        }
-        applyOperation((current) => bulkDeleteNodes(current, ids));
-        if (affectedBooks.size > 0) {
-            sync.markBooksDirty([...affectedBooks]);
-        }
+        applyTreeChange(services, (current) => bulkDeleteNodes(current, ids), {
+            deletions,
+            books: affectedBooks,
+        });
         setSelectedIds((prev) => {
             const next = new Set(prev);
             ids.forEach((id) => next.delete(id));
@@ -465,6 +456,9 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
             case 'delete':
                 void handleDelete([id]);
                 break;
+            case 'export-md':
+                void services.md.exportFolder(id);
+                break;
         }
     };
 
@@ -493,8 +487,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         const ids = movePickerFor?.ids ?? [];
         setMovePickerFor(null);
         if (ids.length > 0) {
-            applyOperation((current) => bulkMoveNodes(current, ids, parentId));
-            sync.refreshStructure();
+            applyTreeChange(services, (current) => bulkMoveNodes(current, ids, parentId), { structure: true });
         }
     };
 
@@ -566,13 +559,8 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         applyOperation((current) => commitImageOp(current, imageId, patch));
     };
 
-    const resolveImage = (ref: string): string | undefined => {
-        if (!ref.startsWith('img:')) {
-            return undefined;
-        }
-        const node = index.get(ref.slice(4));
-        return node && node.kind === 'image' ? node.src : undefined;
-    };
+    const resolveImage = (ref: string): string | undefined =>
+        resolveImageReference(state.root, index, selected?.id ?? null, ref);
 
     const substitute = (text: string): string => {
         try {
@@ -642,6 +630,22 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         onDuplicate: (id: string) => handleDuplicate(id),
         onDelete: (id: string) => void handleDelete([id]),
         onToggleWiRoot: (id: string) => void toggleWiRoot(id),
+        uploadImage: async (file: File): Promise<string | null> => {
+            const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : '';
+            if (!services.md.imageStore.accepts(ext)) {
+                return null;
+            }
+            try {
+                return await services.md.imageStore.upload({
+                    bytes: new Uint8Array(await file.arrayBuffer()),
+                    ext,
+                    stem: file.name.replace(/\.[^.]+$/, ''),
+                });
+            } catch (error) {
+                notifyError(`The image could not be stored: ${error instanceof Error ? error.message : String(error)}`);
+                throw error;
+            }
+        },
         folderExtras: (folder: FolderNode) => (
             <RootBookSettings
                 folder={folder}
@@ -663,6 +667,13 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     <i className="fa-solid fa-book-atlas" /> Worlds/Lorebooks
                 </button>
                 <div className="wiw-header-spacer" />
+                <MarkdownControl
+                    md={services.md}
+                    exportScopeId={selected?.kind === 'folder' ? selected.id : state.root.id}
+                    exportScopeLabel={selected?.kind === 'folder' ? `"${selected.name}"` : 'workspace'}
+                    importTargetId={importTarget().id}
+                    importTargetLabel={importTarget().id === state.root.id ? 'workspace root' : `"${importTarget().name}"`}
+                />
                 <button
                     type="button"
                     className="wiw-button wiw-icon-button"

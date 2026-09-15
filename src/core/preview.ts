@@ -21,6 +21,10 @@ function escapeHtml(text: string): string {
         .replace(/"/g, '&quot;');
 }
 
+function unescapeHtml(text: string): string {
+    return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+}
+
 function applyPlaceholder(text: string, options: PreviewOptions): string {
     if (!options.resolvePlaceholder) {
         return text;
@@ -31,14 +35,22 @@ function applyPlaceholder(text: string, options: PreviewOptions): string {
 function renderInline(text: string, options: PreviewOptions): string {
     let out = escapeHtml(applyPlaceholder(text, options));
     out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
-    out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt: string, ref: string) => {
-        const decoded = (alt ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+    const embed = (alt: string, escapedRef: string): string => {
+        const ref = unescapeHtml(escapedRef);
         const source = options.resolveImage?.(ref) ?? undefined;
         if (source) {
-            return `<img src="${escapeHtml(source)}" alt="${decoded}" />`;
+            return `<img src="${escapeHtml(source)}" alt="${alt}" />`;
         }
-        return `<span class="wiw-md-missing-image">[missing image: ${escapeHtml(ref)}]</span>`;
-    });
+        return `<span class="wiw-md-missing-image">[missing image: ${escapedRef}]</span>`;
+    };
+    // Markdown images: `![alt](ref)`, `![alt](<ref with spaces>)`, refs may contain spaces.
+    out = out.replace(/!\[([^\]]*)\]\((&lt;.+?&gt;|[^)]+)\)/g, (_match, alt: string, ref: string) =>
+        embed(alt ?? '', ref.replace(/^&lt;(.*)&gt;$/, '$1'))
+    );
+    // Obsidian embeds: `![[name]]`, `![[name|alt]]`.
+    out = out.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match, ref: string, alt?: string) =>
+        embed(alt ?? '', ref)
+    );
     out = out.replace(
         /\[([^\]]+)\]\(([^)\s]+)\)/g,
         '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>'

@@ -15,12 +15,26 @@ export const ROOT_ID = 'workspace-root';
 export type NodeKind = 'folder' | 'entry' | 'image';
 export type SortMode = 'custom' | 'title' | 'position' | 'depth' | 'order' | 'trigger';
 
+/**
+ * Markdown round-trip extras (spec 004 FR-005): metadata a markdown file or folder
+ * record carried that the convention does not own, kept so export writes it back.
+ */
+export interface NodeMarkdownExtras {
+    /** Keys without the `wi_` prefix, in original order. */
+    foreign?: Record<string, unknown>;
+    /** Unrecognized `wi_*` keys (reported, preserved). */
+    unknownOwned?: Record<string, unknown>;
+    /** Imported from malformed front matter; the file is not rewritten until edited. */
+    rawOnParseError?: boolean;
+}
+
 export interface NodeBase {
     id: string;
     parentId: string | null;
     name: string;
     createdAt: string;
     updatedAt: string;
+    md?: NodeMarkdownExtras;
 }
 
 export interface OrphanedEntry {
