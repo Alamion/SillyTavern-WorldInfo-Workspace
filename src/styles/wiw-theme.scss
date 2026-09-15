@@ -876,6 +876,45 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     min-height: 0;
 }
 
+// Form controls of the assistant (inputs, number fields, selects, textareas —
+// including its settings, context and editor overlays): themed like the editor
+// fields instead of the browser's default white background.
+.wiw-assistant {
+    input[type='text'],
+    input[type='number'],
+    input:not([type]),
+    select,
+    textarea {
+        padding: 0.2rem 0.4rem;
+        border: 1px solid var(--SmartThemeBorderColor);
+        border-radius: 4px;
+        background: var(--SmartThemeBlurTintColor);
+        color: var(--SmartThemeBodyColor);
+        font: inherit;
+        min-width: 0;
+
+        &:focus {
+            outline: none;
+            border-color: var(--SmartThemeQuoteColor);
+        }
+
+        &:disabled {
+            opacity: 0.55;
+        }
+    }
+
+    option,
+    optgroup {
+        background: var(--SmartThemeBlurTintColor);
+        color: var(--SmartThemeBodyColor);
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        accent-color: var(--SmartThemeQuoteColor);
+    }
+}
+
 .wiw-assistant-header {
     display: flex;
     align-items: center;
