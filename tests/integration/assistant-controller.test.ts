@@ -632,6 +632,29 @@ describe('reorganization and undo (US2)', () => {
         expect(findNode(harness.store.getState(), created)?.parentId).toBe(folderId);
     });
 
+    it('undoes every click of a reply at once, newest first (owner report 2026-09-17)', async () => {
+        const { harness, seq, proposals } = await withReply(
+            [
+                '<op type="create_folder" parent="f3" ref="new1"><title>Magic</title></op>',
+                '<op type="create_entry" parent="new1"><title>Mirror magic</title><content>x</content></op>',
+                '<op type="create_entry" parent="new1"><title>Doll craft</title><content>y</content></op>',
+            ].join('\n')
+        );
+        for (const proposal of proposals) {
+            await harness.controller.accept(seq, proposal.id);
+        }
+        const batchNow = () => harness.controller.getSnapshot().messages.at(-1)?.batch;
+        expect(batchNow()?.applied).toHaveLength(3);
+        const undone = await harness.controller.undoAll(seq);
+        expect(undone?.reverted).toHaveLength(3);
+        expect(undone?.skipped).toEqual([]);
+        expect(batchNow()?.proposals.map((proposal) => proposal.decision)).toEqual(['reverted', 'reverted', 'reverted']);
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Magic');
+        // Nothing left: a second undo does nothing.
+        expect(await harness.controller.undoAll(seq)).toBeNull();
+        expect(await harness.controller.undoBatch(seq, batchNow()?.applied[0]?.id ?? '')).toBeNull();
+    });
+
     it('re-applies a declined deletion only through the confirmation', async () => {
         const { harness, seq, proposals } = await withReply('<op type="delete" id="e2"></op>');
         confirmAnswer.value = false;

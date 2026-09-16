@@ -102,6 +102,8 @@ export interface AssistantController {
     confirmDestructive(seq: number, proposalId: string): Promise<void>;
     /** Resolves with the undo result, or null when nothing was undone. */
     undoBatch(seq: number, appliedBatchId: string): Promise<AppliedBatchUndone | null>;
+    /** Undoes every applied batch of a reply, newest first; the results are combined. */
+    undoAll(seq: number): Promise<AppliedBatchUndone | null>;
     /** Proposal review (FR-009, FR-010, FR-013, FR-017). */
     accept(seq: number, proposalId: string): Promise<void>;
     acceptAll(seq: number): Promise<void>;
@@ -617,6 +619,45 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         }));
     };
 
+    /** Reverts one applied batch (FR-015); an already undone one is left alone. */
+    const undoBatch = async (seq: number, appliedBatchId: string): Promise<AppliedBatchUndone | null> => {
+        const message = messageAt(seq);
+        const applied = message?.batch?.applied.find((item) => item.id === appliedBatchId);
+        // A fork shares the original's applied changes but not its undo (owner decision 2026-09-16).
+        if (!message?.batch || !applied || applied.undone !== undefined || message.forkedFrom !== undefined) {
+            return null;
+        }
+        const undone = undoAppliedBatch(
+            {
+                store: deps.store,
+                sync: deps.sync,
+                newId: deps.newId,
+                now: deps.now,
+                emit: deps.emit,
+            },
+            { conversationId: message.conversationId },
+            applied
+        );
+        const revertedProposals = new Set(
+            applied.items
+                .filter((item) => undone.reverted.includes(item.nodeId))
+                .map((item) => item.proposalId)
+        );
+        await updateBatch(seq, (batch) => ({
+            ...batch,
+            applied: batch.applied.map((item) =>
+                item.id === appliedBatchId ? { ...item, undone } : item
+            ),
+            proposals: batch.proposals.map((proposal) =>
+                revertedProposals.has(proposal.id)
+                    ? { ...proposal, decision: 'reverted' as const }
+                    : proposal
+            ),
+        }));
+        await deps.conversations.flush(message.conversationId);
+        return undone;
+    };
+
     /** A follow-up turn in the same conversation (feedback, continue, ask to fix). */
     const followUp = async (request: string, assistantPrefill?: string): Promise<void> => {
         const conversation = conversations.find((item) => item.id === activeConversationId);
@@ -838,42 +879,20 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             }
             await applyAccepted(seq, [proposalId]);
         },
-        async undoBatch(seq, appliedBatchId) {
-            const message = messageAt(seq);
-            const applied = message?.batch?.applied.find((item) => item.id === appliedBatchId);
-            // A fork shares the original's applied changes but not its undo (owner decision 2026-09-16).
-            if (!message?.batch || !applied || message.forkedFrom !== undefined) {
-                return null;
+        undoBatch,
+        async undoAll(seq) {
+            // Newest first: later changes may sit inside items created earlier.
+            const pending = [...(messageAt(seq)?.batch?.applied ?? [])]
+                .filter((applied) => applied.undone === undefined)
+                .reverse();
+            const reverted: string[] = [];
+            const skipped: AppliedBatchUndone['skipped'] = [];
+            for (const applied of pending) {
+                const undone = await undoBatch(seq, applied.id);
+                reverted.push(...(undone?.reverted ?? []));
+                skipped.push(...(undone?.skipped ?? []));
             }
-            const undone = undoAppliedBatch(
-                {
-                    store: deps.store,
-                    sync: deps.sync,
-                    newId: deps.newId,
-                    now: deps.now,
-                    emit: deps.emit,
-                },
-                { conversationId: message.conversationId },
-                applied
-            );
-            const revertedProposals = new Set(
-                applied.items
-                    .filter((item) => undone.reverted.includes(item.nodeId))
-                    .map((item) => item.proposalId)
-            );
-            await updateBatch(seq, (batch) => ({
-                ...batch,
-                applied: batch.applied.map((item) =>
-                    item.id === appliedBatchId ? { ...item, undone } : item
-                ),
-                proposals: batch.proposals.map((proposal) =>
-                    revertedProposals.has(proposal.id)
-                        ? { ...proposal, decision: 'reverted' as const }
-                        : proposal
-                ),
-            }));
-            await deps.conversations.flush(message.conversationId);
-            return undone;
+            return pending.length === 0 ? null : { at: deps.now(), reverted, skipped };
         },
         async accept(seq, proposalId) {
             const message = messageAt(seq);

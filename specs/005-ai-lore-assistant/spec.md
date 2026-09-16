@@ -425,7 +425,9 @@ proposals are produced.
 - **FR-015**: The user MUST be able to undo any applied batch of a conversation (not only
   the latest) for as long as the conversation exists; items modified again after
   application MUST be skipped and reported as not cleanly revertible rather than
-  overwritten, while the remaining items of the batch are reverted.
+  overwritten, while the remaining items of the batch are reverted. Changes of one reply
+  accepted in several clicks are undone from one control: the last click, or all of them
+  newest first (owner report 2026-09-17).
 - **FR-016**: A likely duplicate (proposed creation matching an existing entry's title or
   keywords) MUST be flagged in its preview.
 - **FR-017**: The user MUST be able to give feedback on a proposal or batch (e.g., "make it

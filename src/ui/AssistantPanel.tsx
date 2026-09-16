@@ -4,6 +4,7 @@ import { notifySuccess, notifyWarning } from '../adapters/logger';
 import { undoSummary } from '../core/assistant/undo';
 import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
+import type { AppliedBatchUndone } from '../core/assistant/types';
 import { BatchBar } from './assistant/BatchBar';
 import { ConversationSwitcher } from './assistant/ConversationSwitcher';
 import { ConversationView, type MessageActions } from './assistant/ConversationView';
@@ -40,6 +41,11 @@ export function AssistantPanel({
     }, [assistant, selectedIds]);
 
     const busy = snapshot.activeRequest !== null;
+    const reportUndo = (undone: AppliedBatchUndone | null): void => {
+        if (undone !== null) {
+            (undone.skipped.length > 0 ? notifyWarning : notifySuccess)(undoSummary(undone));
+        }
+    };
     const blocked = snapshot.availability !== 'ready';
 
     const actions: MessageActions = {
@@ -164,14 +170,9 @@ export function AssistantPanel({
                                         onDenyAll={() => void assistant.denyAll(message.seq)}
                                         onFeedback={(text) => void assistant.feedback(message.seq, text)}
                                         onUndo={(appliedBatchId) => {
-                                            void assistant.undoBatch(message.seq, appliedBatchId).then((undone) => {
-                                                if (undone !== null) {
-                                                    (undone.skipped.length > 0 ? notifyWarning : notifySuccess)(
-                                                        undoSummary(undone)
-                                                    );
-                                                }
-                                            });
+                                            void assistant.undoBatch(message.seq, appliedBatchId).then(reportUndo);
                                         }}
+                                        onUndoAll={() => void assistant.undoAll(message.seq).then(reportUndo)}
                                     />
                                 </div>
                             )}

@@ -13,6 +13,7 @@ export function BatchBar({
     onDenyAll,
     onFeedback,
     onUndo,
+    onUndoAll,
 }: {
     batch: ProposalBatch;
     busy: boolean;
@@ -22,11 +23,20 @@ export function BatchBar({
     onDenyAll: () => void;
     onFeedback: (text: string) => void;
     onUndo: (appliedBatchId: string) => void;
+    onUndoAll: () => void;
 }): JSX.Element {
     const [feedback, setFeedback] = useState('');
     const pending = batch.proposals.filter((proposal) => proposal.decision === 'pending');
     const undoable = batch.applied.filter((applied: AppliedBatch) => applied.undone === undefined);
-    const undoButtons = forked ? [] : undoable;
+    // Every accept click is its own applied batch: offer the newest one and "all",
+    // not one identical button per click (owner report 2026-09-17).
+    const last = forked ? undefined : undoable.at(-1);
+    const lastNames = (last?.items ?? [])
+        .map((item) => batch.proposals.find((proposal) => proposal.id === item.proposalId)?.summary)
+        .filter((summary): summary is string => summary !== undefined);
+    const undone = batch.applied.flatMap((applied) => (applied.undone !== undefined ? [applied.undone] : []));
+    const revertedCount = undone.reduce((sum, item) => sum + item.reverted.length, 0);
+    const skippedCount = undone.reduce((sum, item) => sum + item.skipped.length, 0);
     return (
         <div className="wiw-proposal-actions">
             <button
@@ -72,28 +82,34 @@ export function BatchBar({
                     undo in the original conversation
                 </span>
             )}
-            {undoButtons.map((applied) => (
+            {last !== undefined && (
                 <button
-                    key={applied.id}
                     type="button"
                     className="wiw-button"
                     disabled={busy}
-                    onClick={() => onUndo(applied.id)}
-                    title={`Applied ${String(applied.items.length)} change(s)`}
+                    onClick={() => onUndo(last.id)}
+                    title={`Undo the last applied change(s):\n${lastNames.join('\n')}`}
                 >
-                    <i className="fa-solid fa-rotate-left" /> Undo batch
+                    <i className="fa-solid fa-rotate-left" /> Undo last
                 </button>
-            ))}
-            {batch.applied
-                .filter((applied) => applied.undone !== undefined)
-                .map((applied) => (
-                    <span key={applied.id} className="wiw-badge">
-                        reverted {String(applied.undone?.reverted.length ?? 0)}
-                        {applied.undone !== undefined && applied.undone.skipped.length > 0
-                            ? `, skipped ${String(applied.undone.skipped.length)}`
-                            : ''}
-                    </span>
-                ))}
+            )}
+            {!forked && undoable.length > 1 && (
+                <button
+                    type="button"
+                    className="wiw-button"
+                    disabled={busy}
+                    onClick={onUndoAll}
+                    title="Undo every change applied from this reply, newest first"
+                >
+                    <i className="fa-solid fa-clock-rotate-left" /> Undo all ({String(undoable.length)})
+                </button>
+            )}
+            {undone.length > 0 && (
+                <span className="wiw-badge">
+                    reverted {String(revertedCount)}
+                    {skippedCount > 0 ? `, skipped ${String(skippedCount)}` : ''}
+                </span>
+            )}
         </div>
     );
 }
