@@ -5,6 +5,7 @@ import { parseReply } from '../core/assistant/parser';
 import { acceptAllSelection, applyOrder, withBlocked } from '../core/assistant/plan';
 import { stalenessOf } from '../core/assistant/rules';
 import { toProposals } from '../core/assistant/validate';
+import { forkedMessage, showVariant, variantIndex, withNewVariant } from '../core/assistant/variants';
 import type { SyncEngine } from './syncEngine';
 import type { ApplyOutcome } from './assistantApply';
 import type { ChatContextPort, ConversationStorePort, LlmPort, ProfileInfo } from '../core/assistant/ports';
@@ -108,11 +109,19 @@ export interface AssistantController {
     refreshProposal(seq: number, proposalId: string): Promise<void>;
     feedback(seq: number, text: string, proposalId?: string): Promise<void>;
     continueReply(seq: number): Promise<void>;
+    /** Generates a new version of a reply; earlier versions are kept (swipes). */
     regenerate(seq: number, options?: { sameContext?: boolean }): Promise<void>;
+    /** Shows another stored version of a reply. */
+    showVariant(seq: number, index: number): Promise<void>;
     askToFix(seq: number): Promise<void>;
+    /** Removes one message from the conversation; applied changes stay in the workspace. */
+    deleteMessage(seq: number): Promise<void>;
+    /** Copies the messages up to `seq` into a new conversation and opens it. */
+    forkConversation(seq: number): Promise<string | null>;
 }
 
 const TITLE_LIMIT = 60;
+const FORK_PREFIX = 'Fork: ';
 
 const findNodeInState = findNode;
 const fingerprintOf = fingerprintValues;
@@ -456,7 +465,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             createdAt: deps.now(),
         });
         notify();
-        const built = buildForConversation(conversation, trimmed, assistantSeq);
+        const built = buildForConversation(conversation, trimmed, userSeq);
         await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
     };
 
@@ -464,12 +473,12 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
     const buildForConversation = (
         conversation: Conversation,
         request: string,
-        assistantSeq: number
+        historyBeforeSeq: number
     ): { messages: LlmMessage[]; snapshot: NonNullable<Message['context']> } => {
         const current = settings();
         const context = conversation.context;
         const history = messagesOf(conversation.id).filter(
-            (message) => message.seq < assistantSeq - 1 && message.status !== 'failed'
+            (message) => message.seq < historyBeforeSeq && message.status !== 'failed'
         );
         const built = buildRequest({
             state: deps.store.getState(),
@@ -512,7 +521,9 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             newProposalId: () => `${String(message.seq)}-${String((counter += 1))}`,
         });
         return {
-            id: `${message.conversationId}-${String(message.seq)}`,
+            id: `${message.conversationId}-${String(message.seq)}${
+                variantIndex(message) > 0 ? `-v${String(variantIndex(message))}` : ''
+            }`,
             proposals: withBlocked(proposals),
             unparsed: parsed.unparsed,
             applied: message.batch?.applied ?? [],
@@ -633,7 +644,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 createdAt: deps.now(),
             });
             notify();
-            const built = buildForConversation(touched, request, assistantSeq);
+            const built = buildForConversation(touched, request, userSeq);
             const messages =
                 assistantPrefill === undefined
                     ? built.messages
@@ -826,7 +837,8 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         async undoBatch(seq, appliedBatchId) {
             const message = messageAt(seq);
             const applied = message?.batch?.applied.find((item) => item.id === appliedBatchId);
-            if (!message?.batch || !applied) {
+            // A fork shares the original's applied changes but not its undo (owner decision 2026-09-16).
+            if (!message?.batch || !applied || message.forkedFrom !== undefined) {
                 return;
             }
             const undone = undoAppliedBatch(
@@ -961,10 +973,13 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         async regenerate(seq, options = {}) {
             const conversation = conversations.find((item) => item.id === activeConversationId);
             const message = messageAt(seq);
-            if (!conversation || !message || busy) {
+            if (!conversation || message?.role !== 'assistant' || busy) {
                 return;
             }
-            const userRequest = messagesOf(conversation.id).find((item) => item.seq === seq - 1)?.text ?? '';
+            // The request this reply answers: the nearest user message before it.
+            const userMessage = messagesOf(conversation.id)
+                .filter((item) => item.role === 'user' && item.seq < seq)
+                .at(-1);
             busy = true;
             abortController = new AbortController();
             try {
@@ -975,29 +990,83 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                     bucket.length,
                     ...bucket.filter((item) => item.seq <= seq)
                 );
-                await putMessage({
-                    ...message,
-                    text: '',
-                    prose: undefined,
-                    previousText: message.text === '' ? message.previousText : message.text,
-                    reasoning: undefined,
-                    batch: message.batch !== undefined ? { ...message.batch, proposals: [] } : undefined,
-                    status: 'pending',
-                    failure: undefined,
-                    retryAt: undefined,
-                    retryAttempt: 0,
-                });
+                const previousContext = message.context;
+                await putMessage(withNewVariant(message, deps.now()));
                 notify();
-                if (options.sameContext === true && message.context !== undefined) {
-                    await runRequest(conversation, seq, message.context.requestMessages, message.context);
+                if (options.sameContext === true && previousContext !== undefined) {
+                    await runRequest(conversation, seq, previousContext.requestMessages, previousContext);
                     return;
                 }
-                const built = buildForConversation(conversation, userRequest, seq);
+                const built = buildForConversation(
+                    conversation,
+                    userMessage?.text ?? '',
+                    userMessage?.seq ?? seq
+                );
                 await runRequest(conversation, seq, built.messages, built.snapshot);
             } finally {
                 busy = false;
                 abortController = null;
             }
+        },
+        async showVariant(seq, index) {
+            const message = messageAt(seq);
+            if (!message || busy) {
+                return;
+            }
+            const next = showVariant(message, index);
+            if (next === message) {
+                return;
+            }
+            await putMessage(next);
+            notify();
+        },
+        async deleteMessage(seq) {
+            const message = messageAt(seq);
+            if (!message || (busy && activeRequest?.seq === seq)) {
+                return;
+            }
+            if (message.status === 'retry-wait' && retryTimer !== null) {
+                clearTimeout(retryTimer);
+                retryTimer = null;
+            }
+            const bucket = messagesOf(message.conversationId);
+            bucket.splice(
+                0,
+                bucket.length,
+                ...bucket.filter((item) => item.seq !== seq)
+            );
+            await deps.conversations.deleteMessage(message.conversationId, seq);
+            notify();
+        },
+        async forkConversation(seq) {
+            const original = conversations.find((item) => item.id === activeConversationId);
+            if (!original || busy) {
+                return null;
+            }
+            const copied = messagesOf(original.id).filter((item) => item.seq <= seq);
+            if (copied.length === 0) {
+                return null;
+            }
+            const baseTitle = original.title.startsWith(FORK_PREFIX)
+                ? original.title
+                : `${FORK_PREFIX}${original.title}`;
+            const fork: Conversation = {
+                ...structuredClone(original),
+                id: deps.newId(),
+                title: baseTitle,
+                createdAt: deps.now(),
+                updatedAt: deps.now(),
+                nextSeq: seq + 1,
+            };
+            await putConversation(fork);
+            messagesByConversation.set(fork.id, []);
+            for (const message of copied) {
+                await putMessage(forkedMessage(message, fork.id, original.id));
+            }
+            await deps.conversations.flush(fork.id);
+            activeConversationId = fork.id;
+            notify();
+            return fork.id;
         },
         async askToFix(seq) {
             const message = messageAt(seq);
@@ -1011,7 +1080,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                     .map((proposal) => `- ${proposal.summary}: ${proposal.invalidReason ?? ''}`),
             ].join('\n');
             await followUp(
-                `Your previous operation blocks could not be used:\n${reasons}\nSend them again, fixed, using only handles from the workspace context.`
+                `Your previous operation blocks could not be used:\n${reasons}\nSend them again, fixed, using only handles from the <workspace> block.`
             );
         },
         stop() {

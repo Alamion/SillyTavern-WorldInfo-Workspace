@@ -63,6 +63,18 @@ prepared by the owner for development and validation.
   chat or another sent entry, recursively until the context limit or nothing new matches.
   Sending every entry of the structure stays available as an option. This supersedes the
   2026-09-15 answer below about the outline of the whole tree.
+- Q: (owner review 2026-09-16, free models) How does the user recover from a bad reply?
+  → A: The last assistant reply keeps versions: `>` on the last version generates a new
+  one from the same request and history, `<`/`>` switch between kept versions, each with
+  its own proposals and decisions; the shown version is what later requests see. Any
+  message (user or assistant) can be deleted — accepted changes stay in the workspace.
+  Any message can start a fork: a new conversation with the messages up to and including
+  it; accepted changes there are read-only (undo stays in the original), pending proposals
+  stay decidable. Icons follow the app's own chat.
+- Q: (owner review 2026-09-16) Where does the workspace context go in the request? → A: In
+  the latest user turn inside a `<workspace>` block, as data the user shares; the system
+  message carries only instructions and protocol. Models (DeepSeek via OpenRouter) treated
+  a separate system message as hidden rules and claimed no lore had been shown.
 - Q: Which edits, besides deletions, need their own confirmation? → A: Edits that remove
   more than half of an entry's content, or remove any of its keywords; all other edits
   apply through the batch-level accept.
@@ -363,7 +375,10 @@ proposals are produced.
 - **FR-003**: The assistant MUST support two modes per request: *propose* (reply may
   contain operation proposals) and *discuss* (text only, no proposals).
 - **FR-004**: The user MUST be able to regenerate the last assistant reply, and to
-  continue a reply that was cut off.
+  continue a reply that was cut off. Regenerating keeps earlier versions of the reply,
+  which the user can switch between (versions of the last reply only); the user MUST be
+  able to delete any single message and to fork the conversation at any message
+  (clarification 2026-09-16).
 - **FR-005**: Replies MUST be able to reference existing tree items; a reference opens the
   item in the editor, and a reference to a missing item says so.
 

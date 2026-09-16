@@ -69,6 +69,12 @@ export function createMemoryConversationStore(
                 list(conversationId).filter((message) => message.seq <= seq)
             );
         },
+        deleteMessage: async (conversationId, seq) => {
+            messages.set(
+                conversationId,
+                list(conversationId).filter((message) => message.seq !== seq)
+            );
+        },
         flush: async () => {
             /* memory writes are immediate */
         },
@@ -165,6 +171,9 @@ export function createIndexedDbConversationStore(): ConversationStorePort {
                 }
                 return null;
             });
+        },
+        deleteMessage: async (conversationId, seq) => {
+            await withStore(MESSAGES, 'readwrite', (store) => store.delete([conversationId, seq]));
         },
         flush: async () => {
             /* every write is committed by its transaction */

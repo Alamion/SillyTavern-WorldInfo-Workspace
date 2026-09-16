@@ -8,6 +8,7 @@ import type { AppliedBatch, ProposalBatch } from '../../core/assistant/types';
 export function BatchBar({
     batch,
     busy,
+    forked,
     onAcceptAll,
     onDenyAll,
     onFeedback,
@@ -15,6 +16,8 @@ export function BatchBar({
 }: {
     batch: ProposalBatch;
     busy: boolean;
+    /** Copied by a fork: its applied changes can only be undone in the original. */
+    forked: boolean;
     onAcceptAll: () => void;
     onDenyAll: () => void;
     onFeedback: (text: string) => void;
@@ -23,6 +26,7 @@ export function BatchBar({
     const [feedback, setFeedback] = useState('');
     const pending = batch.proposals.filter((proposal) => proposal.decision === 'pending');
     const undoable = batch.applied.filter((applied: AppliedBatch) => applied.undone === undefined);
+    const undoButtons = forked ? [] : undoable;
     return (
         <div className="wiw-proposal-actions">
             <button
@@ -63,7 +67,12 @@ export function BatchBar({
             >
                 <i className="fa-solid fa-paper-plane" /> Send feedback
             </button>
-            {undoable.map((applied) => (
+            {forked && undoable.length > 0 && (
+                <span className="wiw-badge" title="Undo is available in the conversation this one was forked from">
+                    undo in the original conversation
+                </span>
+            )}
+            {undoButtons.map((applied) => (
                 <button
                     key={applied.id}
                     type="button"

@@ -176,7 +176,7 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.1)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.2)
 ```
 
 ## Settings
@@ -284,7 +284,12 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   folders above it), entry contents for selected + key-triggered entries
   (`core/assistant/triggers.ts`, recursive) or all entries, optional chat/card/persona/
   activated entries, history with decision notes; budget by ~3.5 chars/token; everything
-  left out is reported.
+  left out is reported. The workspace part goes into the latest user turn as a
+  `<workspace>` block — system messages carry only rules (models ignore lore there).
+- **Messages**: the last reply keeps versions (`Message.variants`, `core/assistant/variants.ts`;
+  the shown one is mirrored in the message fields); any message can be deleted
+  (`deleteMessage`) or start a fork (`forkConversation`, copies marked `forkedFrom`, no undo
+  in the fork).
 - **Proposals**: validated against scope and Phase 1 field rules; destructive = deletion,
   > 50 % of content removed (word-level), or any keyword removed → own confirmation, never
   via Accept all. Stale targets (changed since parse) need a fresh review. Applying goes

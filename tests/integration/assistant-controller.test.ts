@@ -517,7 +517,8 @@ describe('propose mode (US1)', () => {
         await harness.controller.regenerate(seq, { sameContext: true });
         expect(harness.llm.requests[1]?.messages).toEqual(sentFirst);
         const message = harness.controller.getSnapshot().messages.at(-1);
-        expect(message?.previousText).toContain('The Salty Keel');
+        expect(message?.variants?.[0]?.text).toContain('The Salty Keel');
+        expect(message?.variantIndex).toBe(1);
         expect(message?.batch?.proposals[0]?.summary).toContain('Second try');
     });
 
@@ -744,5 +745,108 @@ describe('owner report 2026-09-15: controls before the first message', () => {
         const sent = harness.llm.requests.at(-1)?.messages.at(-1)?.content ?? '';
         expect(sent).toContain('use the right item');
         expect(sent).toContain('unknown handle "e99"');
+    });
+});
+
+describe('reply versions, message deletion and forks (owner request 2026-09-16)', () => {
+    const ENTRY = (title: string): string =>
+        `<op type="create_entry" parent="f2"><title>${title}</title><content>x</content></op>`;
+
+    async function chatWith(reply: string) {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection([NODE_IDS.hearth]);
+        harness.llm.reply(reply);
+        await harness.controller.createConversation();
+        await harness.controller.send('Add a tavern');
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        return { harness, seq };
+    }
+    const last = (harness: Harness) => harness.controller.getSnapshot().messages.at(-1);
+
+    it('generates new versions from the same request and switches between them', async () => {
+        const { harness, seq } = await chatWith(ENTRY('First'));
+        harness.llm.reply(ENTRY('Second'));
+        await harness.controller.regenerate(seq);
+        expect(harness.llm.requests[1]?.messages.at(-1)?.content).toMatch(/Add a tavern$/);
+        expect(harness.llm.requests[1]?.messages.filter((message) => message.role !== 'system')).toHaveLength(1);
+        expect(last(harness)?.variants).toHaveLength(2);
+        expect(last(harness)?.batch?.proposals[0]?.summary).toContain('Second');
+
+        await harness.controller.showVariant(seq, 0);
+        expect(last(harness)?.variantIndex).toBe(0);
+        expect(last(harness)?.batch?.proposals[0]?.summary).toContain('First');
+        await harness.controller.showVariant(seq, 1);
+        expect(last(harness)?.batch?.proposals[0]?.summary).toContain('Second');
+    });
+
+    it('keeps decisions per version and sends only the shown version next time', async () => {
+        const { harness, seq } = await chatWith(ENTRY('First'));
+        const firstId = last(harness)?.batch?.proposals[0]?.id ?? '';
+        await harness.controller.deny(seq, firstId);
+        harness.llm.reply(ENTRY('Second'));
+        await harness.controller.regenerate(seq);
+        await harness.controller.showVariant(seq, 0);
+        expect(last(harness)?.batch?.proposals[0]?.decision).toBe('denied');
+
+        await harness.controller.showVariant(seq, 1);
+        harness.llm.reply('ok');
+        await harness.controller.send('Next');
+        const history = harness.llm.requests.at(-1)?.messages.map((message) => message.content).join('\n') ?? '';
+        expect(history).toContain('Second');
+        expect(history).not.toContain('<title>First</title>');
+    });
+
+    it('replaces an empty failed attempt instead of keeping it as a version', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        harness.llm.fail({ kind: 'provider', message: 'boom', retryable: false });
+        await harness.controller.createConversation();
+        await harness.controller.send('Add a tavern');
+        const seq = last(harness)?.seq ?? 1;
+        harness.llm.reply('Here it is.');
+        await harness.controller.regenerate(seq);
+        expect(last(harness)?.variants).toHaveLength(1);
+        expect(last(harness)?.text).toBe('Here it is.');
+    });
+
+    it('deletes a single message and keeps applied changes in the workspace', async () => {
+        const { harness, seq } = await chatWith(ENTRY('Kept Tavern'));
+        await harness.controller.acceptAll(seq);
+        await harness.controller.deleteMessage(seq);
+        await harness.controller.deleteMessage(seq - 1);
+        expect(harness.controller.getSnapshot().messages).toHaveLength(0);
+        expect(await harness.conversations.listMessages(harness.controller.getSnapshot().activeConversationId ?? '')).toHaveLength(0);
+        expect(JSON.stringify(harness.store.getState())).toContain('Kept Tavern');
+    });
+
+    it('forks up to a message, keeps decisions and leaves undo to the original', async () => {
+        const { harness, seq } = await chatWith(ENTRY('Forked Tavern'));
+        await harness.controller.acceptAll(seq);
+        harness.llm.reply('later');
+        await harness.controller.send('More');
+        const originalId = harness.controller.getSnapshot().activeConversationId ?? '';
+
+        const forkId = await harness.controller.forkConversation(seq);
+        const snapshot = harness.controller.getSnapshot();
+        expect(snapshot.activeConversationId).toBe(forkId);
+        expect(snapshot.activeConversation?.title).toBe('Fork: Add a tavern');
+        expect(snapshot.messages.map((message) => message.seq)).toEqual([0, 1]);
+        const copied = snapshot.messages.at(-1);
+        expect(copied?.forkedFrom).toBe(originalId);
+        expect(copied?.batch?.proposals[0]?.decision).toBe('applied');
+
+        await harness.controller.undoBatch(seq, copied?.batch?.applied[0]?.id ?? '');
+        expect(JSON.stringify(harness.store.getState())).toContain('Forked Tavern');
+
+        harness.llm.reply('forked reply');
+        await harness.controller.send('Continue in the fork');
+        expect(harness.controller.getSnapshot().messages.map((message) => message.seq)).toEqual([0, 1, 2, 3]);
+
+        await harness.controller.selectConversation(originalId);
+        expect(harness.controller.getSnapshot().messages).toHaveLength(4);
+        const appliedId = harness.controller.getSnapshot().messages[1]?.batch?.applied[0]?.id ?? '';
+        await harness.controller.undoBatch(seq, appliedId);
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Forked Tavern');
     });
 });

@@ -58,7 +58,9 @@ are dropped with a notice.
 | `origin` | `{ profileId, profileName, api, model }?` | Assistant messages (FR-034) |
 | `context` | `ContextSnapshot?` | Assistant messages: what was sent |
 | `batch` | `ProposalBatch?` | Assistant messages in propose mode |
-| `previousText` | `string?` | Last replaced version after a regenerate |
+| `variants` | `ReplyVariant[]?` | Every version of an assistant reply (`text`, `prose`, `reasoning`, `status`, `failure`, `origin`, `context`, `batch`, `createdAt`, `startedAt`); the shown one is mirrored in the message's own fields |
+| `variantIndex` | `number?` | Shown version (default 0) |
+| `forkedFrom` | `string?` | Original conversation id of a message copied by a fork; its applied batches cannot be undone here |
 | `createdAt` | ISO string | |
 
 ### MessageStatus (assistant message)
@@ -71,14 +73,19 @@ pending ──first chunk──▶ receiving ──end──▶ received
 retry-wait (automatic retry countdown, R7) sits between failed attempts and pending
 ```
 
-Regenerate replaces the last assistant message: `regenerate({ sameContext: false })`
-rebuilds the context from the current tree (FR-004); `regenerate({ sameContext: true })`
-re-sends `context.requestMessages` unchanged (FR-027). The previous version is kept as a
-collapsed "previous version" on the new message (`previousText`) until the next request;
-messages after it are removed (`deleteMessagesAfter`). Continue appends a continuation turn
+Regenerate adds a version to an assistant message (revised 2026-09-16):
+`regenerate({ sameContext: false })` rebuilds the context from the current tree for the
+nearest user request before the reply (FR-004); `regenerate({ sameContext: true })`
+re-sends `context.requestMessages` unchanged (FR-027). The shown version is saved into
+`variants` and a new empty one generated into; an empty failed or stopped attempt is
+replaced rather than kept. `showVariant(seq, index)` switches versions; messages after the
+regenerated one are removed (`deleteMessagesAfter`). `deleteMessage(seq)` removes one
+message (applied changes stay in the tree). `forkConversation(seq)` copies messages up to
+`seq` into a new conversation (`Fork: <title>`, same mode and context) and marks them
+`forkedFrom`. Continue appends a continuation turn
 whose text is concatenated for parsing. Proposals of a replaced reply that were already
-applied keep their `AppliedBatch` (moved onto the new message's batch record) so undo
-stays available.
+applied keep their `AppliedBatch` inside their own version, so undo stays available after
+switching back to that version.
 
 ## ContextSnapshot
 

@@ -257,6 +257,20 @@ export interface ProposalBatch {
     applied: AppliedBatch[];
 }
 
+/** One generated version of an assistant reply (swipes, owner request 2026-09-16). */
+export interface ReplyVariant {
+    text: string;
+    prose?: string;
+    reasoning?: string;
+    status: MessageStatus;
+    failure?: AssistantFailure;
+    origin?: MessageOrigin;
+    context?: ContextSnapshot;
+    batch?: ProposalBatch;
+    createdAt: string;
+    startedAt?: string;
+}
+
 export interface Message {
     conversationId: string;
     seq: number;
@@ -271,8 +285,17 @@ export interface Message {
     origin?: MessageOrigin;
     context?: ContextSnapshot;
     batch?: ProposalBatch;
-    /** Text of the version a regenerate replaced. */
-    previousText?: string;
+    /**
+     * Every version of an assistant reply. The shown one is mirrored in the
+     * message's own fields; its slot here is refreshed when the user switches.
+     */
+    variants?: ReplyVariant[];
+    variantIndex?: number;
+    /**
+     * Copied from another conversation by a fork: undo records stay with the
+     * original, so applied changes are read-only here.
+     */
+    forkedFrom?: string;
     createdAt: string;
     /** Start of the request, for the elapsed-time display. */
     startedAt?: string;

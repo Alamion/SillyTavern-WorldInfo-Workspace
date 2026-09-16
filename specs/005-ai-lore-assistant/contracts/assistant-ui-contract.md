@@ -16,6 +16,7 @@ system); icons Font Awesome 6 Free.
 │     context notice: "Sent: structure (12 items) · 3 with contents (2 by keys). Omitted: …"    │
 │     proposal list (per item) · batch bar · unparsed report            │
 │     footer: profile · model · status/elapsed or "1 240 chars…"        │
+│             tools (right): [‹ 2/3 ›] (last reply) [branch] [trash]    │
 │ composer: [Propose|Discuss] textarea  [Send] / [Stop]                 │
 │   context chip: "Cities · by keys · chat 10" (opens context)  │
 └───────────────────────────────────────────────────────────────────────┘
@@ -26,7 +27,7 @@ system); icons Font Awesome 6 Free.
 | Component | Responsibility | Requirements |
 |-----------|----------------|--------------|
 | `AssistantPanel.tsx` | Region root: state banners, conversation switcher, composer | FR-001, FR-019, FR-032 |
-| `assistant/ConversationView.tsx` | Messages, statuses, reasoning toggle, item references (click → select + open item in editor; missing → toast "This item no longer exists") | FR-002, FR-005, FR-030 |
+| `assistant/ConversationView.tsx` | Messages, statuses, reasoning toggle, item references (click → select + open item in editor; missing → toast "This item no longer exists"); message tools as icons like the app's chat: `fa-chevron-left`/`fa-chevron-right` with "2/3" on the last reply ("Previous version", "Next version", "Generate another version" on the last one), `fa-code-branch` "Fork: continue in a new conversation from this message", `fa-trash-can` "Delete message" | FR-002, FR-004, FR-005, FR-030 |
 | `assistant/ProposalCard.tsx` | One proposal: op icon (reuse mock icon map), summary with tree path, badges (destructive, duplicate, stale, blocked, invalid + reason), Accept / Deny / Edit / Diff / Feedback | FR-007–FR-009, FR-013, FR-014, FR-016, FR-017 |
 | `assistant/ProposalEditor.tsx` | Edit title/keys/content/fields of a proposal before accepting | FR-009 |
 | `assistant/BatchBar.tsx` | Accept all pending / Deny all pending / Feedback… / Undo batch | FR-009, FR-015, FR-017 |
@@ -54,7 +55,9 @@ system); icons Font Awesome 6 Free.
 | Rate limit | Failure card: "The provider is rate-limiting requests (temporary)." + auto-retry countdown "Retrying in 30 s" [Cancel] / [Retry now] |
 | Other failures | Failure card: readable reason per `AssistantFailure.kind`, [Retry], collapsible provider detail; the request text stays in the conversation |
 | Truncated | Notice: "The reply was cut off." [Continue] [Regenerate]; complete proposals stay usable |
-| Regenerate | [Regenerate] rebuilds the context from the current tree; [Regenerate with the same context] re-sends the stored request; the replaced text stays viewable as "Previous version" |
+| Regenerate | [Regenerate] and `›` on the last version rebuild the context from the current tree; [Regenerate with the same context] re-sends the stored request; earlier versions stay reachable with `‹ ›` |
+| Delete message | Confirmation "Delete this message?" (+ "with all its versions" when it has several); when changes were accepted from it: "Changes already accepted from it stay in the workspace, but the assistant will no longer see this reply or its decisions." |
+| Forked conversation | Title "Fork: <original title>"; copied batches with applied changes show the badge "undo in the original conversation" instead of [Undo batch] |
 | Some blocks broken | Compact notice: "2 operation blocks could not be used." [Show broken blocks] [Regenerate with the same context]; expanding lists each raw excerpt + reason (collapsed by default) |
 | Zero valid proposals with broken blocks | Same notice, plus [Ask to fix] |
 | Context trimmed | Context notice lists omitted parts |

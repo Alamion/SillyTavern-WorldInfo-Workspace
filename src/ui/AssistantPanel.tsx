@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
 import { notifyWarning } from '../adapters/logger';
+import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
 import { BatchBar } from './assistant/BatchBar';
 import { ConversationSwitcher } from './assistant/ConversationSwitcher';
@@ -52,6 +53,30 @@ export function AssistantPanel({
             }
             onOpenNode(nodeId);
         },
+        onShowVariant: (seq, index) => void assistant.showVariant(seq, index),
+        onNewVariant: (seq) => void assistant.regenerate(seq),
+        onFork: (seq) => void assistant.forkConversation(seq),
+        onDelete: (message) => {
+            const applied = (message.variants ?? [message]).some(
+                (variant) => (variant.batch?.applied.length ?? 0) > 0
+            );
+            const versions = message.variants !== undefined && message.variants.length > 1;
+            void confirmDialog(
+                [
+                    versions ? 'Delete this message with all its versions?' : 'Delete this message?',
+                    applied
+                        ? 'Changes already accepted from it stay in the workspace, but the assistant will no longer see this reply or its decisions.'
+                        : '',
+                ]
+                    .filter((part) => part !== '')
+                    .join(' ')
+            ).then((confirmed) => {
+                // The dialog is async: never delete a same-numbered message of another conversation.
+                if (confirmed && assistant.getSnapshot().activeConversationId === message.conversationId) {
+                    void assistant.deleteMessage(message.seq);
+                }
+            });
+        },
     };
 
     const proposalActions = (seq: number): ProposalActions => ({
@@ -95,6 +120,8 @@ export function AssistantPanel({
             <ConversationView
                 messages={snapshot.messages}
                 actions={actions}
+                busy={busy}
+                blocked={blocked}
                 renderBatch={(message) => {
                     const batch = message.batch;
                     return (
@@ -123,6 +150,7 @@ export function AssistantPanel({
                                     <BatchBar
                                         batch={batch}
                                         busy={busy}
+                                        forked={message.forkedFrom !== undefined}
                                         onAcceptAll={() => {
                                             void assistant.acceptAll(message.seq).then(() => {
                                                 // Destructive proposals stay pending: bring the

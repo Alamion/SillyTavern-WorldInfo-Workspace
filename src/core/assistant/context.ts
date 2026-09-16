@@ -482,13 +482,27 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         ...optional,
     ].filter((part) => part !== '');
 
+    // The workspace travels in the user turn, as data the user shares: many models
+    // treat a system message as hidden rules and then claim they were shown no
+    // lore (owner report 2026-09-16, DeepSeek via OpenRouter). System = rules only.
     const messages: LlmMessage[] = [
         { role: 'system', content: systemText },
-        ...(workspaceParts.length > 0
-            ? [{ role: 'system' as const, content: workspaceParts.join('\n\n') }]
-            : []),
         ...historyMessages,
-        { role: 'user', content: requestText },
+        {
+            role: 'user',
+            content:
+                workspaceParts.length > 0
+                    ? [
+                          '<workspace>',
+                          'My workspace as it is now, shared with you for this request:',
+                          '',
+                          workspaceParts.join('\n\n'),
+                          '</workspace>',
+                          '',
+                          requestText,
+                      ].join('\n')
+                    : requestText,
+        },
     ];
 
     const snapshot: ContextSnapshot = {

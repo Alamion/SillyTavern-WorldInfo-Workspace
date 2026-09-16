@@ -60,6 +60,7 @@ export interface ConversationStorePort {
     listMessages(conversationId: string): Promise<Message[]>;
     putMessage(message: Message): Promise<void>;
     deleteMessagesAfter(conversationId: string, seq: number): Promise<void>;
+    deleteMessage(conversationId: string, seq: number): Promise<void>;
     /** Flushes debounced writes of one conversation (or all). */
     flush(conversationId?: string): Promise<void>;
 }

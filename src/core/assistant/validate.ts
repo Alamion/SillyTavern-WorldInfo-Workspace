@@ -110,7 +110,7 @@ export function toProposals(
 ): OperationProposal[] {
     const { state, snapshot } = input;
     const scope = new Set(snapshot.scopeNodeIds);
-    const refs = new Map<string, { proposalId: string; kind: 'folder' | 'entry' }>();
+    const refs = new Map<string, { proposalId: string; kind: 'folder' | 'entry'; title?: string }>();
     const proposals: OperationProposal[] = [];
 
     // Refs are collected from the whole reply first: models often reference a new
@@ -130,6 +130,7 @@ export function toProposals(
         refs.set(ref, {
             proposalId: ids[index] ?? '',
             kind: block.type === 'create_folder' ? 'folder' : 'entry',
+            title: valuesOf(block).title,
         });
     });
 
@@ -204,7 +205,8 @@ export function toProposals(
                 } else {
                     dependsOn.push(declared.proposalId);
                     parent = { ref: resolved.ref };
-                    parentLabel = `the new folder "${resolved.ref}"`;
+                    // The user sees the folder's name, never the model's ref (owner report 2026-09-16).
+                    parentLabel = `the new folder "${declared.title ?? resolved.ref}"`;
                 }
             } else if (resolved.nodeId !== undefined) {
                 const node = findNode(state, resolved.nodeId);

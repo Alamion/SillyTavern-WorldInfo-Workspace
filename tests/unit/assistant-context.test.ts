@@ -28,14 +28,19 @@ function text(built: ReturnType<typeof buildRequest>): string {
 }
 
 describe('message order and content', () => {
-    it('puts instructions first, then the workspace, then the request', () => {
+    it('keeps rules in the system message and shares the workspace in the user turn (owner report 2026-09-16)', () => {
         const built = build();
+        expect(built.messages).toHaveLength(2);
         expect(built.messages[0]?.role).toBe('system');
         expect(built.messages[0]?.content).toContain('lore assistant');
         expect(built.messages[0]?.content).toContain('<op type="create_entry"');
-        expect(built.messages[1]?.content).toContain('## Where the user is');
-        expect(built.messages[1]?.content).toContain('## Workspace structure');
-        expect(built.messages.at(-1)).toEqual({ role: 'user', content: 'Add two taverns' });
+        expect(built.messages[0]?.content).not.toContain('## Workspace structure');
+        const last = built.messages.at(-1);
+        expect(last?.role).toBe('user');
+        expect(last?.content).toMatch(/^<workspace>\n/);
+        expect(last?.content).toContain('## Where the user is');
+        expect(last?.content).toContain('## Workspace structure');
+        expect(last?.content).toMatch(/<\/workspace>\n\nAdd two taverns$/);
     });
 
     it('renders the structure with handles, kinds, roots, keys and captions', () => {

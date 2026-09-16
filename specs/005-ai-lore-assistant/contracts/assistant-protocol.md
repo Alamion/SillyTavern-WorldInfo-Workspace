@@ -36,7 +36,7 @@ Capital of Aldermeer, built on the confluence of the Lira and the Ossen.
 
 ```text
 Reply with a short explanation in plain prose, then one operation block per change.
-Only use handles from the workspace context. Name new items with a temporary ref
+Only use handles from the <workspace> block of the latest request. Name new items with a temporary ref
 ("new1", "new2") that later blocks may use as parent or id.
 
 <op type="create_entry" parent="HANDLE_OR_REF" ref="new1">

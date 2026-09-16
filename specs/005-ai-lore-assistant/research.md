@@ -128,7 +128,10 @@ do not break them — staleness is checked separately, R8).
 **Decision**: pure builder `src/core/assistant/context.ts` produces the message array:
 
 1. System: instructions (user-editable, default template) + protocol description +
-   mode rules (propose/discuss).
+   mode rules (propose/discuss). Nothing else goes into system messages except decision
+   notes: steps 2–5 are wrapped in `<workspace>…</workspace>` and placed at the start of the
+   latest user turn, before the request (revised 2026-09-16 — models treated a separate
+   system message as hidden rules and denied seeing any lore).
 2. Where the user is: selected items and the current folder for new items (revised
    2026-09-16 — without it models placed new folders wherever seemed convenient).
 3. Structure outline: one line per node of the chosen structure and the folders above

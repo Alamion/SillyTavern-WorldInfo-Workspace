@@ -140,6 +140,17 @@ describe('structure operations', () => {
         expect(proposals.every((proposal) => proposal.decision === 'pending')).toBe(true);
     });
 
+    it('names a new parent folder by its title, not by the ref (owner report 2026-09-16)', () => {
+        const { proposals } = proposalsOf(
+            [
+                '<op type="create_entry" parent="new_folder" ref="new2"><title>Ember Step</title><content>x</content></op>',
+                '<op type="create_folder" parent="f3" ref="new_folder"><title>Spells</title></op>',
+            ].join('\n')
+        );
+        expect(proposals[0]?.summary).toContain('in the new folder "Spells"');
+        expect(proposals[0]?.summary).not.toContain('new_folder');
+    });
+
     it('rejects a ref used twice and a ref that is not a folder', () => {
         const { proposals } = proposalsOf(
             [

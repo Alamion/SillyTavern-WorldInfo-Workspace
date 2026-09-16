@@ -29,11 +29,11 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 |---|----------|-------|----------|
 | A0 | Availability | Disable Connection Manager, open assistant; re-enable; open settings with no profile chosen | Banner texts per UI contract; composer disabled; rest of workspace works; after choosing a profile the composer enables |
 | A1 | Profile independence | Select `openrouter free provider` in assistant settings while the chat uses another profile; send a request | Request goes through the assistant profile; main chat connection unchanged; message footer shows profile + model |
-| A2 | Streaming feedback | With a streaming preset: send "Create three entries about everyday life in Aldermeer" with Hearth & Home selected | Prose streams live with a growing char counter; proposals appear as blocks complete; first visible feedback within ~3 s of the provider's first token |
+| A2 | Streaming feedback | With a streaming preset: send "Create three entries about everyday life in Aldermeer" with Geography / Cities selected | Prose streams live with a growing char counter; proposals appear as blocks complete; first visible feedback within ~3 s of the provider's first token |
 | A3 | Non-streaming feedback | Turn streaming off in the profile's preset; repeat | Waiting status with elapsed seconds; full reply at once |
-| A4 | Create + accept subset (US1) | From A2, accept two, deny one | Only two entries created in Hearth & Home, persisted after reload, present in the root's native book after sync |
+| A4 | Create + accept subset (US1) | From A2, accept two, deny one | Only two entries created in Cities, persisted after reload, present in the root's native book after sync |
 | A5 | Edit + diff + edit-before-accept | "Rewrite Bristlemark's harbor paragraph and add a city-law section"; open diff; edit the proposed content; accept | Per-field diff shown; the user-edited version is applied |
-| A6 | Reorganize + delete confirmation (US2) | "Create a Taverns folder under Hearth & Home, move Bristlemark Taverns into it, delete the duplicate tavern entry" → Accept all | Folder created before the move; the deletion stays pending with its own confirmation listing affected items and books; after confirming, tree and native books match |
+| A6 | Reorganize + delete confirmation (US2) | "Create a Taverns folder under Cities, move Bristlemark into it, delete City naming ideas" → Accept all | Folder created before the move; the deletion stays pending with its own confirmation listing affected items and books; after confirming, tree and native books match |
 | A7 | Rate limit (US4) | Select `openrouter small gemma free`, send while rate-limited | "Rate-limiting" failure card, countdown auto-retry (max 2), Stop cancels, request text kept, tree unchanged |
 | A8 | Stop | Send a long request, Stop mid-stream | Ends promptly; completed blocks usable; no changes applied |
 | A9 | Truncation | Set response length to 150; request 5 entries | "Cut off" notice; complete blocks usable; Continue produces the rest |
@@ -49,6 +49,9 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 | A19 | Parallel chat | Start a chat generation, then an assistant request (and vice versa) | Both complete; neither cancels the other; stopping one does not stop the other |
 | A20 | Interop events | Listen to `wi-workspace:assistant-applied` / `-undone` in the console during A4/A14 | Payloads match `contracts/hooks.md` |
 | A21 | Text Completion (best-effort) | Select any Text Completion profile if available | Warning shown; request attempted; no acceptance requirement |
+| A22 | Reply versions | Send a propose request; deny one proposal; press `›` on the reply; switch back with `‹` | "2/2" after the new version; the first version shows its denied proposal; the next request's history carries the shown version only |
+| A23 | Delete and fork | Delete a user message and an assistant reply with an accepted change; fork at an earlier reply and continue there | Messages gone after reload, accepted change still in the tree; fork titled "Fork: …" with messages up to the chosen one; its applied batch shows "undo in the original conversation"; undo works in the original |
+| A24 | Context in the user turn | With DeepSeek (or any router model) ask "What is in the selected folder?" | The model describes the shared structure instead of saying it sees no context; the server log shows one system message and the `<workspace>` block in the last user message |
 
 ## Success criteria mapping
 
@@ -102,3 +105,17 @@ Changes made after the owner's first manual passes (regression tests alongside e
 - Themed form controls in the assistant panel.
 - Draggable splitter between the editor and the assistant panel (260 px minimum, at most 60 % of
   the workspace width, double-click resets to 360 px).
+
+### 2026-09-16 — owner review, second round (build 0.4.2)
+
+Owner results: A3 PASS, A5 PASS; A6 could not be run — it named a folder that exists only in
+the test fixtures (A2, A4, A6 now use the demo's Geography / Cities).
+
+Changes made after the round (regression tests alongside each):
+
+- Reply versions on the last assistant reply (`‹ 2/3 ›`), message deletion and forks, as icons
+  like the app's chat; forks keep decisions but leave undo to the original.
+- New parent folders are named by their title in proposal summaries ("in the new folder
+  "Spells"") instead of the model's ref; the model-facing format is unchanged.
+- The workspace context moved from a second system message into the latest user turn
+  (`<workspace>` block): a DeepSeek model on OpenRouter kept saying it saw no context.

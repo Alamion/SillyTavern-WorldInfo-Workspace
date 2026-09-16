@@ -87,6 +87,14 @@ function runConversationStoreSuite(name: string, factory: () => ConversationStor
             expect((await store.listMessages('c1')).map((item) => item.seq)).toEqual([1, 2]);
         });
 
+        it('deletes one message', async () => {
+            for (const seq of [1, 2, 3]) {
+                await store.putMessage(message('c1', seq));
+            }
+            await store.deleteMessage('c1', 2);
+            expect((await store.listMessages('c1')).map((item) => item.seq)).toEqual([1, 3]);
+        });
+
         it('returns copies, never live references', async () => {
             await store.putConversation(conversation('c1', '2026-09-15T11:00:00.000Z'));
             const first = await store.getConversation('c1');
