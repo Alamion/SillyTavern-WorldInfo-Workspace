@@ -598,7 +598,9 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                     return proposal;
                 }
                 if (outcome.status === 'applied') {
-                    return { ...proposal, decision: 'applied' as const };
+                    const next: OperationProposal = { ...proposal, decision: 'applied' };
+                    delete next.failedReason;
+                    return next;
                 }
                 if (outcome.status === 'stale') {
                     return {

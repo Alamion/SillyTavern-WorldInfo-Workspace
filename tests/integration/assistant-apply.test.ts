@@ -283,6 +283,39 @@ describe('structure operations, deletions and undo (US2)', () => {
         expect(findNode(rig.store.getState(), 'e-bristle')?.parentId).toBe('R');
     });
 
+    it('puts an entry into a folder accepted by an earlier click (live run 2026-09-16)', () => {
+        const rig = buildRig();
+        seedTwoFolders(rig);
+        const events: Array<{ event: string; payload: unknown }> = [];
+        const batch = batchFrom(
+            rig,
+            [
+                '<op type="create_folder" parent="f2" ref="new1"><title>Magic</title></op>',
+                '<op type="create_entry" parent="new1"><title>Mirror magic</title><content>a</content></op>',
+            ].join('\n')
+        );
+        const applyDeps = deps(rig, events);
+        const [folder, entry] = batch.proposals;
+        // Entry first: its folder does not exist yet, and the reason says what to do.
+        const early = applyProposals(applyDeps, { conversationId: 'c1' }, batch, [entry?.id ?? '']);
+        expect(early.outcomes[0]).toMatchObject({ status: 'failed' });
+        expect(early.outcomes[0]).toHaveProperty('reason', expect.stringContaining('Magic'));
+        if (entry) {
+            entry.decision = 'failed';
+        }
+
+        const first = applyProposals(applyDeps, { conversationId: 'c1' }, batch, [folder?.id ?? '']);
+        batch.applied.push(first.batch);
+        if (folder) {
+            folder.decision = 'applied';
+        }
+        // Retrying the failed entry now lands it inside the new folder.
+        const second = applyProposals(applyDeps, { conversationId: 'c1' }, batch, [entry?.id ?? '']);
+        expect(second.outcomes[0]).toMatchObject({ status: 'applied' });
+        const created = findNode(rig.store.getState(), second.batch.items[0]?.nodeId ?? '');
+        expect(created?.parentId).toBe(first.batch.items[0]?.nodeId);
+    });
+
     it('renames an entry and keeps its native copy in sync', async () => {
         const rig = buildRig();
         seedRoot(rig);

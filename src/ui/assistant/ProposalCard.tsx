@@ -129,10 +129,10 @@ export function ProposalCard({
                     <button
                         type="button"
                         className="wiw-button"
-                        disabled={!pending}
+                        disabled={!pending && (proposal.decision !== 'failed' || proposal.destructive)}
                         onClick={() => actions.onAccept(proposal.id)}
                     >
-                        <i className="fa-solid fa-check" /> Accept
+                        <i className="fa-solid fa-check" /> {proposal.decision === 'failed' ? 'Retry' : 'Accept'}
                     </button>
                 )}
                 <button

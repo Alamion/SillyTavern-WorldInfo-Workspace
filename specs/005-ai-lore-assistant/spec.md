@@ -412,7 +412,9 @@ proposals are produced.
   interop events are identical to a manual change.
 - **FR-012**: Accepted operations of a batch MUST be applied in a dependency-safe order;
   proposals depending on a denied or failed proposal MUST be shown as blocked with the
-  reason.
+  reason. A creation accepted on its own (a separate click) MUST still resolve for the
+  proposals that go into it; a proposal that failed to apply MUST offer a retry (except
+  destructive ones) and its reason MUST say what to apply first.
 - **FR-013**: At acceptance time each proposal MUST be validated against the current tree;
   a proposal whose target changed since it was proposed MUST be shown as stale (with the
   current state) and require a fresh decision.

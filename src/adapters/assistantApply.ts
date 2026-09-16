@@ -104,13 +104,26 @@ export function applyProposals(
     const items: AppliedItem[] = [];
     const outcomes: ApplyOutcome[] = [];
     const summaries: AppliedOperationSummary[] = [];
+    // Creations accepted earlier (a separate click) still resolve their refs.
     const createdByRef = new Map<string, string>();
+    for (const earlier of batch.applied.filter((item) => item.undone === undefined)) {
+        for (const item of earlier.items) {
+            const creation = batch.proposals.find((proposal) => proposal.id === item.proposalId);
+            if (
+                creation?.ref !== undefined &&
+                creation.decision === 'applied' &&
+                findNode(deps.store.getState(), item.nodeId) !== undefined
+            ) {
+                createdByRef.set(creation.ref, item.nodeId);
+            }
+        }
+    }
     let failed: AppliedBatch['failed'];
     let failedOp: OperationProposal['op'] | undefined;
 
     for (const proposal of accepted) {
-        // Only reviewable proposals can land (FR-014, FR-028).
-        if (proposal.decision !== 'pending' && proposal.decision !== 'accepted') {
+        // Only reviewable proposals can land (FR-014, FR-028); a failed one may be retried.
+        if (!['pending', 'accepted', 'failed'].includes(proposal.decision)) {
             outcomes.push({
                 proposalId: proposal.id,
                 status: 'failed',
@@ -131,12 +144,14 @@ export function applyProposals(
                   ? proposal.parent.nodeId
                   : createdByRef.get(proposal.parent.ref);
         if (proposal.parent !== undefined && parentId === undefined) {
-            outcomes.push({
-                proposalId: proposal.id,
-                status: 'failed',
-                reason: 'the folder it depends on was not created',
-            });
-            failed = { proposalId: proposal.id, reason: 'the folder it depends on was not created' };
+            const ref = 'ref' in proposal.parent ? proposal.parent.ref : undefined;
+            const folder = batch.proposals.find((item) => item.ref !== undefined && item.ref === ref);
+            const reason =
+                folder !== undefined
+                    ? `the folder it goes into is not created: apply "${folder.summary}" first, then accept this again`
+                    : 'the folder it depends on was not created';
+            outcomes.push({ proposalId: proposal.id, status: 'failed', reason });
+            failed = { proposalId: proposal.id, reason };
             failedOp = proposal.op;
             break;
         }
