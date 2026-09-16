@@ -1,3 +1,4 @@
+import { renderMarkdown } from '../preview';
 import { parseReply } from './parser';
 import type { Message } from './types';
 
@@ -34,4 +35,22 @@ export function statusText(message: Message, now: number = Date.now()): string |
         return 'Stopped.';
     }
     return null;
+}
+
+const REF_OPEN = '\uE000';
+const REF_CLOSE = '\uE001';
+
+/**
+ * Reply prose as HTML with `[[handle]]` references as buttons (FR-005). The
+ * markdown is rendered ONCE for the whole text: splitting it at references first
+ * broke `**[[e1]] Bristlemark**` and list items apart (live run 2026-09-16). The
+ * references pass through the renderer as private-use markers it leaves
+ * untouched, and become buttons afterwards; clicks are delegated via `data-handle`.
+ */
+export function replyHtml(text: string): string {
+    const marked = text.replace(/\[\[([A-Za-z0-9_-]+)\]\]/g, `${REF_OPEN}$1${REF_CLOSE}`);
+    return renderMarkdown(marked).replace(
+        new RegExp(`${REF_OPEN}([A-Za-z0-9_-]+)${REF_CLOSE}`, 'g'),
+        '<button type="button" class="wiw-assistant-ref" data-handle="$1">$1</button>'
+    );
 }

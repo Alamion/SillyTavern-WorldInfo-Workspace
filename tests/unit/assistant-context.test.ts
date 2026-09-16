@@ -187,6 +187,8 @@ describe('entry contents by keys (owner report 2026-09-16)', () => {
     it('sends every entry of the structure with `all`', () => {
         const built = build({ request: 'Add two inns', context: { ...BASE, entryContents: 'all' } });
         expect(built.snapshot.included.fullItems).toBe(2);
+        // Nothing was chosen by keys (live run 2026-09-16 notice said "48 by keys").
+        expect(built.snapshot.included.triggeredItems).toBe(0);
     });
 
     it('scans enabled chat messages for keys', () => {

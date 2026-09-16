@@ -119,3 +119,45 @@ Changes made after the round (regression tests alongside each):
   "Spells"") instead of the model's ref; the model-facing format is unchanged.
 - The workspace context moved from a second system message into the latest user turn
   (`<workspace>` block): a DeepSeek model on OpenRouter kept saying it saw no context.
+
+### 2026-09-16 — automated live run (headless Chromium, `dev` account, `openrouter free provider`, build 0.4.2 → 0.4.3)
+
+| # | Result | Notes |
+|---|--------|-------|
+| A2 | PASS | First feedback after 1.5 s, full reply in 4.5 s; three entries proposed in Cities, the current folder |
+| A4 | PASS | Accept two / deny one → two entries in Cities, still there after a page reload (demo Cities is not under a World Info root, so no native book to check) |
+| A6 | PASS after fix | Folder, move and deletion proposed; Accept all left the deletion pending; its own confirmation deleted the entry. Undo of the folder + move batch skipped the new folder — fixed |
+| A8 | PASS | Stop during an 11 000-char thinking phase ended in 0.3 s; tree unchanged; the empty attempt did not stay as a version |
+| A10 | PASS | Chat 10 + card + activated: notice "chat 2 · character card"; prose with clickable refs, no proposals |
+| A11 | PASS | Manual edit, then Accept → "stale — the item changed since this was proposed" + [Review again] → pending |
+| A12 | PASS | Deny the folder → both entries "blocked", Accept disabled |
+| A13 | PASS | Removing a keyword → destructive, skipped by Accept all, own confirmation |
+| A14 | PASS after fix | Batch of two edits reverted exactly; the result toast was missing — added |
+| A15 | PASS | Conversations and decisions restored after reloads |
+| A16 | PASS after fix | Current folder: "1 with contents (1 by keys)" for a key named in the request. Whole workspace + all entries at 6000 tokens: ≈1840 tokens sent, omitted parts listed. Typing the limit was broken and the notice claimed "48 by keys" — fixed |
+| A17 | PASS (model-side) | The model refused "delete x99" in prose; invalid cards seen live on echoed format examples (below) |
+| A20 | PASS | `assistant-applied` / `assistant-undone` payloads with conversation, batch, operations / reverted ids |
+| A22 | PASS | `›` made version 2/2 with its own proposals; version 1 kept applied/denied decisions; the next request carried version 2 only |
+| A23 | PASS | Fork "Fork: …" with "undo in the original conversation"; undo worked in the original with a toast; user message and reply deleted with the right confirmations |
+| A24 | PASS | One system message + `<workspace>` in the user turn; the model listed the folder's entries |
+| A9, A18, A19, A21 | NOT RUN | A9: router ignores response length (2026-09-15); A18: needs a real folder handle; A19: the dev instance's main chat API is not connected; A21: no Text Completion profile |
+
+Defects found and fixed in this run (regression tests alongside):
+
+- Reply prose was rendered in pieces around `[[handle]]` references, so `**[[e1]] Name**` showed literal
+  `**` and list items split; the markdown is now rendered once (`replyHtml`).
+- Undo skipped a folder created by the same batch that moved items into it ("items were added inside it").
+- Undo showed no result toast (UI contract): "Reverted N changes; M skipped (reason)."
+- Token limits in AI settings were saved per keystroke and repaired to the default on every intermediate
+  value (typing "9000" gave "160000"); a value below response length + 500 was silently replaced. Limits
+  are now saved on blur/Enter with the reason shown for unusable values.
+- With "All entries" the notice counted every entry as "by keys".
+- A model that wrote its reasoning into the reply echoed the protocol's format example and repeated a draft
+  block: echoed examples (`HANDLE`, `HANDLE_OR_REF`) and exact repeats are dropped.
+- Inline backticks around a block left a stray "``" in the prose.
+- Texts: the destructive-edit confirmation no longer nests quotes; deleting a reply whose changes were all
+  undone no longer warns about accepted changes.
+
+Observation: during the run another client of the dev instance (an older open tab) saved `settings.json`
+and replaced the workspace with its earlier state (last writer wins in the app's settings file); the test
+entries of A4/A6 disappeared that way, not through the extension.

@@ -77,6 +77,14 @@ describe('tolerance', () => {
         expect(final.unparsed[0]?.excerpt.length).toBeLessThanOrEqual(201);
     });
 
+    it('drops inline backticks wrapped around a block (live run 2026-09-16)', () => {
+        const parsed = parseReply('Removing `Cinder hollow`.\n\n`<op type="edit_entry" id="e2"><keys>Cinderhollow</keys></op>`', {
+            final: true,
+        });
+        expect(parsed.blocks).toHaveLength(1);
+        expect(parsed.prose).toBe('Removing `Cinder hollow`.');
+    });
+
     it('recognizes fenced blocks and drops the fences from prose', () => {
         const parsed = parseReply(fixture('fenced.txt'), { final: true });
         expect(parsed.blocks.map((block) => block.type)).toEqual(['create_folder', 'rename']);

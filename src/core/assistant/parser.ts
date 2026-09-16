@@ -339,6 +339,8 @@ export function parseReply(text: string, options: { final?: boolean } = {}): Par
         .join('')
         // Fences around blocks are dropped; fenced prose keeps its own fences.
         .replace(/```[a-zA-Z]*\s*\n?\s*```/g, '')
+        // …and so are inline backticks around a block (live run 2026-09-16: "`<op …>`" left "``").
+        .replace(/(?<!`)``(?!`)/g, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
     const references = [...prose.matchAll(/\[\[([A-Za-z0-9_-]+)\]\]/g)].map((match) => match[1] ?? '');

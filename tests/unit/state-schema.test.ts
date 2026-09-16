@@ -14,6 +14,7 @@ import {
 import {
     canSaveAssistantSettings,
     setAssistantSettings,
+    tokenLimitProblem,
 } from '../../src/core/assistant/settingsOps';
 import { DEFAULT_ASSISTANT_SETTINGS } from '../../src/core/assistant/types';
 import type { NativeWorldInfoEntry } from '../../src/global';
@@ -357,5 +358,23 @@ describe('assistant settings (spec 005 FR-035)', () => {
     it('refuses to save while a recovery is pending', () => {
         expect(canSaveAssistantSettings(true)).toBe(false);
         expect(canSaveAssistantSettings(false)).toBe(true);
+    });
+});
+
+describe('tokenLimitProblem (live run 2026-09-16)', () => {
+    const current = { responseTokens: 4000, contextTokens: 16000 };
+
+    it('accepts limits that the settings repair keeps as typed', () => {
+        expect(tokenLimitProblem('contextTokens', 9000, current)).toBeNull();
+        expect(tokenLimitProblem('responseTokens', 2000, current)).toBeNull();
+    });
+
+    it('explains values the repair would silently replace', () => {
+        expect(tokenLimitProblem('contextTokens', 3000, current)).toBe(
+            'Context size must be at least the response length + 500 (4500).'
+        );
+        expect(tokenLimitProblem('contextTokens', 10, current)).toContain('between 1000 and 1000000');
+        expect(tokenLimitProblem('responseTokens', 15800, current)).toContain('raise it first');
+        expect(tokenLimitProblem('responseTokens', 12.5, current)).toBe('Enter a whole number.');
     });
 });

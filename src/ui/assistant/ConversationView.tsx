@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { renderMarkdown } from '../../core/preview';
-import { displayText, statusText } from '../../core/assistant/display';
+import { displayText, replyHtml, statusText } from '../../core/assistant/display';
 import type { Message } from '../../core/assistant/types';
 import { variantCount, variantIndex } from '../../core/assistant/variants';
 import { FailureCard } from './FailureCard';
@@ -30,38 +29,6 @@ interface RowTools {
     busy: boolean;
     /** No usable connection: a new version cannot be generated. */
     blocked: boolean;
-}
-
-/** Splits prose into text and `[[handle]]` references (FR-005). */
-function renderProse(
-    text: string,
-    handles: Record<string, string>,
-    onOpenItem: MessageActions['onOpenItem']
-): JSX.Element[] {
-    const parts = text.split(/(\[\[[A-Za-z0-9_-]+\]\])/g);
-    return parts.map((part, index) => {
-        const match = /^\[\[([A-Za-z0-9_-]+)\]\]$/.exec(part);
-        if (!match) {
-            return (
-                <span
-                    key={index}
-                    className="wiw-bubble-text"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(part) }}
-                />
-            );
-        }
-        const handle = match[1] ?? '';
-        return (
-            <button
-                key={index}
-                type="button"
-                className="wiw-assistant-ref"
-                onClick={() => onOpenItem(handle, handles)}
-            >
-                {handle}
-            </button>
-        );
-    });
 }
 
 /** Version arrows, fork and delete — the icons of the app's own chat. */
@@ -154,7 +121,18 @@ const MessageRow = memo(function MessageRow({
     const handles = message.context?.handles ?? {};
     return (
         <div className={`wiw-bubble wiw-bubble-${message.role}`}>
-            {shown !== '' && renderProse(shown, handles, actions.onOpenItem)}
+            {shown !== '' && (
+                <div
+                    className="wiw-bubble-text"
+                    onClick={(event) => {
+                        const handle = (event.target as HTMLElement).closest<HTMLElement>('[data-handle]')?.dataset['handle'];
+                        if (handle !== undefined) {
+                            actions.onOpenItem(handle, handles);
+                        }
+                    }}
+                    dangerouslySetInnerHTML={{ __html: replyHtml(shown) }}
+                />
+            )}
             {message.reasoning !== undefined && message.reasoning !== '' && (
                 <details className="wiw-collapsible">
                     <summary>Thinking</summary>

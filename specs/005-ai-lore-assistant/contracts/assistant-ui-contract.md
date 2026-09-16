@@ -36,7 +36,7 @@ system); icons Font Awesome 6 Free.
 | `assistant/ProposalDiff.tsx` | Per-field diff built on `DiffView.tsx` | FR-008, FR-013 |
 | `assistant/ReplyNotices.tsx` | Context notice, truncated notice, broken-blocks notice (Show broken blocks, Regenerate with the same context, Ask to fix) | FR-004, FR-023, FR-027 |
 | `assistant/FailureCard.tsx` | Failure reason, retry countdown, Retry / Retry now / Cancel | FR-026 |
-| `assistant/SettingsMenu.tsx` | Profile select (with api + streaming badge), response/context limits, instructions editor with Reset | FR-018–FR-020, FR-024 |
+| `assistant/SettingsMenu.tsx` | Profile select (with api + streaming badge), response/context limits (saved on blur/Enter; an unusable value stays with its reason, e.g. "Context size must be at least the response length + 500 (4500)."), instructions editor with Reset | FR-018–FR-020, FR-024 |
 | `assistant/ContextMenu.tsx` | "Assistant context" dialog in three sections — Structure (Current folder following the selection with its live name and size / Chosen folders with an indented folder tree, children of a chosen folder shown as included / Whole workspace with its size), Entry contents (Selected and mentioned entries — recommended / All entries of the structure), Current chat (Recent messages + count, character card, persona, activated entries); footer [Use as default] … [Done] | FR-021, FR-021a, FR-022, FR-035 |
 | `DiffView.tsx` (existing) | Per-field before/after for edits and stale refresh | FR-008 |
 

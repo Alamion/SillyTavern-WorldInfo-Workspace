@@ -176,7 +176,7 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.2)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.3)
 ```
 
 ## Settings

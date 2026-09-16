@@ -104,10 +104,36 @@ function summaryOf(
     }
 }
 
+/** Placeholders of the protocol's format example (`contracts/assistant-protocol.md`). */
+const EXAMPLE_HANDLES: ReadonlySet<string> = new Set(['HANDLE', 'HANDLE_OR_REF']);
+
+/**
+ * Blocks worth turning into proposals. Small models that write their reasoning into
+ * the reply copy the format example and repeat a draft block in the final answer
+ * (live run 2026-09-16: six "unknown handle HANDLE_OR_REF" cards and a duplicated
+ * edit). Echoed examples and exact repeats are dropped; everything else is kept,
+ * however broken, so real mistakes still get a reason.
+ */
+function usableBlocks(blocks: readonly ParsedBlock[]): ParsedBlock[] {
+    const seen = new Set<string>();
+    return blocks.filter((block) => {
+        if (['id', 'parent'].some((name) => EXAMPLE_HANDLES.has(block.attrs[name] ?? ''))) {
+            return false;
+        }
+        const key = JSON.stringify([block.type, block.attrs, block.tags]);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
 export function toProposals(
-    blocks: readonly ParsedBlock[],
+    allBlocks: readonly ParsedBlock[],
     input: ValidateInput
 ): OperationProposal[] {
+    const blocks = usableBlocks(allBlocks);
     const { state, snapshot } = input;
     const scope = new Set(snapshot.scopeNodeIds);
     const refs = new Map<string, { proposalId: string; kind: 'folder' | 'entry'; title?: string }>();

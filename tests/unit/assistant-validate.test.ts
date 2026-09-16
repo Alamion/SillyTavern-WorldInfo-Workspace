@@ -151,6 +151,20 @@ describe('structure operations', () => {
         expect(proposals[0]?.summary).not.toContain('new_folder');
     });
 
+    it('drops echoed format examples and exact repeats (live run 2026-09-16)', () => {
+        const edit = '<op type="edit_entry" id="e1"><content>One sentence.</content></op>';
+        const { proposals } = proposalsOf(
+            [
+                '<op type="create_entry" parent="HANDLE_OR_REF" ref="new1"><title>Entry title</title><content>Entry text</content></op>',
+                '<op type="delete" id="HANDLE"></op>',
+                edit,
+                edit,
+            ].join('\n')
+        );
+        expect(proposals).toHaveLength(1);
+        expect(proposals[0]?.op).toBe('edit_entry');
+    });
+
     it('rejects a ref used twice and a ref that is not a folder', () => {
         const { proposals } = proposalsOf(
             [

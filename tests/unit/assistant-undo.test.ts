@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planUndo } from '../../src/core/assistant/undo';
+import { planUndo, undoSummary } from '../../src/core/assistant/undo';
 import { createFolderNode, findNode } from '../../src/core/state/schema';
 import type { AppliedBatch } from '../../src/core/assistant/types';
 import { NODE_IDS, aldermeerState } from '../fixtures/assistant/outline-aldermeer';
@@ -83,5 +83,20 @@ describe('planUndo', () => {
             state
         );
         expect(plan.skipped[0]?.reason).toBe('items were added inside it');
+    });
+});
+
+describe('undoSummary (UI contract: undo result toast)', () => {
+    it('counts reverted changes and lists distinct skip reasons', () => {
+        expect(undoSummary({ reverted: ['a'], skipped: [] })).toBe('Reverted 1 change.');
+        expect(
+            undoSummary({
+                reverted: ['a', 'b'],
+                skipped: [
+                    { reason: 'it was edited after the batch was applied' },
+                    { reason: 'it was edited after the batch was applied' },
+                ],
+            })
+        ).toBe('Reverted 2 changes; 2 skipped (it was edited after the batch was applied).');
     });
 });

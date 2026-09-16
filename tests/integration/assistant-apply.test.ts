@@ -261,6 +261,28 @@ describe('structure operations, deletions and undo (US2)', () => {
         expect(result.batch.items[1]?.inverse).toEqual({ kind: 'restore-position', parentId: 'R', index: 0 });
     });
 
+    it('undoes a new folder together with the items the same batch moved into it (live run 2026-09-16)', () => {
+        const rig = buildRig();
+        seedTwoFolders(rig);
+        const events: Array<{ event: string; payload: unknown }> = [];
+        const batch = batchFrom(
+            rig,
+            [
+                '<op type="create_folder" parent="f2" ref="new1"><title>Taverns</title></op>',
+                '<op type="move" id="e1" parent="new1"></op>',
+            ].join('\n')
+        );
+        // A real clock: every change gets its own timestamp.
+        let tick = Date.parse(NOW);
+        const clocked = { ...deps(rig, events), now: () => new Date((tick += 1000)).toISOString() };
+        const result = applyProposals(clocked, { conversationId: 'c1' }, batch, batch.proposals.map((proposal) => proposal.id));
+        const folderId = result.batch.items[0]?.nodeId ?? '';
+        const undone = undoAppliedBatch(clocked, { conversationId: 'c1' }, result.batch);
+        expect(undone.skipped).toEqual([]);
+        expect(findNode(rig.store.getState(), folderId)).toBeUndefined();
+        expect(findNode(rig.store.getState(), 'e-bristle')?.parentId).toBe('R');
+    });
+
     it('renames an entry and keeps its native copy in sync', async () => {
         const rig = buildRig();
         seedRoot(rig);

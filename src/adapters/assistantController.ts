@@ -13,6 +13,7 @@ import { systemPrompt } from '../core/assistant/prompts';
 import { canSaveAssistantSettings, setAssistantSettings } from '../core/assistant/settingsOps';
 import type {
     AppliedBatch,
+    AppliedBatchUndone,
     AssistantFailure,
     AssistantMode,
     AssistantSettings,
@@ -99,7 +100,8 @@ export interface AssistantController {
     retryNow(seq: number): Promise<void>;
     /** Destructive confirmation and batch undo (FR-010, FR-015). */
     confirmDestructive(seq: number, proposalId: string): Promise<void>;
-    undoBatch(seq: number, appliedBatchId: string): Promise<void>;
+    /** Resolves with the undo result, or null when nothing was undone. */
+    undoBatch(seq: number, appliedBatchId: string): Promise<AppliedBatchUndone | null>;
     /** Proposal review (FR-009, FR-010, FR-013, FR-017). */
     accept(seq: number, proposalId: string): Promise<void>;
     acceptAll(seq: number): Promise<void>;
@@ -825,7 +827,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             // Destructive EDIT: disclose what disappears before applying.
             const node = proposal.targetId !== undefined ? findNode(deps.store.getState(), proposal.targetId) : undefined;
             const confirmed = await deps.confirm(
-                `Apply "${proposal.summary}"? It removes a large part of ${
+                `Apply this change: ${proposal.summary}? It removes a large part of ${
                     node?.name ?? 'the entry'
                 } (or one of its keywords). This can be undone from the batch bar.`
             );
@@ -839,7 +841,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             const applied = message?.batch?.applied.find((item) => item.id === appliedBatchId);
             // A fork shares the original's applied changes but not its undo (owner decision 2026-09-16).
             if (!message?.batch || !applied || message.forkedFrom !== undefined) {
-                return;
+                return null;
             }
             const undone = undoAppliedBatch(
                 {
@@ -869,6 +871,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 ),
             }));
             await deps.conversations.flush(message.conversationId);
+            return undone;
         },
         async accept(seq, proposalId) {
             const message = messageAt(seq);

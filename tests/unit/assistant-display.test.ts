@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayText, statusText } from '../../src/core/assistant/display';
+import { displayText, replyHtml, statusText } from '../../src/core/assistant/display';
 import type { Message } from '../../src/core/assistant/types';
 
 /**
@@ -61,5 +61,23 @@ describe('statusText', () => {
     it('is empty for finished messages and says stopped for stopped ones', () => {
         expect(statusText(message({ status: 'received', text: 'done' }), now)).toBeNull();
         expect(statusText(message({ status: 'stopped' }), now)).toBe('Stopped.');
+    });
+});
+
+describe('replyHtml (live run 2026-09-16)', () => {
+    it('keeps markdown around references intact', () => {
+        const html = replyHtml('Entries:\n\n- **[[e1]] Bristlemark** — harbor city\n- **[[e2]] Cinderhollow**');
+        expect(html).toContain(
+            '<li><strong><button type="button" class="wiw-assistant-ref" data-handle="e1">e1</button> Bristlemark</strong> — harbor city</li>'
+        );
+        expect(html).not.toContain('**');
+        expect(html.match(/<li>/g)).toHaveLength(2);
+    });
+
+    it('escapes html in prose and ignores malformed references', () => {
+        const html = replyHtml('<script>x</script> [[e1 ]] [[f2]]');
+        expect(html).toContain('&lt;script&gt;');
+        expect(html).toContain('[[e1 ]]');
+        expect(html).toContain('data-handle="f2"');
     });
 });

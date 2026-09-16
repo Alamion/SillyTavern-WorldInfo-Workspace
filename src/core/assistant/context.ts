@@ -364,7 +364,8 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         }
         used += cost;
         itemBlocks.push(block);
-        if (!isSeed) {
+        // With `all` nothing is chosen by keys: the notice must not claim it was.
+        if (!isSeed && context.entryContents !== 'all') {
             triggeredIncluded += 1;
         }
     };

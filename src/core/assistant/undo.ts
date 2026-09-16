@@ -38,7 +38,12 @@ export interface UndoPlan {
     skipped: Array<{ proposalId: string; reason: string }>;
 }
 
-function skipReason(state: WorkspaceState, item: AppliedItem): string | null {
+/**
+ * `leaving` = nodes that steps planned earlier in this undo move out or delete: a
+ * folder the batch created and then filled is empty again by the time its own
+ * step runs (live run 2026-09-16: "Taverns" was skipped after its move was undone).
+ */
+function skipReason(state: WorkspaceState, item: AppliedItem, leaving: ReadonlySet<string>): string | null {
     if (item.inverse.kind === 'reinsert') {
         if (findNode(state, item.nodeId) !== undefined) {
             return 'the item exists again';
@@ -54,7 +59,11 @@ function skipReason(state: WorkspaceState, item: AppliedItem): string | null {
     if (node.updatedAt !== item.afterUpdatedAt) {
         return 'it was edited after the batch was applied';
     }
-    if (item.inverse.kind === 'delete-created' && node.kind === 'folder' && node.children.length > 0) {
+    if (
+        item.inverse.kind === 'delete-created' &&
+        node.kind === 'folder' &&
+        node.children.some((child) => !leaving.has(child.id))
+    ) {
         return 'items were added inside it';
     }
     if (item.inverse.kind === 'restore-position' && findNode(state, item.inverse.parentId) === undefined) {
@@ -63,14 +72,29 @@ function skipReason(state: WorkspaceState, item: AppliedItem): string | null {
     return null;
 }
 
+/** Result toast text: "Reverted 4 changes; 1 skipped (it was edited after the batch was applied)". */
+export function undoSummary(undone: { reverted: readonly string[]; skipped: ReadonlyArray<{ reason: string }> }): string {
+    const count = undone.reverted.length;
+    const head = `Reverted ${String(count)} change${count === 1 ? '' : 's'}`;
+    if (undone.skipped.length === 0) {
+        return `${head}.`;
+    }
+    const reasons = [...new Set(undone.skipped.map((item) => item.reason))].join('; ');
+    return `${head}; ${String(undone.skipped.length)} skipped (${reasons}).`;
+}
+
 export function planUndo(batch: AppliedBatch, state: WorkspaceState): UndoPlan {
     const steps: UndoStep[] = [];
     const skipped: Array<{ proposalId: string; reason: string }> = [];
+    const leaving = new Set<string>();
     for (const item of [...batch.items].reverse()) {
-        const reason = skipReason(state, item);
+        const reason = skipReason(state, item, leaving);
         if (reason !== null) {
             skipped.push({ proposalId: item.proposalId, reason });
             continue;
+        }
+        if (item.inverse.kind === 'restore-position' || item.inverse.kind === 'delete-created') {
+            leaving.add(item.nodeId);
         }
         const base = { proposalId: item.proposalId, nodeId: item.nodeId };
         switch (item.inverse.kind) {

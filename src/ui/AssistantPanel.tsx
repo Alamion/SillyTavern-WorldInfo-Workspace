@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
-import { notifyWarning } from '../adapters/logger';
+import { notifySuccess, notifyWarning } from '../adapters/logger';
+import { undoSummary } from '../core/assistant/undo';
 import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
 import { BatchBar } from './assistant/BatchBar';
@@ -57,8 +58,8 @@ export function AssistantPanel({
         onNewVariant: (seq) => void assistant.regenerate(seq),
         onFork: (seq) => void assistant.forkConversation(seq),
         onDelete: (message) => {
-            const applied = (message.variants ?? [message]).some(
-                (variant) => (variant.batch?.applied.length ?? 0) > 0
+            const applied = (message.variants ?? [message]).some((variant) =>
+                (variant.batch?.applied ?? []).some((batch) => batch.undone === undefined)
             );
             const versions = message.variants !== undefined && message.variants.length > 1;
             void confirmDialog(
@@ -162,9 +163,15 @@ export function AssistantPanel({
                                         }}
                                         onDenyAll={() => void assistant.denyAll(message.seq)}
                                         onFeedback={(text) => void assistant.feedback(message.seq, text)}
-                                        onUndo={(appliedBatchId) =>
-                                            void assistant.undoBatch(message.seq, appliedBatchId)
-                                        }
+                                        onUndo={(appliedBatchId) => {
+                                            void assistant.undoBatch(message.seq, appliedBatchId).then((undone) => {
+                                                if (undone !== null) {
+                                                    (undone.skipped.length > 0 ? notifyWarning : notifySuccess)(
+                                                        undoSummary(undone)
+                                                    );
+                                                }
+                                            });
+                                        }}
                                     />
                                 </div>
                             )}
