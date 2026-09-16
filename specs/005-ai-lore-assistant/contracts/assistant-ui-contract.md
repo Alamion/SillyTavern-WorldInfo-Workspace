@@ -32,7 +32,7 @@ system); icons Font Awesome 6 Free.
 | `assistant/ProposalEditor.tsx` | Edit title/keys/content/fields of a proposal before accepting | FR-009 |
 | `assistant/BatchBar.tsx` | Accept all pending / Deny all pending / Feedback… / Undo batch | FR-009, FR-015, FR-017 |
 | Destructive confirmation (via `src/adapters/popups.ts`) | Deletions: `workspaceActions.describeDeletion` disclosure (affected items, books, linked files); destructive edits: removed-content summary | FR-010 |
-| `assistant/Composer.tsx` | Textarea, Send/Stop, Propose/Discuss toggle, context chip | FR-002, FR-003 |
+| `assistant/Composer.tsx` | Textarea, Send/Stop, Propose/Discuss toggle, context chip; unsent text kept in `sessionStorage` (`WorldInfoWorkspace:assistant-draft`, one draft per tab, removed on send or when emptied) | FR-002, FR-002a, FR-003 |
 | `assistant/ProposalDiff.tsx` | Per-field diff built on `DiffView.tsx` | FR-008, FR-013 |
 | `assistant/ReplyNotices.tsx` | Context notice, truncated notice, broken-blocks notice (Show broken blocks, Regenerate with the same context, Ask to fix) | FR-004, FR-023, FR-027 |
 | `assistant/FailureCard.tsx` | Failure reason, retry countdown, Retry / Retry now / Cancel | FR-026 |

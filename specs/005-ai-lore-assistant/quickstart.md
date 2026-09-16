@@ -19,7 +19,7 @@ Reference: requirements in [spec.md](./spec.md); formats in
 ## Automated
 
 ```bash
-pnpm run test            # unit (protocol, validate, context, rules, undo), integration (apply + sync engine), contract (llm client, hooks)
+pnpm run test            # unit (protocol, validate, context, rules, undo, composer draft), integration (apply + sync engine), contract (llm client, hooks)
 pnpm run typecheck && pnpm run lint && pnpm run build
 ```
 
@@ -52,6 +52,7 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 | A22 | Reply versions | Send a propose request; deny one proposal; press `›` on the reply; switch back with `‹` | "2/2" after the new version; the first version shows its denied proposal; the next request's history carries the shown version only |
 | A23 | Delete and fork | Delete a user message and an assistant reply with an accepted change; fork at an earlier reply and continue there | Messages gone after reload, accepted change still in the tree; fork titled "Fork: …" with messages up to the chosen one; its applied batch shows "undo in the original conversation"; undo works in the original |
 | A24 | Context in the user turn | With DeepSeek (or any router model) ask "What is in the selected folder?" | The model describes the shared structure instead of saying it sees no context; the server log shows one system message and the `<workspace>` block in the last user message |
+| A25 | Unsent draft | Type a multi-line request without sending; close the workspace, open the chat / a character card, reopen the workspace; switch conversations; send; close and reopen again; then reload the page with a new unsent text | The typed text (line breaks included) is back after reopening and stays while switching conversations; after sending the input is empty and stays empty after reopening; after a reload in the same tab the unsent text is back (session storage) |
 
 ## Success criteria mapping
 
@@ -161,3 +162,9 @@ Defects found and fixed in this run (regression tests alongside):
 Observation: during the run another client of the dev instance (an older open tab) saved `settings.json`
 and replaced the workspace with its earlier state (last writer wins in the app's settings file); the test
 entries of A4/A6 disappeared that way, not through the extension.
+
+### 2026-09-16 — owner check (build 0.4.4)
+
+| # | Result | Notes |
+|---|--------|-------|
+| A25 | PASS | Unsent text kept across closing and reopening the workspace; cleared after sending |

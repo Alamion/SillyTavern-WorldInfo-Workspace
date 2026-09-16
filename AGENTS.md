@@ -117,6 +117,7 @@ src/
 │   │                        #   deleteNodes/describeDeletion (the single delete path)
 │   ├── llmClient.ts         # LlmPort over ConnectionManagerRequestService (spec 005)
 │   ├── conversationStore.ts # IndexedDB WorldInfoWorkspace-assistant + memory fallback
+│   ├── composerDraft.ts     # Unsent composer text in sessionStorage (FR-002a)
 │   ├── chatContext.ts       # Chat messages, character card, persona, activated entries
 │   ├── assistantApply.ts    # Apply proposals / deletions / undo via tree ops + hooks
 │   ├── assistantController.ts # UI-facing assistant surface (conversations, requests,
@@ -301,7 +302,8 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   often — this is expected.
 - **Storage**: IndexedDB `WorldInfoWorkspace-assistant` (stores `conversations`,
   `messages` keyed `[conversationId, seq]`), per browser profile; memory fallback with a
-  banner when IndexedDB is unavailable.
+  banner when IndexedDB is unavailable. The unsent composer text lives in `sessionStorage`
+  `WorldInfoWorkspace:assistant-draft` (per tab; removed on send; storage errors ignored).
 - **Hooks** (additive): `wi-workspace:assistant-applied` `{ conversationId, batchId,
   operations: [{ op, nodeId, name }], failed? }`, `wi-workspace:assistant-undone`
   `{ conversationId, batchId, reverted: string[], skipped: string[] }`.

@@ -372,6 +372,10 @@ proposals are produced.
   has streaming enabled, the reply text MUST stream live together with a live count of
   received characters (proposals are shown once they are complete); otherwise a waiting
   status with elapsed time is shown.
+- **FR-002a**: Unsent text in the message input MUST survive closing and reopening the
+  workspace within the same browser tab session (e.g. to check the chat or a character
+  card), and MUST be cleared once sent. Unavailable browser session storage only means the
+  text is not kept; the assistant keeps working.
 - **FR-003**: The assistant MUST support two modes per request: *propose* (reply may
   contain operation proposals) and *discuss* (text only, no proposals).
 - **FR-004**: The user MUST be able to regenerate the last assistant reply, and to

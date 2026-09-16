@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { createComposerDraft } from '../../adapters/composerDraft';
 import type { AssistantMode } from '../../core/assistant/types';
+
+const draft = createComposerDraft();
 
 /**
  * Request composer (spec 005 FR-002, FR-003): Enter sends on desktop,
  * Shift+Enter inserts a newline, and Send turns into Stop while a request runs.
+ * Unsent text survives closing and reopening the workspace (FR-002a).
  */
 export function Composer({
     mode,
@@ -24,7 +28,11 @@ export function Composer({
     onModeChange: (mode: AssistantMode) => void;
     onOpenContext: () => void;
 }): JSX.Element {
-    const [text, setText] = useState('');
+    const [text, setTextState] = useState(() => draft.load());
+    const setText = (value: string): void => {
+        setTextState(value);
+        draft.save(value);
+    };
     const send = (): void => {
         const trimmed = text.trim();
         if (trimmed === '' || busy || disabled) {
