@@ -53,6 +53,7 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 | A23 | Delete and fork | Delete a user message and an assistant reply with an accepted change; fork at an earlier reply and continue there | Messages gone after reload, accepted change still in the tree; fork titled "Fork: …" with messages up to the chosen one; its applied batch shows "undo in the original conversation"; undo works in the original |
 | A24 | Context in the user turn | With DeepSeek (or any router model) ask "What is in the selected folder?" | The model describes the shared structure instead of saying it sees no context; the server log shows one system message and the `<workspace>` block in the last user message |
 | A25 | Unsent draft | Type a multi-line request without sending; close the workspace, open the chat / a character card, reopen the workspace; switch conversations; send; close and reopen again; then reload the page with a new unsent text | The typed text (line breaks included) is back after reopening and stays while switching conversations; after sending the input is empty and stays empty after reopening; after a reload in the same tab the unsent text is back (session storage) |
+| A26 | Accept one by one | Ask for a new folder with several entries in it; accept one entry first, then the folder, then press Retry on the entry; accept the other entries one by one | The early entry fails with "apply \"…\" first"; after the folder is applied Retry puts it inside the folder; the other entries land there on their own click |
 
 ## Success criteria mapping
 
