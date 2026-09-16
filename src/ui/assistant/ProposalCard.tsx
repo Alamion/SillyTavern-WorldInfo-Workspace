@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { renderMarkdown } from '../../core/preview';
 import { findNode, type WorkspaceState } from '../../core/state/schema';
 import { FIELD_SPECS, OWNED_PREFIX } from '../../core/md/convention';
+import { canApplyAgain } from '../../core/assistant/plan';
 import type { OperationProposal } from '../../core/assistant/types';
 import { ProposalDiff } from './ProposalDiff';
 import { ProposalEditor } from './ProposalEditor';
@@ -64,6 +65,7 @@ export function ProposalCard({
     const target = proposal.targetId !== undefined ? findNode(state, proposal.targetId) : undefined;
     const duplicate = proposal.duplicateOf !== undefined ? findNode(state, proposal.duplicateOf) : undefined;
     const pending = proposal.decision === 'pending';
+    const again = canApplyAgain(proposal.decision);
     // Feedback also revises proposals that could not be used (owner report 2026-09-15).
     const revisable = ['pending', 'invalid', 'blocked', 'stale', 'failed'].includes(proposal.decision);
     const hasDiff = proposal.op === 'edit_entry' || values.content !== undefined;
@@ -116,7 +118,7 @@ export function ProposalCard({
                     <button type="button" className="wiw-button" onClick={() => actions.onRefresh(proposal.id)}>
                         <i className="fa-solid fa-rotate" /> Review again
                     </button>
-                ) : proposal.destructive && pending ? (
+                ) : proposal.destructive && (pending || again) ? (
                     <button
                         type="button"
                         className="wiw-button wiw-danger-button"
@@ -129,10 +131,11 @@ export function ProposalCard({
                     <button
                         type="button"
                         className="wiw-button"
-                        disabled={!pending && (proposal.decision !== 'failed' || proposal.destructive)}
+                        disabled={!pending && !again}
                         onClick={() => actions.onAccept(proposal.id)}
                     >
-                        <i className="fa-solid fa-check" /> {proposal.decision === 'failed' ? 'Retry' : 'Accept'}
+                        <i className="fa-solid fa-check" />{' '}
+                        {proposal.decision === 'failed' ? 'Retry' : again ? 'Apply again' : 'Accept'}
                     </button>
                 )}
                 <button

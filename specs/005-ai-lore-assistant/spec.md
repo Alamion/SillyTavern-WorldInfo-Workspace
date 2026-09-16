@@ -413,8 +413,9 @@ proposals are produced.
 - **FR-012**: Accepted operations of a batch MUST be applied in a dependency-safe order;
   proposals depending on a denied or failed proposal MUST be shown as blocked with the
   reason. A creation accepted on its own (a separate click) MUST still resolve for the
-  proposals that go into it; a proposal that failed to apply MUST offer a retry (except
-  destructive ones) and its reason MUST say what to apply first.
+  proposals that go into it; a proposal that failed to apply or was undone MUST be
+  appliable again (destructive ones through their confirmation), and a failure's reason
+  MUST say what to apply first.
 - **FR-013**: At acceptance time each proposal MUST be validated against the current tree;
   a proposal whose target changed since it was proposed MUST be shown as stale (with the
   current state) and require a fresh decision.

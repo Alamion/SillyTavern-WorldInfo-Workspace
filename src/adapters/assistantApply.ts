@@ -10,6 +10,7 @@ import {
 } from '../core/tree/operations';
 import { planUndo } from '../core/assistant/undo';
 import { deleteNodes } from './workspaceActions';
+import { canApplyAgain } from '../core/assistant/plan';
 import { stalenessOf } from '../core/assistant/rules';
 import type {
     AppliedBatch,
@@ -122,8 +123,8 @@ export function applyProposals(
     let failedOp: OperationProposal['op'] | undefined;
 
     for (const proposal of accepted) {
-        // Only reviewable proposals can land (FR-014, FR-028); a failed one may be retried.
-        if (!['pending', 'accepted', 'failed'].includes(proposal.decision)) {
+        // Only reviewable proposals can land (FR-014, FR-028); failed or undone ones may be applied again.
+        if (proposal.decision !== 'pending' && proposal.decision !== 'accepted' && !canApplyAgain(proposal.decision)) {
             outcomes.push({
                 proposalId: proposal.id,
                 status: 'failed',
@@ -148,7 +149,7 @@ export function applyProposals(
             const folder = batch.proposals.find((item) => item.ref !== undefined && item.ref === ref);
             const reason =
                 folder !== undefined
-                    ? `the folder it goes into is not created: apply "${folder.summary}" first, then accept this again`
+                    ? `the folder it goes into is not created: apply "${folder.summary}" first, then apply this again`
                     : 'the folder it depends on was not created';
             outcomes.push({ proposalId: proposal.id, status: 'failed', reason });
             failed = { proposalId: proposal.id, reason };

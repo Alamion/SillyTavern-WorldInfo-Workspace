@@ -2,7 +2,7 @@ import { applyDeletion, applyProposals, undoAppliedBatch } from './assistantAppl
 import { buildRequest } from '../core/assistant/context';
 import { describeFailure, retryPolicy } from '../core/assistant/failures';
 import { parseReply } from '../core/assistant/parser';
-import { acceptAllSelection, applyOrder, withBlocked } from '../core/assistant/plan';
+import { acceptAllSelection, applyOrder, canApplyAgain, withBlocked } from '../core/assistant/plan';
 import { stalenessOf } from '../core/assistant/rules';
 import { toProposals } from '../core/assistant/validate';
 import { forkedMessage, showVariant, variantIndex, withNewVariant } from '../core/assistant/variants';
@@ -805,7 +805,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         async confirmDestructive(seq, proposalId) {
             const message = messageAt(seq);
             const proposal = message?.batch?.proposals.find((item) => item.id === proposalId);
-            if (!message || !proposal || proposal.decision !== 'pending') {
+            if (!message || !proposal || (proposal.decision !== 'pending' && !canApplyAgain(proposal.decision))) {
                 return;
             }
             if (proposal.op === 'delete' && proposal.targetId !== undefined) {

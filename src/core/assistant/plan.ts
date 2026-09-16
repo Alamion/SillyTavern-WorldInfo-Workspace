@@ -25,6 +25,14 @@ export function applyOrder(proposals: readonly OperationProposal[]): OperationPr
         .map((entry) => entry.proposal);
 }
 
+/**
+ * Decisions that may be applied again: a failure to retry, or an undone change the
+ * user wants back (items that go into an undone folder need it re-applied).
+ */
+export function canApplyAgain(decision: Decision): boolean {
+    return decision === 'failed' || decision === 'reverted';
+}
+
 const DEAD: ReadonlySet<Decision> = new Set<Decision>(['denied', 'invalid', 'failed', 'superseded']);
 
 /**

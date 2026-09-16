@@ -8,7 +8,7 @@ import type { ConversationStorePort } from '../../src/core/assistant/ports';
 import { DEFAULT_ASSISTANT_SETTINGS } from '../../src/core/assistant/types';
 import { WorkspaceStore } from '../../src/core/state/store';
 import type { SyncEngine } from '../../src/adapters/syncEngine';
-import { getAssistantSettings } from '../../src/core/state/schema';
+import { findNode, getAssistantSettings } from '../../src/core/state/schema';
 import { FAKE_PROFILE, FakeLlm } from '../support/fakeLlm';
 import { FakeChatContext } from '../support/fakeChatContext';
 import { NODE_IDS, aldermeerState } from '../fixtures/assistant/outline-aldermeer';
@@ -604,6 +604,43 @@ describe('reorganization and undo (US2)', () => {
         expect(batch?.proposals[0]?.decision).toBe('reverted');
         expect(batch?.applied[0]?.undone?.reverted).toHaveLength(1);
         expect(JSON.stringify(harness.store.getState())).not.toContain('Temporary');
+    });
+
+    it('applies an undone folder again so the items that go into it can land (live run 2026-09-17)', async () => {
+        const { harness, seq, proposals } = await withReply(
+            [
+                '<op type="create_folder" parent="f3" ref="new1"><title>Magic</title></op>',
+                '<op type="create_entry" parent="new1"><title>Mirror magic</title><content>x</content></op>',
+            ].join('\n')
+        );
+        const [folder, entry] = proposals;
+        const batchNow = () => harness.controller.getSnapshot().messages.at(-1)?.batch;
+        await harness.controller.accept(seq, folder?.id ?? '');
+        await harness.controller.undoBatch(seq, batchNow()?.applied[0]?.id ?? '');
+        expect(batchNow()?.proposals[0]?.decision).toBe('reverted');
+
+        await harness.controller.accept(seq, entry?.id ?? '');
+        expect(batchNow()?.proposals[1]).toMatchObject({ decision: 'failed' });
+        expect(batchNow()?.proposals[1]?.failedReason).toContain('Magic');
+
+        await harness.controller.accept(seq, folder?.id ?? '');
+        await harness.controller.accept(seq, entry?.id ?? '');
+        expect(batchNow()?.proposals.map((proposal) => proposal.decision)).toEqual(['applied', 'applied']);
+        expect(batchNow()?.proposals[1]?.failedReason).toBeUndefined();
+        const created = batchNow()?.applied.at(-1)?.items[0]?.nodeId ?? '';
+        const folderId = batchNow()?.applied.at(-2)?.items[0]?.nodeId;
+        expect(findNode(harness.store.getState(), created)?.parentId).toBe(folderId);
+    });
+
+    it('re-applies a declined deletion only through the confirmation', async () => {
+        const { harness, seq, proposals } = await withReply('<op type="delete" id="e2"></op>');
+        confirmAnswer.value = false;
+        await harness.controller.confirmDestructive(seq, proposals[0]?.id ?? '');
+        expect(harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('failed');
+        confirmAnswer.value = true;
+        await harness.controller.confirmDestructive(seq, proposals[0]?.id ?? '');
+        expect(harness.controller.getSnapshot().messages.at(-1)?.batch?.proposals[0]?.decision).toBe('applied');
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Bristlemark Taverns');
     });
 
     it('persists applied batches so undo survives a reload', async () => {
