@@ -1,8 +1,20 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { createComposerDraft } from '../../adapters/composerDraft';
 import type { AssistantMode } from '../../core/assistant/types';
 
 const draft = createComposerDraft();
+
+/** Browsers that size a textarea to its content in CSS (as the app's own chat input does). */
+const cssAutofit = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
+
+/**
+ * Fallback for browsers without `field-sizing`: the app's `autoFitSendTextArea`
+ * pattern — collapse, then take the content height; CSS min/max-height clamp it.
+ */
+function fitToContent(textarea: HTMLTextAreaElement): void {
+    textarea.style.height = '1px';
+    textarea.style.height = `${String(textarea.scrollHeight)}px`;
+}
 
 /**
  * Request composer (spec 005 FR-002, FR-003): Enter sends on desktop,
@@ -29,6 +41,14 @@ export function Composer({
     onOpenContext: () => void;
 }): JSX.Element {
     const [text, setTextState] = useState(() => draft.load());
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // Grows while typing, shrinks after sending or clearing (owner request 2026-09-17:
+    // a phone cannot drag the resize handle).
+    useLayoutEffect(() => {
+        if (!cssAutofit && textareaRef.current) {
+            fitToContent(textareaRef.current);
+        }
+    }, [text]);
     const setText = (value: string): void => {
         setTextState(value);
         draft.save(value);
@@ -65,6 +85,7 @@ export function Composer({
                 </button>
             </div>
             <textarea
+                ref={textareaRef}
                 value={text}
                 disabled={disabled}
                 placeholder={
@@ -72,7 +93,13 @@ export function Composer({
                         ? 'Ask for new entries, an edit, or a reorganization…'
                         : 'Ask about the lore…'
                 }
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) => {
+                    if (cssAutofit) {
+                        // Drop a manual drag size so the field follows its content again.
+                        event.target.style.height = '';
+                    }
+                    setText(event.target.value);
+                }}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();

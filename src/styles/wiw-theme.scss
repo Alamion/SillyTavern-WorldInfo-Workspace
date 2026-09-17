@@ -946,10 +946,15 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     flex-direction: column;
     gap: 0.35rem;
 
+    // Sized to the content like the app's chat input (#send_textarea); JS fallback
+    // in Composer.tsx where `field-sizing` is unsupported.
     textarea {
         width: 100%;
         min-height: 3.6rem;
+        max-height: 40vh;
+        max-height: 40dvh;
         resize: vertical;
+        field-sizing: content;
     }
 }
 

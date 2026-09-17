@@ -56,6 +56,7 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 | A26 | Accept one by one | Ask for a new folder with several entries in it; accept one entry first, then the folder, then press Retry on the entry; accept the other entries one by one | The early entry fails with "apply \"…\" first"; after the folder is applied Retry puts it inside the folder; the other entries land there on their own click |
 | A27 | Apply an undone change again | Ask for a new folder with an entry in it; accept the folder, undo its batch; press Retry on the entry; press "Apply again" on the folder, then Retry on the entry; decline a proposed deletion, then use "Confirm delete…" again | The entry fails naming the folder; after "Apply again" the folder is back and the entry lands inside it; the declined deletion asks for confirmation again and then applies |
 | A28 | Undo after accepting one by one | Ask for a folder with two entries in it; accept all three one by one; press "Undo last", then "Undo all" | One "Undo last" and one "Undo all (3)" instead of three buttons; "Undo last" removes the last entry only; "Undo all" removes the rest (entries before the folder, nothing skipped); one "reverted 3" badge |
+| A29 | Growing input | On a phone (and in Firefox) type a request of several lines; keep typing past a third of the screen; send | The input grows line by line, stops growing at about 40% of the screen height and scrolls inside; after sending it is back to two lines |
 
 ## Success criteria mapping
 
