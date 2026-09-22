@@ -17,6 +17,8 @@ import { analyzeNativeBook } from '../core/sync/divergence';
 import { mapBookToNodes, planBoundImport, type BoundImportPlan } from '../core/sync/import';
 import { fingerprintEntry } from '../core/sync/fingerprint';
 import { flushDrafts } from './draftRegistry';
+import { noopEmitter, type HookEmitter } from './hooks';
+import { WI_EVENTS, type BookPushedPayload, type RootChangedPayload } from '../core/hooks/events';
 import { nameInUse } from '../core/sync/bookNaming';
 import { normalizeNativeEntry } from '../core/state/schema';
 import { nameEquals } from '../core/sync/bookNaming';
@@ -46,6 +48,12 @@ export interface SyncEngineInput {
     ctx: import('../global').SillyTavernContext;
     store: WorkspaceStore;
     worldInfo: WorldInfoAdapter;
+    /**
+     * Public interop hooks (spec 006 FR-007). Injected rather than taken from
+     * `ctx` so the contract tests can collect emissions through the same seam
+     * the markdown and assistant adapters use.
+     */
+    emit?: HookEmitter;
 }
 
 export interface SyncEngine {
@@ -174,6 +182,28 @@ function emitBookFailure(bookName: string, message: string): void {
 export function createSyncEngine(input: SyncEngineInput): SyncEngine {
     const { store, worldInfo } = input;
     const ctx = input.ctx;
+    const emit: HookEmitter = input.emit ?? noopEmitter;
+    /** Announces a push outcome exactly once, on a terminal path only. */
+    const emitPush = (
+        bookName: string,
+        rootId: string,
+        outcome: BookPushedPayload['outcome'],
+        extra: Omit<BookPushedPayload, 'bookName' | 'rootId' | 'outcome'> = {}
+    ): void => {
+        emit(WI_EVENTS.bookPushed, { bookName, rootId, outcome, ...extra });
+    };
+    const emitRoot = (
+        folder: { id: string; name: string },
+        bookName: string | null,
+        action: RootChangedPayload['action']
+    ): void => {
+        emit(WI_EVENTS.rootChanged, {
+            folderId: folder.id,
+            folderName: folder.name,
+            bookName,
+            action,
+        });
+    };
     const reports = new Map<string, DivergenceReport>();
     const listeners = new Set<() => void>();
     const pendingBooks = new Set<string>();
@@ -300,6 +330,9 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         const current = await worldInfo.loadBook(bookName);
         if (!current) {
             emitBookFailure(bookName, `Native book "${bookName}" is missing from the app's book list.`);
+            emitPush(bookName, root.id, 'book-missing', {
+                reason: `Native book "${bookName}" is missing from the app's book list.`,
+            });
             pendingBooks.delete(bookName);
             return;
         }
@@ -343,6 +376,9 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                         name: entry.comment || `Entry ${entry.uid}`,
                     })),
                     blocked: true,
+                });
+                emitPush(bookName, root.id, 'conflict-blocked', {
+                    reason: `${plan.conflicts.length} entry conflict(s) need review.`,
                 });
                 pendingBooks.delete(bookName);
                 notify();
@@ -389,6 +425,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                 bookName,
                 `${result.skipped.length} invalid item(s) block the push for "${bookName}": ${result.skipped[0]!.reason}`
             );
+            emitPush(bookName, root.id, 'validation-blocked', {
+                skipped: result.skipped.map((row) => ({ nodeId: row.nodeId, reason: row.reason })),
+                reason: result.skipped[0]!.reason,
+            });
             pendingBooks.delete(bookName);
             notify();
             return;
@@ -398,7 +438,8 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         );
         try {
             await worldInfo.saveBook(bookName, result.book, true);
-        } catch {
+        } catch (error) {
+            emitPush(bookName, root.id, 'save-failed', { reason: String(error) });
             pendingBooks.add(bookName);
             notify();
             return;
@@ -428,6 +469,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             }
             // FR-021 fulfilled: the flattened save removed the tombstoned uids.
             nextRoot.book.tombstones = [];
+        });
+        emitPush(bookName, root.id, 'success', {
+            exported: result.exported.length,
+            skipped: result.skipped.map((row) => ({ nodeId: row.nodeId, reason: row.reason })),
         });
         pendingBooks.delete(bookName);
         reports.delete(bookName);
@@ -683,10 +728,18 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     target.expanded = true;
                 }
             });
+            // Emitted here, not at the callers: designateRestoredRoot and the UI
+            // toggle both delegate to this method, so emitting there would fire
+            // twice for a markdown-restored root (spec 006 R9).
+            emitRoot(folder, boundName, 'designated');
             refreshStructure();
             await pushBook(boundName!, { force: true });
         },
         undesignateRoot: (folderId: string): void => {
+            const folder = findNode(store.getState(), folderId);
+            if (folder?.kind !== 'folder' || !folder.isWiRoot) {
+                return;
+            }
             store.update((draft) => {
                 const target = findNode(draft, folderId);
                 if (target?.kind === 'folder' && target.isWiRoot) {
@@ -695,6 +748,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     resetEntitySync(draft, folderId);
                 }
             });
+            emitRoot(folder, null, 'undesignated');
             notify();
         },
         renameRootBook: async (folderId, newBase): Promise<void> => {
@@ -712,6 +766,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     target.book.bookName = result.bookName;
                 }
             });
+            emitRoot(folder, result.bookName, 'book-renamed');
         },
         deleteRootBook: async (folderId, mode): Promise<void> => {
             const folder = findNode(store.getState(), folderId);
@@ -730,6 +785,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     resetEntitySync(draft, folderId);
                 }
             });
+            emitRoot(folder, bookName, mode === 'delete' ? 'book-deleted' : 'undesignated');
             notify();
         },
         importUnboundBook: async (bookName: string, parentFolderId?: string): Promise<void> => {
@@ -754,8 +810,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                 }
             }
             const now = new Date().toISOString();
+            let importedFolderId = '';
             store.update((draft) => {
                 const folderId = ctx.uuidv4();
+                importedFolderId = folderId;
                 const requestedParent = parentFolderId ? findNode(draft, parentFolderId) : undefined;
                 const parent: FolderNode = requestedParent?.kind === 'folder' ? requestedParent : draft.root;
                 const folder: FolderNode = {
@@ -788,6 +846,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                 parent.children.push(folder);
                 parent.expanded = true;
             });
+            emitRoot({ id: importedFolderId, name: bookName }, bookName, 'imported');
             // Imported under another WI root: the entries also join the
             // enclosing books, which must be queued for a push.
             engineRef.current.refreshStructure();

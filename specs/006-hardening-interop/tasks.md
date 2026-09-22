@@ -167,26 +167,26 @@ exactly once per occurrence across every originating route, with payloads matchi
 
 ### Tests (write first, must fail)
 
-- [ ] T048 [P] [US2] Contract tests for `wi-workspace:tree-changed` in `tests/contract/hooks.test.ts`: payload shape, exactly-once, and a negative case asserting **no** event for bookkeeping-only deltas (sync status, uid, tombstones, expanded, settings)
-- [ ] T049 [P] [US2] Contract tests for `wi-workspace:book-pushed` in `tests/contract/hooks.test.ts` covering all five outcomes (`success`, `save-failed`, `conflict-blocked`, `validation-blocked`, `book-missing`)
-- [ ] T050 [P] [US2] Contract tests for `wi-workspace:root-changed` in `tests/contract/hooks.test.ts` covering all five actions, incl. markdown-restored roots not double-firing
-- [ ] T051 [P] [US2] Contract tests for `wi-workspace:workspace-shown` / `:workspace-hidden` in `tests/contract/hooks.test.ts`, incl. the already-open-at-init bootstrap and mode switches
-- [ ] T052 [P] [US2] Containment tests in `tests/contract/hooks.test.ts`: a subscriber that throws and one that blocks cause 0 failed or blocked workspace operations (FR-010, SC-006)
-- [ ] T053 [P] [US2] Privacy tests in `tests/contract/hooks.test.ts`: serialized payloads contain no entry content, chat text or persona data
-- [ ] T054 [US2] (SC-005) Integration test in `tests/integration/hooks-routes.test.ts` on the `tests/support/fakeHost.ts` harness: exactly-once per occurrence across **every** route — manual edit, assistant apply, markdown pull, native import, bulk action, delete (FR-009)
+- [X] T048 [P] [US2] Contract tests for `wi-workspace:tree-changed` in `tests/contract/hooks.test.ts`: payload shape, exactly-once, and a negative case asserting **no** event for bookkeeping-only deltas (sync status, uid, tombstones, expanded, settings)
+- [X] T049 [P] [US2] Contract tests for `wi-workspace:book-pushed` in `tests/contract/hooks.test.ts` covering all five outcomes (`success`, `save-failed`, `conflict-blocked`, `validation-blocked`, `book-missing`)
+- [X] T050 [P] [US2] Contract tests for `wi-workspace:root-changed` in `tests/contract/hooks.test.ts` covering all five actions, incl. markdown-restored roots not double-firing
+- [X] T051 [P] [US2] Contract tests for `wi-workspace:workspace-shown` / `:workspace-hidden` in `tests/contract/hooks.test.ts`, incl. the already-open-at-init bootstrap and mode switches
+- [X] T052 [P] [US2] Containment tests in `tests/contract/hooks.test.ts`: a subscriber that throws and one that blocks cause 0 failed or blocked workspace operations (FR-010, SC-006)
+- [X] T053 [P] [US2] Privacy tests in `tests/contract/hooks.test.ts`: serialized payloads contain no entry content, chat text or persona data
+- [X] T054 [US2] (SC-005) Integration test in `tests/integration/hooks-routes.test.ts` on the `tests/support/fakeHost.ts` harness: exactly-once per occurrence across **every** route — manual edit, assistant apply, markdown pull, native import, bulk action, delete (FR-009)
 
 ### Implementation
 
-- [ ] T055 [P] [US2] (FR-007) Declare event names and payload types in `src/core/hooks/events.ts` per `contracts/hooks.md` (closes the FR-008 gap — no `wi-workspace:*` payload is typed anywhere today)
-- [ ] T056 [US2] Implement the pure previous→next tree diff (create/delete/move/rename/update, with the bookkeeping-only filter) in `src/core/hooks/treeDiff.ts`
-- [ ] T057 [US2] Create the typed, contained, injectable emitter in `src/adapters/hooks.ts` (`try { void ctx.eventSource.emit(...) } catch { debugLog }`), keeping the `emit?: (event, payload) => void` shape the contract tests inject
-- [ ] T058 [US2] Migrate the two duplicated inline emit lambdas in `src/adapters/settingsStore.ts` (lines 97, 127) and the call sites in `src/adapters/mdLink.ts` and `src/adapters/assistantApply.ts` to the shared emitter — names and payloads unchanged (FR-011)
-- [ ] T059 [US2] Add the tree-event diff subscription with microtask coalescing in `src/adapters/settingsStore.ts`, mirroring the existing image-GC subscription that already keeps a `previousState` snapshot
-- [ ] T060 [US2] Emit `book-pushed` at the five terminal points of `pushBook` in `src/adapters/syncEngine.ts` (success, save-failed, conflict-blocked, validation-blocked, book-missing), only on non-recursive terminal paths
-- [ ] T061 [US2] Emit `root-changed` inside `designateRoot`, `undesignateRoot`, `deleteRootBook`, `renameRootBook` and `importUnboundBook` in `src/adapters/syncEngine.ts` — never at the callers, and not on the early-return paths
-- [ ] T062 [US2] Emit `workspace-shown` / `workspace-hidden` in `src/index.ts`, covering the already-open-at-init bootstrap and the Workspace ⇄ native mode switch
-- [ ] T063 [US2] Export the public event types from `src/global.d.ts` (or a public type entry) so consumers can type payloads
-- [ ] T064 [US2] (FR-012) Add a check asserting the documented event list and the emitted events match exactly in `tests/contract/hooks.test.ts` (SC-010)
+- [X] T055 [P] [US2] (FR-007) Declare event names and payload types in `src/core/hooks/events.ts` per `contracts/hooks.md` (closes the FR-008 gap — no `wi-workspace:*` payload is typed anywhere today)
+- [X] T056 [US2] Implement the pure previous→next tree diff (create/delete/move/rename/update, with the bookkeeping-only filter) in `src/core/hooks/treeDiff.ts`
+- [X] T057 [US2] Create the typed, contained, injectable emitter in `src/adapters/hooks.ts` (`try { void ctx.eventSource.emit(...) } catch { debugLog }`), keeping the `emit?: (event, payload) => void` shape the contract tests inject
+- [X] T058 [US2] Migrate the two duplicated inline emit lambdas in `src/adapters/settingsStore.ts` (lines 97, 127) and the call sites in `src/adapters/mdLink.ts` and `src/adapters/assistantApply.ts` to the shared emitter — names and payloads unchanged (FR-011)
+- [X] T059 [US2] Add the tree-event diff subscription with microtask coalescing in `src/adapters/settingsStore.ts`, mirroring the existing image-GC subscription that already keeps a `previousState` snapshot
+- [X] T060 [US2] Emit `book-pushed` at the five terminal points of `pushBook` in `src/adapters/syncEngine.ts` (success, save-failed, conflict-blocked, validation-blocked, book-missing), only on non-recursive terminal paths
+- [X] T061 [US2] Emit `root-changed` inside `designateRoot`, `undesignateRoot`, `deleteRootBook`, `renameRootBook` and `importUnboundBook` in `src/adapters/syncEngine.ts` — never at the callers, and not on the early-return paths
+- [X] T062 [US2] Emit `workspace-shown` / `workspace-hidden` in `src/index.ts`, covering the already-open-at-init bootstrap and the Workspace ⇄ native mode switch
+- [X] T063 [US2] Export the public event types from `src/global.d.ts` (or a public type entry) so consumers can type payloads
+- [X] T064 [US2] (FR-012) Add a check asserting the documented event list and the emitted events match exactly in `tests/contract/hooks.test.ts` (SC-010)
 
 **Checkpoint**: US2 independently testable — the hook surface is complete and contract-tested.
 

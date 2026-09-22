@@ -11,6 +11,9 @@ import {
 } from '../core/state/schema';
 import { WorkspaceStore } from '../core/state/store';
 import { createWorldInfoAdapter, type WorldInfoAdapter } from './worldInfoAdapter';
+import { createHookEmitter } from './hooks';
+import { WI_EVENTS } from '../core/hooks/events';
+import { diffTree } from '../core/hooks/treeDiff';
 import { createActiveBooksAdapter, type ActiveBooksAdapter } from './activeBooksAdapter';
 import { createSyncEngine, type SyncEngine } from './syncEngine';
 import { createMdController, type MdController } from './mdController';
@@ -85,7 +88,36 @@ export function initWorkspaceState(): WorkspaceStateServices {
 
     const worldInfo = createWorldInfoAdapter(ctx);
     const activeBooks = createActiveBooksAdapter();
-    const sync = createSyncEngine({ ctx, store, worldInfo });
+    const emit = createHookEmitter(ctx);
+    const sync = createSyncEngine({ ctx, store, worldInfo, emit });
+
+    /**
+     * Public tree events (FR-007/FR-009). Derived from the store rather than from
+     * the mutation sites: `applyTreeChange` is not the universal funnel, so only
+     * a store-level diff can guarantee exactly one event per occurrence for every
+     * route (spec 006 R9).
+     *
+     * Coalesced on a microtask because one logical change legitimately publishes
+     * more than once — applyTreeChange replaces and then refreshes structure, and
+     * undo restores fields one at a time.
+     */
+    let treeEventBase = store.getState();
+    let treeFlushQueued = false;
+    store.subscribe(() => {
+        if (treeFlushQueued) {
+            return;
+        }
+        treeFlushQueued = true;
+        queueMicrotask(() => {
+            treeFlushQueued = false;
+            const next = store.getState();
+            const changes = diffTree(treeEventBase, next);
+            treeEventBase = next;
+            if (changes.length > 0) {
+                emit(WI_EVENTS.treeChanged, { changes });
+            }
+        });
+    });
 
     const imageStore = createImageStore({ getRequestHeaders: () => ctx.getRequestHeaders() });
     const md = createMdController({
@@ -94,7 +126,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
         newId: () => ctx.uuidv4(),
         access: fsaAccess,
         imageStore,
-        emit: (event, payload) => void ctx.eventSource.emit(event, payload),
+        emit,
     });
     // FR-024: owned stored images nothing references any more are deleted.
     let previousState = store.getState();
@@ -124,7 +156,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
         newId: () => ctx.uuidv4(),
         now: () => new Date().toISOString(),
         isRecoveryPending,
-        emit: (event, payload) => void ctx.eventSource.emit(event, payload),
+        emit,
     });
     void assistant.init().catch((error: unknown) => {
         notifyWarning(`Assistant conversations could not be loaded: ${String(error)}`);

@@ -36,6 +36,8 @@ export interface WorkspaceShell {
      * when the drawer opens in workspace mode.
      */
     onWorkspaceShown(handler: () => void): void;
+    /** Fires when the Workspace/native mode actually changes. */
+    onModeChange(handler: () => void): void;
 }
 
 function isDrawerOpen(drawer: Element): boolean {
@@ -68,9 +70,21 @@ function buildNativeToggleButton(onActivate: () => void): HTMLElement {
 
 let activeMode: 'native' | 'workspace' = 'native';
 
+/**
+ * Mode-change listeners. The Workspace/native switch is not a drawer open or
+ * close, so without this a consumer would never hear that the workspace surface
+ * stopped being visible (spec 006 FR-007).
+ */
+const modeHandlers: Array<() => void> = [];
+
 function applyMode(on: boolean): void {
-    activeMode = on ? 'workspace' : 'native';
+    const next = on ? 'workspace' : 'native';
+    const changed = activeMode !== next;
+    activeMode = next;
     document.body.classList.toggle(BODY_CLASS, on);
+    if (changed) {
+        modeHandlers.forEach((handler) => handler());
+    }
 }
 
 export function mountWorkspaceShell(): WorkspaceShell | null {
@@ -136,6 +150,7 @@ export function mountWorkspaceShell(): WorkspaceShell | null {
         onOpen: (handler) => openHandlers.push(handler),
         onClose: (handler) => closeHandlers.push(handler),
         onWorkspaceShown: (handler) => shownHandlers.push(handler),
+        onModeChange: (handler) => modeHandlers.push(handler),
     };
 }
 

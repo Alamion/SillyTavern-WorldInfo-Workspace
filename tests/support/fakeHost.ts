@@ -113,6 +113,8 @@ export interface Rig {
     ctx: SillyTavernContext;
     store: WorkspaceStore;
     engine: SyncEngine;
+    /** Public `wi-workspace:*` events the engine emitted, in order. */
+    events: Array<{ event: string; payload: unknown }>;
     advanceTimers(ms?: number): Promise<void>;
 }
 
@@ -121,12 +123,19 @@ export function buildRig(): Rig {
     const ctx = host as unknown as SillyTavernContext;
     const store = new WorkspaceStore(createDefaultState());
     const worldInfo = createWorldInfoAdapter(ctx);
-    const engine = createSyncEngine({ ctx, store, worldInfo });
+    const events: Array<{ event: string; payload: unknown }> = [];
+    const engine = createSyncEngine({
+        ctx,
+        store,
+        worldInfo,
+        emit: (event, payload) => events.push({ event, payload }),
+    });
     return {
         host,
         ctx,
         store,
         engine,
+        events,
         advanceTimers: async (ms = 1100) => {
             await vi.advanceTimersByTimeAsync(ms);
         },
