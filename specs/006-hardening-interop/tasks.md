@@ -54,10 +54,10 @@ node index) → US1 Performance at scale (P1) → US2 Interop hooks (P2) → US3
 **Purpose**: Be able to measure before changing anything. Without baselines the phase
 gate cannot evidence improvement (plan: "the gain is evidenced, not assumed").
 
-- [ ] T001 [P] (FR-006) Create seeded deterministic scale dataset generator in `tests/support/scaleDataset.ts` (~2000 nodes, one 1000-entry WI root book, a second smaller book, depth ~5, realistic content lengths)
-- [ ] T002 Create perf suite scaffolding in `tests/perf/scale.bench.test.ts` with the budget table from `specs/006-hardening-interop/contracts/performance-budgets.md` (P-1…P-9)
-- [ ] T003 Wire `tests/perf/**` into the Vitest config in `vitest.config.ts` so the suite runs with `pnpm run test` (FR-006)
-- [ ] T004 Record pre-fix baselines for P-1…P-9 as comments/constants in `tests/perf/scale.bench.test.ts` so each budget states what it improved from
+- [X] T001 [P] (FR-006) Create seeded deterministic scale dataset generator in `tests/support/scaleDataset.ts` (~2000 nodes, one 1000-entry WI root book, a second smaller book, depth ~5, realistic content lengths)
+- [X] T002 Create perf suite scaffolding in `tests/perf/scale.bench.test.ts` with the budget table from `specs/006-hardening-interop/contracts/performance-budgets.md` (P-1…P-9)
+- [X] T003 Wire `tests/perf/**` into the Vitest config in `vitest.config.ts` so the suite runs with `pnpm run test` (FR-006)
+- [X] T004 Record pre-fix baselines for P-1…P-9 as comments/constants in `tests/perf/scale.bench.test.ts` so each budget states what it improved from
 
 **Checkpoint**: Current performance is measured and reproducible.
 
