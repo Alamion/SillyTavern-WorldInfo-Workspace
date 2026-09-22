@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { NativeWorldInfoEntry } from '../../global';
 import type { SampleFieldMeta, SampleFieldName } from '../../core/fieldSchema';
@@ -6,6 +6,7 @@ import { ADVANCED_LAYOUT, FIELD_SCHEMA } from '../../core/fieldSchema';
 import { renderMarkdown, type ImageResolver } from '../../core/preview';
 import { clampLayoutSize, LAYOUT_LIMITS } from '../../core/state/layout';
 import { useLayout } from '../layoutContext';
+import { useDraftField } from '../useDraftField';
 import { NodeHeader } from '../NodeHeader';
 import { Splitter } from '../Splitter';
 import { CharacterFilterControl, MultiSelectControl } from './MultiSelect';
@@ -304,13 +305,18 @@ function ContentSection({
     const [previewVisible, setPreviewVisible] = useState(!isMobile);
     const { layout, saveLayout } = useLayout();
     const previewRef = useRef<HTMLDivElement | null>(null);
+    // The preview trails the textarea: rendering is a full CommonMark parse, and
+    // typing must never wait for it (spec 006 R4).
+    // Typing stays local and commits shortly after it stops (spec 006 R3).
+    const draft = useDraftField(content, onContentChange);
+    const deferredContent = useDeferredValue(draft.value);
     const html = useMemo(
         () =>
-            renderMarkdown(content, {
+            renderMarkdown(deferredContent, {
                 resolveImage,
                 resolvePlaceholder: substitute,
             }),
-        [content, resolveImage, substitute]
+        [deferredContent, resolveImage, substitute]
     );
     return (
         <section className="wiw-content-section">
@@ -327,9 +333,10 @@ function ContentSection({
             <div className="wiw-content-body">
                 <textarea
                     className="wiw-content-textarea"
-                    value={content}
+                    value={draft.value}
                     spellCheck={false}
-                    onChange={(event) => onContentChange(event.target.value)}
+                    onChange={(event) => draft.onChange(event.target.value)}
+                    onBlur={draft.onBlur}
                 />
                 {previewVisible && !isMobile && (
                     // Sizes in percent of the editor; the preview is on the right, so

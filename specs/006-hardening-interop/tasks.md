@@ -104,10 +104,10 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 ### Tests (write first, must fail)
 
 - [X] T015 [P] [US1] Perf budget tests P-5…P-9 in `tests/perf/scale.bench.test.ts` (push, fingerprint memo, markdown render, reconcile, memory stability)
-- [ ] T016 [P] [US1] Unit tests for draft-field flush semantics in `tests/unit/draft-field.test.ts`: commit on blur, commit on debounce, and **flush on demand** (generation start / panel close) with no lost text
+- [X] T016 [P] [US1] Unit tests for draft-field flush semantics in `tests/unit/draft-field.test.ts`: commit on blur, commit on debounce, and **flush on demand** (generation start / panel close) with no lost text
 - [X] T017 [P] [US1] Unit tests for identity-keyed fingerprint memoization in `tests/unit/fingerprint.test.ts` (extend): unchanged entry hashes once, changed entry re-hashes
 - [ ] T018 [P] [US1] Unit tests for bucketed reconcile equivalence in `tests/unit/md-reconcile.test.ts` (extend): output identical to the pre-bucketing implementation on existing fixtures
-- [ ] T019 [P] [US1] Unit tests for the image-name index in `tests/unit/image-links.test.ts` (extend): resolution results unchanged, no quadratic queue behaviour
+- [X] T019 [P] [US1] Unit tests for the image-name index in `tests/unit/image-links.test.ts` (extend): resolution results unchanged, no quadratic queue behaviour
 - [ ] T020 [P] [US1] (FR-004) Scale-invariance tests in `tests/integration/scale-invariance.test.ts`: sync/import/export/markdown round-trip output identical at 1000 entries vs the small fixture (SC-004)
 
 ### Implementation — sync and core hot paths
@@ -121,11 +121,11 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 
 ### Implementation — typing and preview
 
-- [ ] T027 [US1] Create the shared local-draft + debounced-commit hook in `src/ui/useDraftField.ts` (~250 ms debounce, commit on blur, imperative flush)
-- [ ] T028 [US1] Apply drafts to the entry content field in `src/ui/fieldGroups/FieldGroups.tsx`
-- [ ] T029 [P] [US1] Apply drafts to the name input in `src/ui/NodeHeader.tsx` and to URL/SVG/caption fields in `src/ui/ItemEditor.tsx`
-- [ ] T030 [US1] Flush pending drafts before generation, on panel close and on workspace hide in `src/index.ts` and `src/ui/WorkspaceApp.tsx` — an unflushed draft must never be lost
-- [ ] T031 [US1] Wrap `resolveImage` and `substitute` in `useCallback` in `src/ui/WorkspaceApp.tsx` (lines 544-553) so the preview `useMemo` can hit, and feed the preview a deferred value in `src/ui/fieldGroups/FieldGroups.tsx` (lines 307-314)
+- [X] T027 [US1] Create the shared local-draft + debounced-commit hook in `src/ui/useDraftField.ts` (~250 ms debounce, commit on blur, imperative flush)
+- [X] T028 [US1] Apply drafts to the entry content field in `src/ui/fieldGroups/FieldGroups.tsx`
+- [X] T029 [P] [US1] Apply drafts to the name input in `src/ui/NodeHeader.tsx` and to URL/SVG/caption fields in `src/ui/ItemEditor.tsx`
+- [X] T030 [US1] Flush pending drafts before generation, on panel close and on workspace hide in `src/index.ts` and `src/ui/WorkspaceApp.tsx` — an unflushed draft must never be lost
+- [X] T031 [US1] Wrap `resolveImage` and `substitute` in `useCallback` in `src/ui/WorkspaceApp.tsx` (lines 544-553) so the preview `useMemo` can hit, and feed the preview a deferred value in `src/ui/fieldGroups/FieldGroups.tsx` (lines 307-314)
 
 ### Implementation — tree rendering
 

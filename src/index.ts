@@ -3,6 +3,7 @@ import { debugLog } from './adapters/logger';
 import { initWorkspaceState, type WorkspaceStateServices } from './adapters/settingsStore';
 import { mountWorkspaceShell } from './adapters/shell';
 import { mountWorkspaceSurface } from './ui/mount';
+import { flushDrafts } from './adapters/draftRegistry';
 
 const INIT_FLAG = '__worldInfoWorkspaceInitialized';
 
@@ -23,7 +24,10 @@ function initSurface(services: WorkspaceStateServices): void {
         ensureMounted();
     }
     // FR-009 flush point: pending book pushes complete before the panel closes.
+    // Uncommitted field drafts are committed FIRST, so the pushes that follow
+    // carry the last thing the user typed (spec 006 R3).
     shell.onClose(() => {
+        flushDrafts();
         void services.sync.pushPendingNow('panel-close');
         void services.md.link.flush();
     });

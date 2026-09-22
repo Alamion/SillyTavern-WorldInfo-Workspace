@@ -5,6 +5,8 @@
  * Images and folders render the same row WITHOUT the toggle — images are not
  * entries.
  */
+import { useDraftField } from './useDraftField';
+
 export function NodeHeader({
     kind,
     icon,
@@ -24,6 +26,9 @@ export function NodeHeader({
     onDuplicate(): void;
     onDelete(): void;
 }): JSX.Element {
+    // Renaming stays local and commits shortly after typing stops (spec 006 R3);
+    // the caller keys this row by node id, so switching items flushes the draft.
+    const nameDraft = useDraftField(name, onCommitName);
     return (
         <div className="wiw-node-header">
             {kind === 'entry' && onToggleDisable ? (
@@ -47,9 +52,10 @@ export function NodeHeader({
             <input
                 className="wiw-node-name"
                 type="text"
-                value={name}
+                value={nameDraft.value}
                 title="Name"
-                onChange={(event) => onCommitName(event.target.value)}
+                onChange={(event) => nameDraft.onChange(event.target.value)}
+                onBlur={nameDraft.onBlur}
             />
             <div className="wiw-editor-actions">
                 <button

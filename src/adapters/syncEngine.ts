@@ -16,6 +16,7 @@ import { flattenRoot } from '../core/sync/flatten';
 import { analyzeNativeBook } from '../core/sync/divergence';
 import { mapBookToNodes, planBoundImport, type BoundImportPlan } from '../core/sync/import';
 import { fingerprintEntry } from '../core/sync/fingerprint';
+import { flushDrafts } from './draftRegistry';
 import { nameInUse } from '../core/sync/bookNaming';
 import { normalizeNativeEntry } from '../core/state/schema';
 import { nameEquals } from '../core/sync/bookNaming';
@@ -435,6 +436,9 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
 
     const pushPendingNow = async (reason?: string): Promise<void> => {
         void reason;
+        // Commit uncommitted field drafts first, so a flush triggered by
+        // GENERATION_STARTED carries the last thing the user typed (spec 006 R3).
+        flushDrafts();
         const books = [...dirtyBooksOf(store.getState())];
         for (const bookName of books) {
             await pushBook(bookName);

@@ -541,16 +541,24 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         applyOperation((current) => commitImageOp(current, imageId, patch));
     };
 
-    const resolveImage = (ref: string): string | undefined =>
-        resolveImageReference(state.root, index, selected?.id ?? null, ref);
+    // Stable identities: these feed the markdown preview's useMemo, which never
+    // hit while they were re-created on every render — so the hand-written
+    // CommonMark parser re-ran even when the content had not changed at all
+    // (spec 006 R4).
+    const selectedId = selected?.id ?? null;
+    const resolveImage = useCallback(
+        (ref: string): string | undefined =>
+            resolveImageReference(state.root, index, selectedId, ref),
+        [state.root, index, selectedId]
+    );
 
-    const substitute = (text: string): string => {
+    const substitute = useCallback((text: string): string => {
         try {
             return ctx.substituteParams(text);
         } catch {
             return text;
         }
-    };
+    }, [ctx]);
 
     const membershipLine = computeMembershipLine(selected, index);
 
@@ -730,7 +738,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                             {isEmpty ? (
                                 <EmptyState onLoadDemo={() => void handleLoadDemo()} />
                             ) : (
-                                <ItemEditor {...editorProps} />
+                                <ItemEditor key={selected?.id ?? 'none'} {...editorProps} />
                             )}
                         </main>
                     )}
@@ -787,7 +795,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                         {isEmpty ? (
                             <EmptyState onLoadDemo={() => void handleLoadDemo()} />
                         ) : (
-                            <ItemEditor {...editorProps} />
+                            <ItemEditor key={selected?.id ?? 'none'} {...editorProps} />
                         )}
                     </Sheet>
                 )}
