@@ -6,7 +6,8 @@
     "scripts": {
         "build": "webpack --mode production",
         "dev": "webpack --watch --mode development",
-        "test": "vitest run",
+        "test": "vitest run --exclude '**/tests/perf/**' && pnpm run test:perf",
+        "test:perf": "vitest run tests/perf --no-file-parallelism",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "typecheck": "tsc --noEmit"

@@ -3,11 +3,12 @@ import type { OperationReport } from '../core/md/report';
 import type { Digest, DiskFolderAccess, ImageStorePort, YamlCodec } from '../core/md/ports';
 import type { WorkspaceStore } from '../core/state/store';
 import { findNode } from '../core/state/schema';
-import { notifyError } from './logger';
+import { notifyError, notifyWarning } from './logger';
 import { confirmDialog } from './popups';
 import { createImageResolver, prepareExport } from './mdExport';
 import { createYamlCodec } from './yamlCodec';
 import { runImport } from './mdImport';
+import { createCancelSource, isCancellation } from '../core/md/cancel';
 import { createFilesFolder } from '../core/md/filesFolder';
 import { listTopLevel, selectTopLevel, wrapAsDirectory, type TopLevelItem } from '../core/md/folderViews';
 import type { DiskFolder } from '../core/md/ports';
@@ -27,6 +28,12 @@ export interface MdBusy {
     label: string;
     done: number;
     total: number;
+    /**
+     * Present only while the operation is in a phase that can be stopped safely
+     * (spec 006 FR-003). Writing phases deliberately omit it — stopping halfway
+     * would leave a partially written folder — and say so in their label.
+     */
+    cancel?: () => void;
 }
 
 /** Import choice: the picked folder as one folder, or some of its top-level items. */
@@ -164,9 +171,11 @@ export function createMdController(deps: MdControllerDeps): MdController {
     });
 
     const runImportFrom = async (folder: DiskFolder, targetFolderId: string): Promise<void> => {
+        const source = createCancelSource();
         try {
-            setUi({ busy: { label: 'Importing', done: 0, total: 0 } });
+            setUi({ busy: { label: 'Importing', done: 0, total: 0, cancel: source.cancel } });
             const { report } = await runImport({
+                cancel: source.token,
                 folder,
                 store: deps.store,
                 targetFolderId,
@@ -177,11 +186,25 @@ export function createMdController(deps: MdControllerDeps): MdController {
                 placeholderUid: () => 900000 + Math.floor(Math.random() * 90000),
                 designate: (folderId, bookName) =>
                     designateRestoredRoot({ store: deps.store, sync: deps.sync, confirm }, folderId, bookName),
-                onProgress: (label, done, total) => setUi({ busy: { label, done, total } }),
+                onProgress: (label, done, total) =>
+                    setUi({
+                        busy: {
+                            label,
+                            done,
+                            total,
+                            // Only the reading phase can be stopped; once files
+                            // are being written the handle is dropped.
+                            cancel: label === 'Reading files' ? source.cancel : undefined,
+                        },
+                    }),
             });
             controller.showReport(report);
         } catch (error) {
-            notifyError(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+            if (isCancellation(error)) {
+                notifyWarning('Import cancelled. Nothing was changed.');
+            } else {
+                notifyError(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
         } finally {
             setUi({ busy: null });
         }

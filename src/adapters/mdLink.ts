@@ -26,6 +26,7 @@ import {
 import { NO_RECORD, reconcile, type Conflict, type DiskItem, type ReconcileResult } from '../core/md/reconcile';
 import { createReportBuilder, type OperationReport, type ReportBuilder } from '../core/md/report';
 import { scanFolder, type ScanResult } from '../core/md/scan';
+import { createCancelSource, isCancellation } from '../core/md/cancel';
 import type { WorkspaceState } from '../core/state/schema';
 import type { WorkspaceStore } from '../core/state/store';
 import type { SyncEngine } from './syncEngine';
@@ -49,7 +50,11 @@ export interface LinkStatus {
     heldBack: number;
     /** Conflicts skipped at the last Sync. */
     conflicts: number;
-    busy: { label: string; done: number; total: number } | null;
+    /**
+     * `cancel` is present only while the operation is in a phase that can be
+     * stopped safely — the read/scan phase (spec 006 FR-003).
+     */
+    busy: { label: string; done: number; total: number; cancel?: () => void } | null;
     /** Workspace ids currently tracked in the linked folder (delete disclosure). */
     trackedIds: ReadonlySet<string>;
 }
@@ -445,13 +450,32 @@ export function createMdLink(deps: MdLinkDeps): MdLink {
         const current = link;
         const report = createReportBuilder(options.initial ? 'link' : 'sync');
         const folder = folderOf(current);
-        setStatus({ busy: { label: 'Reading folder', done: 0, total: 0 } });
-        const scan: ScanResult = await scanFolder(folder, {
-            digest: deps.digest,
-            yaml: deps.yaml(),
-            onProgress: (done, total) => setStatus({ busy: { label: 'Reading folder', done, total } }),
-            yieldNow: () => new Promise((resolve) => setTimeout(resolve, 0)),
+        const pullCancel = createCancelSource();
+        setStatus({
+            busy: { label: 'Reading folder', done: 0, total: 0, cancel: pullCancel.cancel },
         });
+        let scan: ScanResult;
+        try {
+            scan = await scanFolder(folder, {
+                digest: deps.digest,
+                yaml: deps.yaml(),
+                onProgress: (done, total) =>
+                    setStatus({
+                        busy: { label: 'Reading folder', done, total, cancel: pullCancel.cancel },
+                    }),
+                yieldNow: () => new Promise((resolve) => setTimeout(resolve, 0)),
+                cancel: pullCancel.token,
+            });
+        } catch (error) {
+            if (isCancellation(error)) {
+                // Nothing was written: a scan only reads.
+                setStatus({ busy: null });
+                return null;
+            }
+            throw error;
+        }
+        // From here the operation writes; it is no longer interruptible.
+        setStatus({ busy: { label: 'Comparing', done: 0, total: 0 } });
         scan.lines.forEach((line) => report.add(line.path, line.outcome, line.message));
         const disk = await describeDisk({ scan, yaml: deps.yaml(), digest: deps.digest });
         const stateBefore = deps.store.getState();

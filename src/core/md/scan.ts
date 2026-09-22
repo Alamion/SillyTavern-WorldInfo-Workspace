@@ -3,6 +3,7 @@ import { DecodeError, decodeText } from './hash';
 import { ENTRY_EXT, FOLDER_RECORD_NAME, isImageFileName, splitName } from './naming';
 import { baseName, parentPath, type Digest, type DiskFolder, type RelPath, type YamlCodec } from './ports';
 import type { ReportLine } from './report';
+import type { CancelToken } from './cancel';
 
 /**
  * Read-only scan of a markdown folder (spec 004 FR-008, research R4 scanner
@@ -71,6 +72,11 @@ export async function scanFolder(
         yaml: YamlCodec;
         onProgress?: (done: number, total: number) => void;
         yieldNow?: () => Promise<void>;
+        /**
+         * Checked between files. A scan has written nothing, so stopping it is
+         * always safe (spec 006 FR-003).
+         */
+        cancel?: CancelToken;
     }
 ): Promise<ScanResult> {
     const listing = await folder.list();
@@ -116,6 +122,7 @@ export async function scanFolder(
             }
             const name = baseName(file.path);
             const { ext } = splitName(name);
+            options.cancel?.throwIfCancelled();
             const wanted =
                 name === FOLDER_RECORD_NAME ||
                 ext.toLowerCase() === ENTRY_EXT ||
@@ -134,6 +141,7 @@ export async function scanFolder(
             if (options.yieldNow && done % YIELD_EVERY === 0) {
                 await options.yieldNow();
             }
+            options.cancel?.throwIfCancelled();
         }
     };
     await Promise.all(

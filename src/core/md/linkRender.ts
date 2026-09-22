@@ -81,7 +81,11 @@ export async function renderWorkspace(input: {
     entryCache?: EntryRenderCache;
 }): Promise<WorkspaceRender> {
     const { state } = input;
-    const plan = planFolderTree(state.root, '', true, input.yaml, baselinePaths(input.baseline));
+    // Entry texts come from the identity-keyed memo below, so the plan must not
+    // render them as well (spec 006 R8).
+    const plan = planFolderTree(state.root, '', true, input.yaml, baselinePaths(input.baseline), {
+        skipEntryText: true,
+    });
     const index = buildNodeIndex(state.root);
     const items = new Map<string, WsRenderItem>();
     const recordByFolder = new Map<string, string>();

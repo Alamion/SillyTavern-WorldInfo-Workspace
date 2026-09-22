@@ -181,13 +181,30 @@ export function MarkdownControl({
 
     const chip = (() => {
         if (busy) {
+            // FR-003: a long operation reports progress and can be stopped while
+            // it is only reading. Once it writes, the cancel handle is gone and
+            // the title says so rather than offering a stop that is not safe.
+            const stoppable = typeof busy.cancel === 'function';
             return (
-                <span className="wiw-chip" title={busy.label}>
+                <span
+                    className="wiw-chip"
+                    title={stoppable ? busy.label : `${busy.label} — cannot be interrupted`}
+                >
                     <i className="fa-solid fa-spinner fa-spin" />
                     <span>
                         {busy.label}
                         {busy.total > 0 ? ` ${busy.done}/${busy.total}` : '…'}
                     </span>
+                    {stoppable && (
+                        <button
+                            type="button"
+                            className="wiw-button wiw-icon-button"
+                            title="Stop this operation"
+                            onClick={() => busy.cancel?.()}
+                        >
+                            <i className="fa-solid fa-xmark" />
+                        </button>
+                    )}
                 </span>
             );
         }

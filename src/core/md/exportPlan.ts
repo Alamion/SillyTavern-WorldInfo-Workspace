@@ -45,7 +45,18 @@ export function planFolderTree(
     baseDir: RelPath,
     scopeIsTop: boolean,
     yaml: YamlCodec,
-    previous: ReadonlyMap<string, RelPath>
+    previous: ReadonlyMap<string, RelPath>,
+    options: {
+        /**
+         * Skips rendering entry file TEXT, leaving paths and folder records.
+         *
+         * The link manager re-renders entries itself through an identity-keyed
+         * memo, so rendering them here too meant every entry was rendered TWICE
+         * on every push and the second render's cache could never pay for the
+         * first (spec 006 R8).
+         */
+        skipEntryText?: boolean;
+    } = {}
 ): ExportPlan {
     const paths = assignPaths(scope, previous, baseDir);
     const directories: RelPath[] = [];
@@ -81,7 +92,9 @@ export function planFolderTree(
                         kind: 'entry',
                         nodeId: child.id,
                         path,
-                        text: renderEntryFile(child, splitName(baseName(path)).stem, yaml),
+                        text: options.skipEntryText
+                            ? ''
+                            : renderEntryFile(child, splitName(baseName(path)).stem, yaml),
                     });
                 }
             } else if (path === undefined) {

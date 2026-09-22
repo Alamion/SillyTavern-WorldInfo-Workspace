@@ -4,6 +4,7 @@ import { EXT_MIME } from '../core/md/naming';
 import type { Digest, DiskFolder, ImageStorePort, YamlCodec } from '../core/md/ports';
 import { createReportBuilder, type OperationReport } from '../core/md/report';
 import { scanFolder } from '../core/md/scan';
+import type { CancelToken } from '../core/md/cancel';
 import { findNode, type TreeNode } from '../core/state/schema';
 import type { WorkspaceStore } from '../core/state/store';
 import { yieldToEventLoop } from './mdExport';
@@ -27,6 +28,8 @@ export interface ImportDeps {
     /** Phase 1 designation flow (adopt-or-create, collision-resolved, never activated). */
     designate: (folderId: string, bookName: string | undefined) => Promise<void>;
     onProgress?: (label: string, done: number, total: number) => void;
+    /** Cancels the READ phase; nothing is written until the scan completes. */
+    cancel?: CancelToken;
 }
 
 export interface ImportResult {
@@ -42,6 +45,7 @@ export async function runImport(deps: ImportDeps): Promise<ImportResult> {
         yaml: deps.yaml,
         onProgress: (done, total) => deps.onProgress?.('Reading files', done, total),
         yieldNow: yieldToEventLoop,
+        cancel: deps.cancel,
     });
     if (findNode(deps.store.getState(), deps.targetFolderId)?.kind !== 'folder') {
         builder.add('', 'skipped', 'The target folder no longer exists.');
