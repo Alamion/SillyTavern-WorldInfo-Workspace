@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { getNodeIndex } from '../core/state/nodeIndex';
+import { withNodeCopied } from '../core/state/sharing';
 import { getAppContext } from '../adapters/appApi';
 import { confirmDialog, inputDialog } from '../adapters/popups';
 import { onSaveEvent } from '../adapters/saveEvents';
@@ -922,17 +924,20 @@ function patchState(
     nodeId: string,
     patch: (node: TreeNode) => void
 ): WorkspaceState {
-    const draft = structuredClone(next);
-    const node = findNode(draft, nodeId);
-    if (node) {
-        patch(node);
+    // Path-copy instead of cloning the whole workspace (spec 006 R1).
+    const copied = withNodeCopied(next, nodeId);
+    if (!copied) {
+        return next;
     }
-    return draft;
+    patch(copied.node);
+    return copied.state;
 }
 
 function diffCreatedId(before: WorkspaceState, after: WorkspaceState): string | null {
-    const beforeIds = buildNodeIndex(before.root);
-    const afterIds = buildNodeIndex(after.root);
+    // Both states are immutable published/computed snapshots, so the identity
+    // cache is safe here and repeat calls (duplicate does two) stay cheap.
+    const beforeIds = getNodeIndex(before.root);
+    const afterIds = getNodeIndex(after.root);
     for (const id of afterIds.keys()) {
         if (!beforeIds.has(id)) {
             return id;

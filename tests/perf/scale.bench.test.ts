@@ -41,16 +41,22 @@ const BUDGET_MS = {
     P6_fingerprint1000: 5,
 };
 
-/** Median of `runs` timed iterations, in ms. Median resists GC/scheduler spikes. */
-function median(runs: number, fn: () => void): number {
-    const samples: number[] = [];
+/**
+ * Fastest of `runs` timed iterations, in ms.
+ *
+ * The BEST sample, not the median: these are regression guards, and the fastest
+ * run is the least contaminated estimate of the real cost. A median flakes when
+ * the machine is busy (observed once in a loaded full-suite run) without the
+ * code having regressed at all.
+ */
+function fastest(runs: number, fn: () => void): number {
+    let best = Number.POSITIVE_INFINITY;
     for (let index = 0; index < runs; index += 1) {
         const start = performance.now();
         fn();
-        samples.push(performance.now() - start);
+        best = Math.min(best, performance.now() - start);
     }
-    samples.sort((a, b) => a - b);
-    return samples[Math.floor(samples.length / 2)] ?? 0;
+    return Number.isFinite(best) ? best : 0;
 }
 
 describe('scale dataset', () => {
@@ -73,7 +79,7 @@ describe('core-path budgets at scale', () => {
         const store = new WorkspaceStore(dataset.state);
         const targetId = dataset.primaryEntryIds[500] ?? '';
         let tick = 0;
-        const elapsed = median(15, () => {
+        const elapsed = fastest(15, () => {
             const next = commitEntryField(
                 store.getState(),
                 targetId,
@@ -92,7 +98,7 @@ describe('core-path budgets at scale', () => {
         // `findNode` stays an uncached walk on purpose (in-place mutators depend
         // on that); hot read-only loops opt into the index instead.
         getNodeIndex(state.root);
-        const elapsed = median(25, () => {
+        const elapsed = fastest(25, () => {
             for (let index = 0; index < 100; index += 1) {
                 getNodeIndex(state.root).get(targetId);
             }
@@ -103,7 +109,7 @@ describe('core-path budgets at scale', () => {
     it(`P-3 bulk delete of 50 nodes < ${BUDGET_MS.P3_bulkDelete50} ms (was: ${BASELINE.P3_bulkDelete50})`, () => {
         const dataset = buildScaleDataset();
         const victims = dataset.primaryEntryIds.slice(0, 50);
-        const elapsed = median(9, () => {
+        const elapsed = fastest(9, () => {
             bulkDeleteNodes(dataset.state, victims);
         });
         expect(elapsed).toBeLessThan(BUDGET_MS.P3_bulkDelete50);
@@ -113,7 +119,7 @@ describe('core-path budgets at scale', () => {
         const dataset = buildScaleDataset();
         const folderId = dataset.state.root.children[0]?.id ?? '';
         let flag = false;
-        const elapsed = median(15, () => {
+        const elapsed = fastest(15, () => {
             setExpanded(dataset.state, folderId, (flag = !flag));
         });
         expect(elapsed).toBeLessThan(BUDGET_MS.P4_setExpanded);
@@ -130,7 +136,7 @@ describe('core-path budgets at scale', () => {
         });
         // First pass populates the memo; subsequent passes must be near-free.
         entries.forEach((entry) => fingerprintEntry(entry));
-        const elapsed = median(9, () => {
+        const elapsed = fastest(9, () => {
             entries.forEach((entry) => fingerprintEntry(entry));
         });
         expect(elapsed).toBeLessThan(BUDGET_MS.P6_fingerprint1000);

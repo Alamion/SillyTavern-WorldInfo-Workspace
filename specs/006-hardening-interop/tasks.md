@@ -129,15 +129,15 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 
 ### Implementation — tree rendering
 
-- [ ] T032 [P] [US1] Create hand-rolled fixed-row windowing in `src/ui/VirtualList.tsx` (no new dependency)
-- [ ] T033 [US1] Stabilize all tree handlers with `useCallback` and pass boolean `selected` / `isDragOver` props instead of the whole `Set` in `src/ui/WorkspaceApp.tsx` and `src/ui/StructureTree.tsx`
-- [ ] T034 [US1] Wrap `Row` in `React.memo` in `src/ui/StructureTree.tsx` (depends on T033 — memo cannot hit without stable props)
-- [ ] T035 [US1] Integrate windowing into the tree in `src/ui/StructureTree.tsx`
-- [ ] T036 [US1] Move `dragOverId` out of React state into a ref with a direct class toggle in `src/ui/StructureTree.tsx`, following the existing `src/ui/Splitter.tsx` pattern
-- [ ] T037 [P] [US1] Debounce the tree search input (~150 ms) before it feeds `collectVisible` in `src/ui/StructureTree.tsx`
-- [ ] T038 [US1] Reuse the sorted child arrays computed in `collectVisible` instead of re-sorting per folder during render in `src/ui/StructureTree.tsx`
-- [ ] T039 [P] [US1] Memoize `contextSummary` on `[state, scope, selectedIds]` in `src/ui/AssistantPanel.tsx` (line 214)
-- [ ] T040 [US1] Have `createChild` return the new node id in `src/core/tree/operations.ts` and drop the double-index `diffCreatedId` in `src/ui/WorkspaceApp.tsx` (lines 925-934, 362-383)
+- [X] T032 [P] [US1] Create hand-rolled fixed-row windowing in `src/ui/VirtualList.tsx` (no new dependency)
+- [X] T033 [US1] Stabilize all tree handlers with `useCallback` and pass boolean `selected` / `isDragOver` props instead of the whole `Set` in `src/ui/WorkspaceApp.tsx` and `src/ui/StructureTree.tsx`
+- [X] T034 [US1] Wrap `Row` in `React.memo` in `src/ui/StructureTree.tsx` (depends on T033 — memo cannot hit without stable props)
+- [X] T035 [US1] Integrate windowing into the tree in `src/ui/StructureTree.tsx`
+- [X] T036 [US1] Move `dragOverId` out of React state into a ref with a direct class toggle in `src/ui/StructureTree.tsx`, following the existing `src/ui/Splitter.tsx` pattern
+- [X] T037 [P] [US1] Debounce the tree search input (~150 ms) before it feeds `collectVisible` in `src/ui/StructureTree.tsx`
+- [X] T038 [US1] Reuse the sorted child arrays computed in `collectVisible` instead of re-sorting per folder during render in `src/ui/StructureTree.tsx`
+- [X] T039 [P] [US1] Memoize `contextSummary` on `[state, scope, selectedIds]` in `src/ui/AssistantPanel.tsx` (line 214)
+- [X] T040 [US1] Have `createChild` return the new node id in `src/core/tree/operations.ts` and drop the double-index `diffCreatedId` in `src/ui/WorkspaceApp.tsx` (lines 925-934, 362-383)
 
 ### Implementation — markdown at scale
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent } from 'react';
 import type { CreateKind } from '../core/tree/operations';
 import {
@@ -10,6 +10,7 @@ import {
     type SortMode,
 } from '../core/tree/browse';
 import type { FolderNode, TreeNode } from '../core/state/schema';
+import { VirtualList } from './VirtualList';
 
 export type TreeMenuAction =
     | 'rename'
@@ -47,12 +48,15 @@ interface RowProps {
     node: TreeNode;
     depth: number;
     siblingIndex: number;
-    visibleIds: ReadonlySet<string>;
-    selectedIds: ReadonlySet<string>;
-    sortMode: SortMode;
+    /**
+     * Per-row booleans, NOT the whole selection/drag state. Passing the Sets made
+     * every row re-render whenever any row was selected or dragged over; with
+     * booleans a row only re-renders when its own state changed (spec 006 R5).
+     */
+    selected: boolean;
+    isDragOver: boolean;
+    isMenuTarget: boolean;
     allowReorder: boolean;
-    dragOverId: string | null;
-    menuTargetId: string | null;
     setDragOverId(id: string | null): void;
     onSelect: StructureTreeProps['onSelect'];
     onExpand: StructureTreeProps['onExpand'];
@@ -60,7 +64,62 @@ interface RowProps {
     onOpenMenu: StructureTreeProps['onOpenMenu'];
 }
 
+/** One visible row, already resolved to its depth and position. */
+interface RowSpec {
+    node: TreeNode;
+    depth: number;
+    siblingIndex: number;
+}
+
+/**
+ * Flattens the visible tree into render order.
+ *
+ * The rows were rendered by a RECURSIVE component, which made `React.memo`
+ * unusable: a memo-skipped parent would never re-render its children, so a
+ * child whose selection changed would silently freeze. The DOM was already a
+ * flat list of sibling rows, so flattening changes the React structure only.
+ * `sortChildrenView` is also called once per folder here instead of again
+ * during each row's render (spec 006 R5).
+ */
+function flattenRows(
+    root: FolderNode,
+    visibleIds: ReadonlySet<string>,
+    sortMode: SortMode
+): RowSpec[] {
+    const rows: RowSpec[] = [];
+    const walk = (node: TreeNode, depth: number, siblingIndex: number): void => {
+        if (!visibleIds.has(node.id)) {
+            return;
+        }
+        rows.push({ node, depth, siblingIndex });
+        if (node.kind !== 'folder' || !node.expanded) {
+            return;
+        }
+        sortChildrenView(node.children, sortMode).forEach((child, childIndex) => {
+            walk(child, depth + 1, childIndex);
+        });
+    };
+    walk(root, 0, 0);
+    return rows;
+}
+
 const LONG_PRESS_MS = 500;
+const SEARCH_DEBOUNCE_MS = 150;
+
+/**
+ * A callback with a permanently stable identity that always invokes the latest
+ * version passed in.
+ *
+ * `React.memo` on the rows is worthless while their handler props change every
+ * render, and the handlers upstream close over selection and store state, so
+ * memoizing them there would risk stale closures instead (spec 006 R5).
+ */
+function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+    const ref = useRef(fn);
+    ref.current = fn;
+    const stable = useRef((...args: A): R => ref.current(...args));
+    return stable.current;
+}
 
 const KIND_ICONS: Record<BrowseFilter, string> = {
     folders: 'fa-folder',
@@ -102,31 +161,23 @@ function isFolderId(root: FolderNode, id: string): boolean {
 
 const STICKY_MENU_ACTIONS: ReadonlySet<TreeMenuAction> = new Set(['move-up', 'move-down']);
 
-function Row({
+function RowImpl({
     node,
     depth,
     siblingIndex,
-    visibleIds,
-    selectedIds,
-    sortMode,
+    selected,
+    isDragOver,
+    isMenuTarget,
     allowReorder,
-    dragOverId,
-    menuTargetId,
     setDragOverId,
     onSelect,
     onExpand,
     onMoveNode,
     onOpenMenu,
-}: RowProps): JSX.Element | null {
-    if (!visibleIds.has(node.id)) {
-        return null;
-    }
+}: RowProps): JSX.Element {
     const isFolder = node.kind === 'folder';
     const expanded = isFolder && node.expanded;
     const indentStyle: CSSProperties = { paddingLeft: `${depth * 12 + 4}px` };
-    const selected = selectedIds.has(node.id);
-    const isDragOver = dragOverId === node.id;
-    const isMenuTarget = menuTargetId === node.id;
     let pressTimer: number | null = null;
     const kindIcon =
         node.kind === 'folder'
@@ -153,9 +204,9 @@ function Row({
         }
     };
     return (
-        <>
-            <div
-                className={`wiw-tree-row${selected ? ' wiw-selected' : ''}${isDragOver ? ' wiw-drag-over' : ''}${isMenuTarget ? ' wiw-menu-target' : ''}`}
+        <div
+            data-vrow=""
+            className={`wiw-tree-row${selected ? ' wiw-selected' : ''}${isDragOver ? ' wiw-drag-over' : ''}${isMenuTarget ? ' wiw-menu-target' : ''}`}
                 style={indentStyle}
                 draggable={allowReorder}
                 onDragStart={(event) => {
@@ -249,34 +300,14 @@ function Row({
                         off
                     </span>
                 )}
-                {isFolder && (node as FolderNode).isWiRoot && (
-                    <span className="wiw-badge wiw-badge-book">WI</span>
-                )}
-            </div>
-            {isFolder &&
-                expanded &&
-                sortChildrenView((node as FolderNode).children, sortMode).map((child, childIndex) => (
-                    <Row
-                        key={child.id}
-                        node={child}
-                        depth={depth + 1}
-                        siblingIndex={childIndex}
-                        visibleIds={visibleIds}
-                        selectedIds={selectedIds}
-                        sortMode={sortMode}
-                        allowReorder={allowReorder}
-                        dragOverId={dragOverId}
-                        menuTargetId={menuTargetId}
-                        setDragOverId={setDragOverId}
-                        onSelect={onSelect}
-                        onExpand={onExpand}
-                        onMoveNode={onMoveNode}
-                        onOpenMenu={onOpenMenu}
-                    />
-                ))}
-        </>
+            {isFolder && (node as FolderNode).isWiRoot && (
+                <span className="wiw-badge wiw-badge-book">WI</span>
+            )}
+        </div>
     );
 }
+
+const Row = memo(RowImpl);
 
 function collectVisible(
     root: FolderNode,
@@ -317,6 +348,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
     const [scope, setScope] = useState<SearchScope>('title+prompt');
     const [dragOverId, setDragOverId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const treeRef = useRef<HTMLDivElement>(null);
     const closeMenuRef = useRef(props.onCloseMenu);
     closeMenuRef.current = props.onCloseMenu;
     const menuOpen = menu !== null;
@@ -343,10 +375,28 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
             document.removeEventListener('keydown', onKeyDown);
         };
     }, [menuOpen]);
+    // The search box drives a full-tree walk; let typing settle first so a long
+    // query does not re-walk 2000 nodes per keystroke (spec 006 R5).
+    const [appliedQuery, setAppliedQuery] = useState('');
+    useEffect(() => {
+        const timer = setTimeout(() => setAppliedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+    }, [query]);
     const visibleIds = useMemo(
-        () => collectVisible(root, kinds, query.trim(), scope, sortMode),
-        [root, kinds, query, scope, sortMode]
+        () => collectVisible(root, kinds, appliedQuery, scope, sortMode),
+        [root, kinds, appliedQuery, scope, sortMode]
     );
+    const allowReorder = sortMode === 'custom';
+    const rows = useMemo(
+        () => flattenRows(root, visibleIds, sortMode),
+        [root, visibleIds, sortMode]
+    );
+    const menuTargetId = menu?.id ?? null;
+    // Stable identities: without these, React.memo on Row could never hit.
+    const selectRow = useStableCallback(props.onSelect);
+    const expandRow = useStableCallback(props.onExpand);
+    const moveRow = useStableCallback(props.onMoveNode);
+    const openRowMenu = useStableCallback(props.onOpenMenu);
     const toggleKind = (kind: BrowseFilter): void => {
         setKinds((prev) => {
             const next = new Set(prev);
@@ -359,7 +409,7 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
         });
     };
     return (
-        <div className="wiw-tree">
+        <div className="wiw-tree" ref={treeRef}>
             <div className="wiw-tree-toolbar">
                 <select
                     className="wiw-tree-sort"
@@ -450,21 +500,26 @@ export function StructureTree(props: StructureTreeProps): JSX.Element {
                     </label>
                 </div>
             </div>
-            <Row
-                node={root}
-                depth={0}
-                siblingIndex={0}
-                visibleIds={visibleIds}
-                selectedIds={selectedIds}
-                sortMode={sortMode}
-                allowReorder={sortMode === 'custom'}
-                dragOverId={dragOverId}
-                menuTargetId={menu?.id ?? null}
-                setDragOverId={setDragOverId}
-                onSelect={props.onSelect}
-                onExpand={props.onExpand}
-                onMoveNode={props.onMoveNode}
-                onOpenMenu={props.onOpenMenu}
+            <VirtualList
+                items={rows}
+                scrollRef={treeRef}
+                keyOf={(row) => row.node.id}
+                renderItem={(row) => (
+                    <Row
+                        node={row.node}
+                        depth={row.depth}
+                        siblingIndex={row.siblingIndex}
+                        selected={selectedIds.has(row.node.id)}
+                        isDragOver={dragOverId === row.node.id}
+                        isMenuTarget={menuTargetId === row.node.id}
+                        allowReorder={allowReorder}
+                        setDragOverId={setDragOverId}
+                        onSelect={selectRow}
+                        onExpand={expandRow}
+                        onMoveNode={moveRow}
+                        onOpenMenu={openRowMenu}
+                    />
+                )}
             />
             {menu && (
                 <div

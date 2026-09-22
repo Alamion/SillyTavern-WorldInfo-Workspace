@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
 import { notifySuccess, notifyWarning } from '../adapters/logger';
 import { undoSummary } from '../core/assistant/undo';
@@ -112,6 +112,16 @@ export function AssistantPanel({
         onRefresh: (proposalId) => void assistant.refreshProposal(seq, proposalId),
     });
 
+    // This walks the whole workspace (scope resolution plus a findNode per
+    // selected id) and ran on every render of a panel that re-renders while the
+    // user types (spec 006 R5).
+    const activeContext = snapshot.activeConversation?.context;
+    const selectedList = useMemo(() => [...selectedIds], [selectedIds]);
+    const summary = useMemo(
+        () => (activeContext ? contextSummary(activeContext, state, selectedList) : 'Context'),
+        [activeContext, state, selectedList]
+    );
+
     return (
         <div className="wiw-assistant">
             <ConversationSwitcher
@@ -209,11 +219,7 @@ export function AssistantPanel({
                 busy={busy}
                 disabled={blocked}
                 canSendEmpty={snapshot.messages.at(-1)?.role === 'user'}
-                contextSummary={
-                    snapshot.activeConversation
-                        ? contextSummary(snapshot.activeConversation.context, state, [...selectedIds])
-                        : 'Context'
-                }
+                contextSummary={summary}
                 onSend={(text) => void assistant.send(text)}
                 onStop={() => assistant.stop()}
                 onModeChange={(mode) => void assistant.setMode(mode)}
