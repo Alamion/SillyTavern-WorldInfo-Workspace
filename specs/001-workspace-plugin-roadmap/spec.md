@@ -322,6 +322,11 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 
 **Order amendments**:
 
+- 2026-09-22: Phase 4 (Hardening & Interop) is delivered next, before Phase 5 (AI
+  Images) — spec 006, owner decision. Its scale target is a 1000-entry book and a
+  ~2000-node workspace. Its "polish" scope is delivered as a standing maintenance-change
+  process (lightweight path for fixes too small for a spec, bounded by a contract-based
+  threshold) rather than a punch list; this amends the constitution to 1.3.0.
 - 2026-09-22: Phase 2 (AI Assistant) delivered and closed by the owner (spec 005; live
   validation A0–A37 and the SC-005 rate in `specs/005-ai-lore-assistant/quickstart.md`).
   Remaining: Phase 4 (Hardening & Interop) and Phase 5 (AI Images), order to be decided.
