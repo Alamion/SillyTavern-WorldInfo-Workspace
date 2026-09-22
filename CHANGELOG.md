@@ -10,7 +10,7 @@ listed here — see the git history for that.
 - Other extensions can now observe the workspace: events for tree changes, native book
   push outcomes, World Info root designation, and workspace visibility. See
   [docs/hooks.md](docs/hooks.md).
-- A README and an extension-author hook reference.
+- A README with screenshots of every feature, an extension-author hook reference, and an MIT licence file.
 
 ### Changed
 

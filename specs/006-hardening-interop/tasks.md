@@ -150,7 +150,7 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 
 - [X] T045 [US1] Report progress and support cancellation for long scans/imports/exports/pushes in `src/adapters/mdController.ts` and `src/ui/OperationReport.tsx`; where cancellation is unsafe, declare the operation uninterruptible before it starts (FR-003)
 - [X] T046 [US1] (FR-005) Satisfied by design — every cache added is a WeakMap (node index, fingerprint memo, markdown entry render), so it is released with the state version it belongs to. Release large working data (indexes, memo caches, rendered state) when the workspace closes in `src/adapters/settingsStore.ts` and `src/index.ts` (FR-005)
-- [ ] T047 [US1] (FR-001, FR-002, SC-001, SC-002) Verify all budgets P-1…P-9 pass in `tests/perf/scale.bench.test.ts`
+- [X] T047 [US1] (FR-001, FR-002, SC-001, SC-002) Verify all budgets P-1…P-9 pass in `tests/perf/scale.bench.test.ts` — all implemented and passing; benchmarks run in a second, non-parallel pass (`pnpm run test:perf`) so timings are not distorted by other test files
 
 **Checkpoint**: US1 independently testable — the workspace is responsive at target scale.
 
