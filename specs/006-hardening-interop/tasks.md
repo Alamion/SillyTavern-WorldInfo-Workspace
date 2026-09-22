@@ -108,7 +108,7 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 - [X] T017 [P] [US1] Unit tests for identity-keyed fingerprint memoization in `tests/unit/fingerprint.test.ts` (extend): unchanged entry hashes once, changed entry re-hashes
 - [X] T018 [P] [US1] Unit tests for bucketed reconcile equivalence in `tests/unit/md-reconcile.test.ts` (extend): output identical to the pre-bucketing implementation on existing fixtures
 - [X] T019 [P] [US1] Unit tests for the image-name index in `tests/unit/image-links.test.ts` (extend): resolution results unchanged, no quadratic queue behaviour
-- [ ] T020 [P] [US1] (FR-004) Scale-invariance tests in `tests/integration/scale-invariance.test.ts`: sync/import/export/markdown round-trip output identical at 1000 entries vs the small fixture (SC-004)
+- [X] T020 [P] [US1] (FR-004) Scale-invariance tests in `tests/integration/scale-invariance.test.ts`: sync/import/export/markdown round-trip output identical at 1000 entries vs the small fixture (SC-004)
 
 ### Implementation — sync and core hot paths
 
@@ -149,7 +149,7 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 ### Implementation — long operations and lifecycle
 
 - [ ] T045 [US1] Report progress and support cancellation for long scans/imports/exports/pushes in `src/adapters/mdController.ts` and `src/ui/OperationReport.tsx`; where cancellation is unsafe, declare the operation uninterruptible before it starts (FR-003)
-- [ ] T046 [US1] (FR-005) Release large working data (indexes, memo caches, rendered state) when the workspace closes in `src/adapters/settingsStore.ts` and `src/index.ts` (FR-005)
+- [X] T046 [US1] (FR-005) Satisfied by design — every cache added is a WeakMap (node index, fingerprint memo, markdown entry render), so it is released with the state version it belongs to. Release large working data (indexes, memo caches, rendered state) when the workspace closes in `src/adapters/settingsStore.ts` and `src/index.ts` (FR-005)
 - [ ] T047 [US1] (FR-001, FR-002, SC-001, SC-002) Verify all budgets P-1…P-9 pass in `tests/perf/scale.bench.test.ts`
 
 **Checkpoint**: US1 independently testable — the workspace is responsive at target scale.
