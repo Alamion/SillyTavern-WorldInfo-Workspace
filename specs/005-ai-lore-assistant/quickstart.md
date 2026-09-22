@@ -200,3 +200,31 @@ http(s)/mailto addresses were not links, the `#section-id` anchor opened a new t
 and `[[e5]]` are assistant handles, which exist only inside one request, so the entry shows a missing
 image and plain text; `img: https://…` without `![](…)` is not markdown image syntax (now a plain link).
 
+
+### 2026-09-22 — automated live run (headless Chromium, `dev` account, build 0.4.10 → 0.4.11)
+
+| # | Result | Notes |
+|---|--------|-------|
+| A9 | PASS after fix | Response length 150/300: routed reasoning models spent it all on thinking and the reply said "empty reply" — now "spent the whole response length on thinking … Raise \"Response length\"" (T093). A cut-off block at 300 showed "The reply was cut off." with Continue / Regenerate and the complete block usable. Continue answered "all five were denied" instead of continuing: the assistant prefill after a "Continue" user turn was ignored and the rest would have landed in a separate reply — fixed (T092). After the fix: a cut-off reply (folder `new1` applied, entry block unfinished) got its rest in the same reply; the new entries went into the new folder through the ref, the folder stayed applied; a second Continue finished it and the notice disappeared. One attempt timed out: toast "Could not continue: …", reply unchanged |
+| A18 | PASS | Linked folder (OPFS handle in place of the picker): an accepted assistant edit reached `Sandbox Entry 05.md` about a second later; after an edit on disk the undo was held back (chip "1"), Sync showed the conflict, "Keep workspace" wrote the original text back |
+| A26 | PASS | Entry accepted before its folder → "the folder it goes into is not created: apply \"Create folder \"Harbor Guilds\" in Sandbox\" first"; folder, then Retry, then the others one by one: all three entries inside "Harbor Guilds" |
+| A27 | PASS after fix | Folder applied and undone ("Reverted 1 change."), the entry failed naming the folder; "Apply again" + Retry put it inside; the declined deletion showed "the deletion was not confirmed", "Confirm delete…" again deleted it; "Undo all" restored the deleted entry — the confirmation said "This cannot be undone" although it can: now "\"Undo\" of this reply restores it." (T095) |
+| A28 | PASS | One "Undo last" + "Undo all (4)"; Undo last removed the last entry only, Undo all the rest ("Reverted 3 changes."), one "reverted 4" badge |
+| A29 | PASS | Live run at 412×880: 2 lines 58 px → 14 lines 288 px (33 %) → 30 lines stops at 352 px (40 %) and scrolls inside; empty again = 58 px. Owner confirmed the same on a phone and in Firefox (~40 %) |
+| A19 | PASS | Owner: a chat generation and an assistant request run side by side; neither cancels the other, stopping one leaves the other running |
+| A21 | PASS | Owner set up LM Studio (Text Completion, "Generic (OpenAI-compatible)", `http://…:1234/v1`, profile `lmstudio text completion`, no instruct template). Warning shown ("…best-effort… This profile has no instruct template."); the profile's preset has streaming off, so requests are blocking. Best-effort as expected: in a fresh conversation the model returned a valid `create_entry` block twice ("Harbor Watchman", "Harbor Bell" — applied, in the tree with its keys, undone again); other attempts continued the prompt instead (echoing the `<workspace>` block — now dropped from the prose, T096), returned only newlines ("empty reply") or, with a longer history (5–6 messages), "The provider rejected the request." (`API request failed: Response not OK`; LM Studio itself answered the same prompt lengths directly, so the rejection comes from the app's backend). No acceptance requirement for this scenario |
+
+**SC-005** (10 typical requests, `openrouter free provider`): 8 of 10 produced valid,
+acceptable proposals without manual retries — new folder with three entries (4/4 valid),
+folder + entry + deletion (3/3), append to an entry (1/1), five taverns (5/5), five
+markets cut off at 300 tokens (1/1 complete), rewrite an entry (1/1, destructive as
+expected), folder + two moves (3/3), keyword + order edit (1/1); two routed tool-trained
+models wrote their changes as function calls (`<|tool_call_start|>[edit_entry(id='e25', …)]`,
+`[create_entry(parent="f7", …)]`) — now reported as a broken block with "Ask to fix" (T094),
+which turned the second one into a valid proposal in one click. `openrouter small gemma free`
+answered 429 to every attempt (both automatic retries included), so it is outside SC-005's
+"when not rate-limited" condition, as in every earlier run.
+
+Observation: the free router does not honour "do not repeat anything already written" every
+time — one continuation repeated an entry already proposed; the repeat is a separate
+pending card and can be denied.

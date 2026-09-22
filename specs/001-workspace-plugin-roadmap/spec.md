@@ -322,6 +322,9 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 
 **Order amendments**:
 
+- 2026-09-22: Phase 2 (AI Assistant) delivered and closed by the owner (spec 005; live
+  validation A0–A37 and the SC-005 rate in `specs/005-ai-lore-assistant/quickstart.md`).
+  Remaining: Phase 4 (Hardening & Interop) and Phase 5 (AI Images), order to be decided.
 - 2026-09-15: Phase 3 (Markdown) delivered and closed by the owner (spec 004).
 - 2026-09-14: Phases 0 and 1 delivered (specs 002, 003). Phase 3 (Markdown) is delivered
   next, before Phase 2 (AI Assistant) — spec 004. Phase 5 (AI Images) added by the owner;

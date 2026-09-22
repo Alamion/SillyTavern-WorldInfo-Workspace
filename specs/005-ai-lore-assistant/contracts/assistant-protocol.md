@@ -94,8 +94,13 @@ references in prose (FR-005).
    exposed. At end of stream, an unclosed `<op` → `unparsed: truncated`.
 7. **Malformed**: a closed block with an unknown `type`, missing required attributes, or
    no usable content → `unparsed: malformed-block` with an excerpt (≤ 200 chars) and a
-   reason; parsing continues with the next block.
-8. **Prose**: everything outside blocks (after removing reasoning) is the reply text;
+   reason; parsing continues with the next block. A final reply with no blocks at all
+   that writes an operation as a call (`<|tool_call_start|>`, or `create_entry(parent=…`
+   with named arguments) → one `malformed-block` "the changes were written as function
+   calls instead of <op> blocks", so "Ask to fix" is offered (live run 2026-09-22).
+8. **Prose**: everything outside blocks (after removing reasoning) is the reply text,
+   minus an echoed `<workspace>` block (Text Completion models continue the prompt —
+   live run 2026-09-22; blocks around the echo are kept);
    `[[HANDLE]]` becomes an item reference resolved through the message's handle map.
 
 ## Required attributes / tags per type

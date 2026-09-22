@@ -515,17 +515,61 @@ describe('propose mode (US1)', () => {
         expect(request?.messages.at(-1)?.content).toContain('unknown operation type');
     });
 
-    it('continues a cut-off reply and reports the truncation', async () => {
-        const harness = await conversationWith(
-            '<op type="create_entry" parent="f2"><title>Half</title><content>text</content></op>\n\n<op type="create_entry parent'
-        );
+    // Live run 2026-09-22: an assistant prefill after a "Continue" user turn was ignored by
+    // routed models, which answered the instruction instead ("all five were denied"), and
+    // the rest landed in a separate reply where refs of the cut-off part do not resolve.
+    const CUT = [
+        'Two taverns.',
+        '<op type="create_folder" parent="f2" ref="new1"><title>Taverns</title></op>',
+        '<op type="create_entry" parent="new1"><title>Half</title><content>text</content></op>',
+        '<op type="create_entry" parent="new1"><title>Cut',
+    ].join('\n');
+
+    it('continues a cut-off reply in the same message, refs of the cut-off part included', async () => {
+        const harness = await conversationWith(CUT);
         const message = harness.controller.getSnapshot().messages.at(-1);
+        const seq = message?.seq ?? 1;
         expect(message?.batch?.unparsed[0]?.kind).toBe('truncated');
-        harness.llm.reply('<op type="create_entry" parent="f2"><title>Rest</title><content>z</content></op>');
-        await harness.controller.continueReply(message?.seq ?? 1);
+        const folderId = message?.batch?.proposals[0]?.id ?? '';
+        await harness.controller.accept(seq, folderId);
+        const count = harness.controller.getSnapshot().messages.length;
+
+        harness.llm.reply('<op type="create_entry" parent="new1"><title>Cut short</title><content>z</content></op>');
+        await harness.controller.continueReply(seq);
+
         const request = harness.llm.requests.at(-1);
-        expect(request?.messages.at(-1)?.role).toBe('assistant');
-        expect(request?.messages.at(-1)?.content).toContain('Half');
+        const sent = request?.messages ?? [];
+        expect(sent.slice(0, -2)).toEqual(message?.context?.requestMessages);
+        expect(sent.at(-2)).toEqual({ role: 'assistant', content: expect.stringContaining('<title>Half</title>') });
+        expect(sent.at(-2)?.content).not.toContain('<title>Cut<');
+        expect(sent.at(-1)?.role).toBe('user');
+        expect(sent.at(-1)?.content).toContain('cut off');
+
+        const after = harness.controller.getSnapshot().messages;
+        expect(after).toHaveLength(count);
+        const continued = after.at(-1);
+        expect(continued?.seq).toBe(seq);
+        expect(continued?.status).toBe('received');
+        expect(continued?.batch?.unparsed).toEqual([]);
+        expect(continued?.batch?.proposals.map((proposal) => [proposal.summary, proposal.decision])).toEqual([
+            [expect.stringContaining('Taverns'), 'applied'],
+            [expect.stringContaining('Half'), 'pending'],
+            [expect.stringContaining('Cut short'), 'pending'],
+        ]);
+        expect(continued?.batch?.proposals[0]?.id).toBe(folderId);
+        expect(continued?.batch?.proposals[2]?.invalidReason).toBeUndefined();
+    });
+
+    it('keeps the cut-off reply unchanged when continuing fails', async () => {
+        const harness = await conversationWith(CUT);
+        const before = harness.controller.getSnapshot().messages.at(-1);
+        harness.llm.fail({ kind: 'provider', message: 'The provider rejected the request.', retryable: true });
+        const failure = await harness.controller.continueReply(before?.seq ?? 1);
+        expect(failure?.kind).toBe('provider');
+        const after = harness.controller.getSnapshot().messages.at(-1);
+        expect(after?.text).toBe(before?.text);
+        expect(after?.status).toBe('received');
+        expect(after?.batch?.proposals).toEqual(before?.batch?.proposals);
     });
 
     it('regenerates with the same context and keeps the previous version', async () => {

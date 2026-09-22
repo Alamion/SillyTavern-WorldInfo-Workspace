@@ -5,12 +5,17 @@ import { parseReply } from '../core/assistant/parser';
 import { acceptAllSelection, applyOrder, canApplyAgain, withBlocked } from '../core/assistant/plan';
 import { stalenessOf } from '../core/assistant/rules';
 import { toProposals } from '../core/assistant/validate';
-import { editMessage, type EditedReply } from '../core/assistant/editReply';
+import {
+    appendContinuation,
+    continuationBase,
+    editMessage,
+    type EditedReply,
+} from '../core/assistant/editReply';
 import { forkedMessage, showVariant, variantIndex, withNewVariant } from '../core/assistant/variants';
 import type { SyncEngine } from './syncEngine';
 import type { ApplyOutcome } from './assistantApply';
 import type { ChatContextPort, ConversationStorePort, LlmPort, ProfileInfo } from '../core/assistant/ports';
-import { systemPrompt } from '../core/assistant/prompts';
+import { CONTINUE_INSTRUCTION, systemPrompt } from '../core/assistant/prompts';
 import { canSaveAssistantSettings, setAssistantSettings } from '../core/assistant/settingsOps';
 import type {
     AppliedBatch,
@@ -123,7 +128,11 @@ export interface AssistantController {
     editProposal(seq: number, proposalId: string, values: ProposedValues): Promise<void>;
     refreshProposal(seq: number, proposalId: string): Promise<void>;
     feedback(seq: number, text: string, proposalId?: string): Promise<void>;
-    continueReply(seq: number): Promise<void>;
+    /**
+     * Asks for the rest of a cut-off reply and appends it to the same message (its
+     * decisions and refs stay). Resolves with the failure when nothing was added.
+     */
+    continueReply(seq: number): Promise<AssistantFailure | null>;
     /** Generates a new version of a reply; earlier versions are kept (swipes). */
     regenerate(seq: number, options?: { sameContext?: boolean }): Promise<void>;
     /** Shows another stored version of a reply. */
@@ -703,8 +712,8 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         return undone;
     };
 
-    /** A follow-up turn in the same conversation (feedback, continue, ask to fix). */
-    const followUp = async (request: string, assistantPrefill?: string): Promise<void> => {
+    /** A follow-up turn in the same conversation (feedback, ask to fix). */
+    const followUp = async (request: string): Promise<void> => {
         const conversation = conversations.find((item) => item.id === activeConversationId);
         if (!conversation || busy) {
             return;
@@ -735,13 +744,9 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             });
             notify();
             const built = buildForConversation(touched, request, userSeq);
-            const messages =
-                assistantPrefill === undefined
-                    ? built.messages
-                    : [...built.messages, { role: 'assistant' as const, content: assistantPrefill }];
-            await runRequest(touched, assistantSeq, messages, {
+            await runRequest(touched, assistantSeq, built.messages, {
                 ...built.snapshot,
-                requestMessages: messages,
+                requestMessages: built.messages,
             });
         } finally {
             busy = false;
@@ -1027,11 +1032,79 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             await followUp(`${text}${scopeNote}`);
         },
         async continueReply(seq) {
+            const conversation = conversations.find((item) => item.id === activeConversationId);
             const message = messageAt(seq);
-            if (!message) {
-                return;
+            if (!conversation || message?.role !== 'assistant' || busy) {
+                return null;
             }
-            await followUp('Continue exactly where you stopped.', message.text);
+            const current = settings();
+            const availability = deps.llm.availability();
+            if (availability.state !== 'ready') {
+                return describeFailure('connection-manager-disabled');
+            }
+            const profile = availability.profiles.find((item) => item.id === current.profileId);
+            if (!profile) {
+                return describeFailure('profile');
+            }
+            // The original request, the reply so far, then the instruction: a trailing
+            // assistant prefill is ignored by many routed models (live run 2026-09-22).
+            const base = continuationBase(message);
+            const requestMessages: LlmMessage[] = [
+                ...requestMessagesFor(conversation, seq),
+                { role: 'assistant', content: base },
+                { role: 'user', content: CONTINUE_INSTRUCTION },
+            ];
+            busy = true;
+            abortController = new AbortController();
+            activeRequest = { conversationId: conversation.id, seq };
+            notify();
+            let failure: AssistantFailure | null = null;
+            let received = '';
+            let done = false;
+            try {
+                await deps.llm.run(
+                    {
+                        profileId: profile.id,
+                        messages: requestMessages,
+                        maxTokens: current.responseTokens,
+                        signal: abortController.signal,
+                    },
+                    (event) => {
+                        if (event.type === 'progress') {
+                            received = event.text;
+                            const text = appendContinuation(base, received);
+                            void putMessage({
+                                ...message,
+                                status: 'receiving',
+                                text,
+                                prose: parseReply(text, {}).prose,
+                            });
+                            notify();
+                        } else if (event.type === 'done') {
+                            received = event.text;
+                            done = true;
+                        } else if (event.type === 'failed') {
+                            failure = event.failure;
+                        }
+                    }
+                );
+            } finally {
+                busy = false;
+                abortController = null;
+                activeRequest = null;
+            }
+            // A stopped continuation keeps what arrived, as a stopped reply does.
+            const stopped = (failure as AssistantFailure | null)?.kind === 'aborted';
+            if ((!done && !stopped) || received.trim() === '') {
+                await putMessage(message);
+                notify();
+                return failure ?? describeFailure('empty');
+            }
+            const edited = editMessage(message, appendContinuation(base, received), deps.store.getState());
+            await putMessage({ ...edited.message, status: 'received' });
+            await deps.conversations.flush(conversation.id);
+            notify();
+            return null;
         },
         async regenerate(seq, options = {}) {
             const conversation = conversations.find((item) => item.id === activeConversationId);

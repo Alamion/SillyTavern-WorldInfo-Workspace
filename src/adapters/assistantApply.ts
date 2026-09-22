@@ -350,7 +350,9 @@ export async function applyDeletion(
             confirm: deps.confirm,
             ...(deps.trackedIds !== undefined ? { trackedIds: deps.trackedIds } : {}),
         },
-        [node.id]
+        [node.id],
+        // The applied batch keeps a re-insert inverse (below), so the deletion is undoable.
+        { undoNote: '"Undo" of this reply restores it.' }
     );
     if (!deleted) {
         outcomes.push({ proposalId, status: 'failed', reason: 'the deletion was not confirmed' });

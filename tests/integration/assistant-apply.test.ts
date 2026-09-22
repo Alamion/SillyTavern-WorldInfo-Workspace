@@ -350,6 +350,9 @@ describe('structure operations, deletions and undo (US2)', () => {
         expect(result.outcomes[0]?.status).toBe('applied');
         expect(confirmations[0]).toContain('Delete "Bristlemark"');
         expect(confirmations[0]).toContain('native book "Book"');
+        // Undo re-inserts it, so the confirmation must not claim otherwise (live run 2026-09-22).
+        expect(confirmations[0]).not.toContain('cannot be undone');
+        expect(confirmations[0]).toContain('"Undo" of this reply restores it.');
         expect(findNode(rig.store.getState(), 'e-bristle')).toBeUndefined();
         await rig.advanceTimers();
         expect(rig.host.books.get('Book')?.entries['5']).toBeUndefined();

@@ -26,13 +26,15 @@ amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and i
 any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
 hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
 UI contract, quickstart S0–S14).
-**Current increment (spec 005, implemented 2026-09-15; live validation pending)**: roadmap
+**Current increment (spec 005, implemented 2026-09-15; live validation A0–A37 completed
+and the phase closed by the owner 2026-09-22 — results and the SC-005 rate in
+`quickstart.md`)**: roadmap
 Phase 2 — AI Lore Assistant. Requests via `ConnectionManagerRequestService` on a profile
 chosen in the assistant settings (streaming follows the profile's preset); prose replies
 with tagged operation blocks (`contracts/assistant-protocol.md`), batch proposals with
 review/diff/undo, conversations in IndexedDB `WorldInfoWorkspace-assistant`. Design:
 `specs/005-ai-lore-assistant/` (research R1–R14, data model, protocol/LLM port/UI/hooks
-contracts, quickstart A0–A21).
+contracts, quickstart A0–A37).
 
 ## Key Reference
 
@@ -186,7 +188,7 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.10)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.11)
 ```
 
 ## Settings
@@ -309,7 +311,9 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   text without thinking. Saving re-parses it: proposals of unchanged blocks
   (`OperationProposal.source`) keep id/decision/user edits, changed or new blocks become fresh
   pending proposals, and applied/reverted proposals whose block was removed stay in the batch
-  so undo keeps working.
+  so undo keeps working. Continue (cut-off reply) uses the same re-parse: the rest is
+  appended to the SAME reply (no assistant prefill — routed models ignore it), so refs and
+  decisions of the cut-off part stay.
 - **Messages**: the last reply keeps versions (`Message.variants`, `core/assistant/variants.ts`;
   the shown one is mirrored in the message fields); any message can be deleted
   (`deleteMessage`) or start a fork (`forkConversation`, copies marked `forkedFrom`, no undo

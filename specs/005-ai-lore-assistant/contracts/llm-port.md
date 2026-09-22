@@ -63,7 +63,7 @@ export interface LlmPort {
 5. Errors: unwraps `error.cause`; classification per research R7 —
    `/429|rate.?limit|quota/i` → `rate-limit`; `AbortError` or `signal.aborted` →
    `aborted`; `TypeError: Failed to fetch` → `network`; `Profile not found` / unsupported
-   API → `profile`; empty text → `empty`; other → `provider` with the message. `timeout`
+   API → `profile`; empty text → `empty`, or `thinking-only` when reasoning arrived (the response length ran out while thinking); other → `provider` with the message. `timeout`
    is raised by the port itself (no progress for 90 s streaming / 180 s non-streaming),
    aborting the underlying request.
 6. The port never touches chat state, the main `abortController`, `GENERATION_*` events,

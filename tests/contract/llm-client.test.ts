@@ -270,6 +270,26 @@ describe('llmClient run', () => {
         expect(events.at(-1)).toMatchObject({ failure: { kind: 'empty' } });
     });
 
+    it('reports thinking without an answer as a response-length problem (live run 2026-09-22)', async () => {
+        const blocking = createHost({ result: { content: '', reasoning: 'Let me plan five entries…' } });
+        const streamed = createHost({
+            presets: { 'openai:Default': { stream_openai: true } },
+            result: streamOf([{ text: '', reasoning: 'Let me plan' }]),
+        });
+        for (const { ctx } of [blocking, streamed]) {
+            const events = await collect((onEvent) =>
+                createLlmClient(() => ctx).run(
+                    { profileId: 'p-cc', messages: [], maxTokens: 150, signal },
+                    onEvent
+                )
+            );
+            expect(events.at(-1)).toMatchObject({
+                type: 'failed',
+                failure: { kind: 'thinking-only', retryable: true },
+            });
+        }
+    });
+
     it('reports an abort by the caller', async () => {
         const controller = new AbortController();
         const { ctx } = createHost({

@@ -21,6 +21,8 @@ const MESSAGES: Readonly<Record<FailureKind, string>> = {
     'connection-manager-disabled':
         'The assistant needs the Connection Manager extension. Enable it in Extensions → Manage extensions.',
     empty: 'The model returned an empty reply.',
+    'thinking-only':
+        'The model spent the whole response length on thinking and wrote no answer. Raise "Response length" in AI settings.',
     truncated: 'The reply was cut off.',
     malformed: 'Part of the reply could not be used.',
 };

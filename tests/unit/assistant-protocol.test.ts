@@ -208,3 +208,54 @@ describe('performance', () => {
         expect(elapsed).toBeLessThan(50);
     });
 });
+
+describe('operations written as function calls (live run 2026-09-22)', () => {
+    const LIVE = [
+        "<|tool_call_start|>[edit_entry(id='e25', content='In the harbor ledger, Sandbox Entry 07 marks…')]<|tool_call_end|>",
+        '[create_entry(parent="f7", ref="new1", title="Harbor bell", keys="harbor bell, tide", content="At every high tide…")]',
+    ];
+
+    it.each(LIVE)('reports %s as a broken block so "Ask to fix" is offered', (text) => {
+        const parsed = parseReply(text, { final: true });
+        expect(parsed.blocks).toEqual([]);
+        expect(parsed.unparsed).toEqual([
+            expect.objectContaining({
+                kind: 'malformed-block',
+                reason: 'the changes were written as function calls instead of <op> blocks',
+            }),
+        ]);
+    });
+
+    it('leaves prose that only mentions an operation name, and replies with real blocks, alone', () => {
+        expect(parseReply('I would use create_entry for that, if you want.', { final: true }).unparsed).toEqual([]);
+        const mixed = parseReply(
+            'See edit_entry(e1) below.\n<op type="delete" id="e1"></op>',
+            { final: true }
+        );
+        expect(mixed.unparsed).toEqual([]);
+        expect(parseReply(LIVE[1] ?? '', {}).unparsed).toEqual([]);
+    });
+});
+
+describe('echoed request context (live run 2026-09-22, Text Completion)', () => {
+    it('drops an echoed <workspace> block from the prose but keeps the blocks around it', () => {
+        const text = [
+            'Here is one watchman.',
+            '<workspace>',
+            'My workspace as it is now, shared with you for this request:',
+            'f1 | folder | Realm of Aldermeer',
+            '</workspace>',
+            '<op type="create_entry" parent="f7"><title>Harbor Watchman</title><content>x</content></op>',
+        ].join('\n');
+        const parsed = parseReply(text, { final: true });
+        expect(parsed.prose).toBe('Here is one watchman.');
+        expect(parsed.blocks).toHaveLength(1);
+    });
+
+    it('drops an unclosed echo to the end of the prose', () => {
+        const parsed = parseReply('Sure.\n<workspace>\nWhere the user is\nNothing is selected', {
+            final: true,
+        });
+        expect(parsed.prose).toBe('Sure.');
+    });
+});

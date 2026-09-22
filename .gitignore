@@ -31,3 +31,6 @@ yarn-error.log*
 
 .idea/
 nul
+
+# Local live-check helpers (playwright-cli scripts, browser artifacts)
+.live/

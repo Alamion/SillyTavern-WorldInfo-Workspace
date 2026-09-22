@@ -82,8 +82,11 @@ replaced rather than kept. `showVariant(seq, index)` switches versions; messages
 regenerated one are removed (`deleteMessagesAfter`). `deleteMessage(seq)` removes one
 message (applied changes stay in the tree). `forkConversation(seq)` copies messages up to
 `seq` into a new conversation (`Fork: <title>`, same mode and context) and marks them
-`forkedFrom`. Continue appends a continuation turn
-whose text is concatenated for parsing. Proposals of a replaced reply that were already
+`forkedFrom`. Continue (amended 2026-09-22) adds no messages: it re-sends the reply's
+`requestMessages`, the reply so far (an unfinished trailing block dropped) as an assistant
+turn and an instruction to write only the rest; the rest is appended to the SAME message
+and re-parsed like an edit (`editMessage`), so decisions and refs of the cut-off part stay.
+A failed continuation leaves the reply unchanged (toast). Proposals of a replaced reply that were already
 applied keep their `AppliedBatch` inside their own version, so undo stays available after
 switching back to that version.
 
@@ -171,7 +174,7 @@ parent no longer exists) is skipped with a reason.
 ## AssistantFailure
 
 `kind: 'rate-limit' | 'provider' | 'network' | 'timeout' | 'aborted' | 'profile' |
-'connection-manager-disabled' | 'empty' | 'truncated' | 'malformed'`, `message: string`
+'connection-manager-disabled' | 'empty' | 'thinking-only' | 'truncated' | 'malformed'`, `message: string`
 (readable), `retryable: boolean`, `detail?: string` (raw provider text, collapsible).
 
 ## Relationships

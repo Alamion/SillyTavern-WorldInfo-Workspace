@@ -102,6 +102,7 @@ export type FailureKind =
     | 'profile'
     | 'connection-manager-disabled'
     | 'empty'
+    | 'thinking-only'
     | 'truncated'
     | 'malformed';
 

@@ -29,6 +29,14 @@ function isStreamFactory(value: ExtractedLlmData | LlmStreamFactory): value is L
     return typeof value === 'function';
 }
 
+/**
+ * No answer text: when the model did think, the response length ran out during the
+ * thinking (the app exposes no finish reason) — say so instead of "empty reply".
+ */
+function emptyKind(reasoning: string): 'empty' | 'thinking-only' {
+    return reasoning.trim() === '' ? 'empty' : 'thinking-only';
+}
+
 function apiOf(profile: ConnectionProfile): ProfileApi {
     return profile.mode === 'tc' ? 'text-completion' : 'chat-completion';
 }
@@ -170,7 +178,7 @@ export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
                     const text = typeof result.content === 'string' ? result.content : String(result.content ?? '');
                     const reasoning = typeof result.reasoning === 'string' ? result.reasoning : '';
                     if (text.trim() === '') {
-                        onEvent({ type: 'failed', failure: describeFailure('empty') });
+                        onEvent({ type: 'failed', failure: describeFailure(emptyKind(reasoning)) });
                         return;
                     }
                     onEvent({ type: 'done', text, reasoning });
@@ -190,7 +198,7 @@ export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
                     }
                 }
                 if (text.trim() === '') {
-                    onEvent({ type: 'failed', failure: describeFailure('empty') });
+                    onEvent({ type: 'failed', failure: describeFailure(emptyKind(reasoning)) });
                     return;
                 }
                 onEvent({ type: 'done', text, reasoning });

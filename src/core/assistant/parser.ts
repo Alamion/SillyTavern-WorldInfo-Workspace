@@ -294,6 +294,12 @@ function buildBlock(
     return { type: operation, attrs, tags, raw };
 }
 
+/** An operation written as a call with named arguments, e.g. `edit_entry(id='e25', …)`. */
+const FUNCTION_CALL_PATTERN = new RegExp(
+    `<\\|tool_call_start\\|>|\\b(?:${[...OPERATION_TYPES].join('|')})\\s*\\(\\s*[a-z_]+\\s*=`,
+    'i'
+);
+
 export function parseReply(text: string, options: { final?: boolean } = {}): ParsedReply {
     const { text: withoutReasoning, reasoning } = extractReasoning(text);
     const blocks: ParsedBlock[] = [];
@@ -337,12 +343,29 @@ export function parseReply(text: string, options: { final?: boolean } = {}): Par
     }
     const prose = proseParts
         .join('')
+        // Text Completion models continue the prompt and echo its <workspace> block
+        // back (live run 2026-09-22); it is never part of an answer.
+        .replace(/<workspace>[\s\S]*?<\/workspace>/gi, '')
+        .replace(/<workspace>[\s\S]*$/i, '')
         // Fences around blocks are dropped; fenced prose keeps its own fences.
         .replace(/```[a-zA-Z]*\s*\n?\s*```/g, '')
         // …and so are inline backticks around a block (live run 2026-09-16: "`<op …>`" left "``").
         .replace(/(?<!`)``(?!`)/g, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
+    // Tool-trained models routed by a free router wrote the changes as calls
+    // (`[create_entry(parent="f7", …)]`) instead of blocks (live run 2026-09-22):
+    // reported as broken so the reply offers "Ask to fix" instead of plain prose.
+    if (options.final === true && blocks.length === 0 && unparsed.length === 0) {
+        const call = FUNCTION_CALL_PATTERN.exec(withoutReasoning);
+        if (call) {
+            unparsed.push({
+                kind: 'malformed-block',
+                excerpt: excerpt(withoutReasoning.slice(call.index)),
+                reason: 'the changes were written as function calls instead of <op> blocks',
+            });
+        }
+    }
     const references = [...prose.matchAll(/\[\[([A-Za-z0-9_-]+)\]\]/g)].map((match) => match[1] ?? '');
     return { prose, blocks, unparsed, reasoning, references };
 }

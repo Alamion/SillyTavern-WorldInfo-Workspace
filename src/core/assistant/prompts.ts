@@ -29,6 +29,14 @@ function label(proposal: OperationProposal): string {
     return `${proposal.op}${name}`;
 }
 
+/** The user turn that asks for the rest of a cut-off reply (see `continuationBase`). */
+export const CONTINUE_INSTRUCTION = [
+    'Your reply above was cut off by the response length.',
+    'Write only what is still missing, starting exactly where it stops; do not repeat anything already written.',
+    'If it stopped inside an operation block, write that whole block again from its opening tag.',
+    'Refs you declared above (new1, new2, …) are still valid.',
+].join(' ');
+
 /**
  * Compact decision memory for the next request (spec 005 FR-033): what the user
  * accepted, denied and undid, so denied ideas are not proposed again.

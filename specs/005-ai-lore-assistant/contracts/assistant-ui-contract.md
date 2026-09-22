@@ -54,7 +54,7 @@ system); icons Font Awesome 6 Free.
 | Receiving (stream) | Prose streams live; footer: "Receiving… 1 240 chars" + Stop; proposals appear as blocks complete |
 | Rate limit | Failure card: "The provider is rate-limiting requests (temporary)." + auto-retry countdown "Retrying in 30 s" [Cancel] / [Retry now] |
 | Other failures | Failure card: readable reason per `AssistantFailure.kind`, [Retry], collapsible provider detail; the request text stays in the conversation |
-| Truncated | Notice: "The reply was cut off." [Continue] [Regenerate]; complete proposals stay usable |
+| Truncated | Notice: "The reply was cut off." [Continue] [Regenerate]; complete proposals stay usable; Continue streams the rest into the same reply (no new messages); a failed Continue toasts "Could not continue: …" and leaves the reply as it was |
 | Regenerate | [Regenerate] and `›` on the last version rebuild the context from the current tree; [Regenerate with the same context] re-sends the stored request; earlier versions stay reachable with `‹ ›` |
 | Delete message | Confirmation "Delete this message?" (+ "with all its versions" when it has several); when changes were accepted from it: "Changes already accepted from it stay in the workspace, but the assistant will no longer see this reply or its decisions." |
 | Forked conversation | Title "Fork: <original title>"; copied batches with applied changes show the badge "undo in the original conversation" instead of [Undo batch] |

@@ -145,3 +145,34 @@ export function editMessage(message: Message, text: string, state: WorkspaceStat
     };
     return { message: next, fresh, kept: retained.length };
 }
+
+/**
+ * Continuing a cut-off reply (live run 2026-09-22): the model gets the reply so far
+ * and writes only what is missing; the rest is appended to the SAME message and the
+ * result goes through `editMessage`, so decisions and refs of the cut-off part stay.
+ *
+ * The part the model continues from: the editable text without an unfinished
+ * trailing operation block, which the model is asked to write again in full.
+ */
+export function continuationBase(message: Message): string {
+    const text = editableText(message);
+    const lower = text.toLowerCase();
+    const lastOpen = lower.search(/<op\b(?![\s\S]*<op\b)/);
+    if (lastOpen >= 0 && lower.indexOf('</op>', lastOpen) < 0) {
+        return text.slice(0, lastOpen).trimEnd();
+    }
+    return text;
+}
+
+/** The reply so far joined with its continuation (a block always starts a new line). */
+export function appendContinuation(base: string, continuation: string): string {
+    const rest = continuation.replace(/^\s+/, '');
+    if (base === '' || rest === '') {
+        return base + rest;
+    }
+    if (/^<op\b/i.test(rest)) {
+        return `${base.trimEnd()}\n${rest}`;
+    }
+    // Providers trim the leading space of a continuation that ends mid-sentence.
+    return /\s$/.test(base) || /^[,.;:!?)]/.test(rest) ? base + rest : `${base} ${rest}`;
+}

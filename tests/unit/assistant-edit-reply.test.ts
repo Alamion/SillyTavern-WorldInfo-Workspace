@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { editableText, editMessage } from '../../src/core/assistant/editReply';
+import { appendContinuation, continuationBase, editableText, editMessage } from '../../src/core/assistant/editReply';
 import type { Message, OperationProposal } from '../../src/core/assistant/types';
 import { aldermeerState } from '../fixtures/assistant/outline-aldermeer';
 
@@ -94,5 +94,23 @@ describe('editMessage', () => {
         const edited = editMessage(message, `new ${BLOCK('A')}`, state).message;
         expect(edited.batch).toBeUndefined();
         expect(edited.prose).toBe('new');
+    });
+});
+
+describe('continuing a cut-off reply (live run 2026-09-22)', () => {
+    it('drops an unfinished trailing block and the thinking from the base', () => {
+        const text = `<think>plan</think>Two entries.\n${BLOCK('A')}\n<op type="create_entry" parent="f2"><title>B`;
+        expect(continuationBase(reply(text))).toBe(`Two entries.\n${BLOCK('A')}`);
+    });
+
+    it('keeps a base that stopped in prose', () => {
+        expect(continuationBase(reply(`${BLOCK('A')}\nThe harbor is`))).toBe(`${BLOCK('A')}\nThe harbor is`);
+    });
+
+    it('joins a block on its own line and prose with one space', () => {
+        expect(appendContinuation(BLOCK('A'), `  ${BLOCK('B')}`)).toBe(`${BLOCK('A')}\n${BLOCK('B')}`);
+        expect(appendContinuation('The harbor is', 'loud at dawn.')).toBe('The harbor is loud at dawn.');
+        expect(appendContinuation('The harbor is ', 'loud.')).toBe('The harbor is loud.');
+        expect(appendContinuation('The harbor', ', at dawn')).toBe('The harbor, at dawn');
     });
 });

@@ -152,7 +152,13 @@ export function AssistantPanel({
                         <>
                             <ReplyNotices
                                 message={message}
-                                onContinue={() => void assistant.continueReply(message.seq)}
+                                onContinue={() =>
+                                    void assistant.continueReply(message.seq).then((failure) => {
+                                        if (failure) {
+                                            notifyWarning(`Could not continue: ${failure.message}`);
+                                        }
+                                    })
+                                }
                                 onRegenerate={() => void assistant.regenerate(message.seq)}
                                 onRegenerateSameContext={() =>
                                     void assistant.regenerate(message.seq, { sameContext: true })

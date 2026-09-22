@@ -126,7 +126,8 @@ function entityBooks(node: TreeNode): string[] {
 export function describeDeletion(
     state: WorkspaceState,
     ids: readonly string[],
-    trackedIds: ReadonlySet<string> = new Set()
+    trackedIds: ReadonlySet<string> = new Set(),
+    undoNote = 'This cannot be undone.'
 ): DeletionDescription {
     const targets = ids
         .map((id) => findNode(state, id))
@@ -147,13 +148,13 @@ export function describeDeletion(
     const single = targets.length === 1 ? targets[0] : undefined;
     let message: string;
     if (single) {
-        message = `Delete "${single.name}"${single.kind === 'folder' ? ' and everything inside it' : ''}? This cannot be undone.`;
+        message = `Delete "${single.name}"${single.kind === 'folder' ? ' and everything inside it' : ''}? ${undoNote}`;
         const entryBooks = entityBooks(single);
         if (entryBooks.length > 0) {
             message += ` Its copy in the native book "${entryBooks[0] ?? ''}" will be removed at the next sync.`;
         }
     } else {
-        message = `Delete ${String(targets.length)} items? This cannot be undone.`;
+        message = `Delete ${String(targets.length)} items? ${undoNote}`;
         if (targets.some((node) => entityBooks(node).length > 0)) {
             message += ' Native book copies of synced items will be removed at the next sync.';
         }
@@ -180,10 +181,10 @@ export interface DeleteNodesDeps {
 export async function deleteNodes(
     deps: DeleteNodesDeps,
     ids: readonly string[],
-    options: { preconfirmed?: boolean; rootBooks?: 'ask' | 'delete' } = {}
+    options: { preconfirmed?: boolean; rootBooks?: 'ask' | 'delete'; undoNote?: string } = {}
 ): Promise<boolean> {
     const state = deps.store.getState();
-    const description = describeDeletion(state, ids, deps.trackedIds?.() ?? new Set());
+    const description = describeDeletion(state, ids, deps.trackedIds?.() ?? new Set(), options.undoNote);
     if (description.items.length === 0) {
         return false;
     }
