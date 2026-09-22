@@ -1,4 +1,25 @@
 <!--
+=== SYNC IMPACT REPORT (2026-09-23) ===
+Version change: 1.2.0 → 1.3.0 (MINOR: materially expanded guidance in Principle VIII)
+Modified principles:
+  - VIII. Proven Pattern, Spec-Driven Execution — qualified with a bounded
+    maintenance path for changes that add no user capability and alter no
+    delivered contract (spec 006 FR-024, owner decision 2026-09-22)
+Added sections: None
+Removed sections: None
+Rationale: the speckit cycle is disproportionate for one or two small fixes, but
+  those changes still need documenting. Without this amendment the maintenance
+  path would be void wherever it conflicts with VIII, because Governance makes
+  this constitution supersede all other project documents — so the rule has to
+  live here rather than only in AGENTS.md.
+Migration: none. Existing specs and workflows are unaffected; the maintenance path
+  is additive and its threshold routes anything contract-touching back to a spec.
+Follow-up TODOs: None
+Previous change: 1.2.0 (Additional Constraints → shared UI style system)
+=== END REPORT ===
+-->
+
+<!--
 === SYNC IMPACT REPORT ===
 Version change: 1.0.0 → 1.1.0 (MINOR: new principle added)
 Modified principles: None renamed
@@ -94,6 +115,17 @@ Improvements over that pattern MUST go through the speckit workflow
 (specify → plan → tasks → implement) so each improvement is specified, reviewed, and
 traceable rather than ad-hoc.
 
+**Maintenance path** (amendment 1.3.0). A change that adds NO new user capability and
+alters NO delivered contract MAY instead take the documented maintenance path in
+`AGENTS.md`: reported with the standing template, triaged against the threshold below,
+fixed, and recorded in `CHANGELOG.md` — plus a short rationale record when the change
+embeds a non-obvious decision. The delivered contracts are the persistence schema, the
+markdown convention, the assistant protocol, native World Info sync semantics, and the
+hook names and payloads. Any change touching one of those MUST take the full workflow.
+When it is genuinely unclear, it takes the full workflow: an unnecessary spec costs time,
+a wrongly skipped one costs a broken contract. The maintenance path shortens
+DOCUMENTATION only — the quality gates of Principles III–VI apply unchanged.
+
 ### IX. Language Policy
 
 Conversation with the assistant MAY be in any language, and responses MUST match the
@@ -156,4 +188,4 @@ Technology stack and environment requirements:
 - Runtime development guidance lives in `AGENTS.md`; `.specify/templates` defines the
   spec/plan/task document structure.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-08
+**Version**: 1.3.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-23

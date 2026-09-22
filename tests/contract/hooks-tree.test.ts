@@ -222,10 +222,21 @@ describe('hook emitter containment (FR-010)', () => {
         expect(() => emitter(WI_EVENTS.treeChanged, { changes: [] })).not.toThrow();
     });
 
-    it('contains a rejected promise', async () => {
-        const emitter = createHookEmitter(ctxWith(() => Promise.reject(new Error('nope'))));
-        expect(() => emitter(WI_EVENTS.treeChanged, { changes: [] })).not.toThrow();
-        await Promise.resolve();
+    it('contains a rejected promise instead of leaking an unhandled rejection', async () => {
+        const unhandled: unknown[] = [];
+        const onUnhandled = (event: PromiseRejectionEvent): void => {
+            unhandled.push(event.reason);
+        };
+        process.on('unhandledRejection', onUnhandled as unknown as NodeJS.UnhandledRejectionListener);
+        try {
+            const emitter = createHookEmitter(ctxWith(() => Promise.reject(new Error('nope'))));
+            expect(() => emitter(WI_EVENTS.treeChanged, { changes: [] })).not.toThrow();
+            // Let the microtask queue drain so an unhandled rejection would surface.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(unhandled).toEqual([]);
+        } finally {
+            process.off('unhandledRejection', onUnhandled as unknown as NodeJS.UnhandledRejectionListener);
+        }
     });
 });
 

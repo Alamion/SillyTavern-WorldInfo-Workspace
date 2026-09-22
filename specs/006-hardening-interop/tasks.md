@@ -200,12 +200,12 @@ consumer, from documentation alone.
 **Independent Test**: Someone who has never seen the plugin completes install → first
 entry → WI root → confirmed sync → markdown link using only the docs.
 
-- [ ] T065 [P] [US3] (SC-007) Write user-facing `README.md`: install, relationship to the native World Info editor, workspace and tree, WI roots and sync semantics, markdown convention and limits (images/folders never export), assistant prerequisites and confirmation model (FR-013)
-- [ ] T066 [P] [US3] Document environment requirements and known limits in `README.md`: markdown linking only on desktop Chromium over a secure page; the assistant requires the Connection Manager extension (FR-015)
-- [ ] T067 [P] [US3] Write the extension-author hook reference in `docs/hooks.md` from `contracts/hooks.md`: every event, payload, firing condition, guarantees and the additive-only promise (FR-014)
-- [ ] T068 [US3] Create `CHANGELOG.md` seeded with one "0.4.11 and earlier" summary entry referencing specs 002–005, per `contracts/maintenance-process.md` (FR-019)
-- [ ] T069 [US3] Update `AGENTS.md` with the new hook surface, the new modules (`core/state/nodeIndex.ts`, `core/state/sharing.ts`, `core/hooks/**`, `adapters/hooks.ts`, `ui/VirtualList.tsx`, `ui/useDraftField.ts`, `tests/perf/**`) and the structural-sharing store contract
-- [ ] T070 [US3] Record the docs-updated-in-the-same-change rule (FR-016) in `AGENTS.md` and `specs/006-hardening-interop/contracts/maintenance-process.md`, then verify docs match code — every documented event exists and fires, every documented limit is real — and record the diff result in `specs/006-hardening-interop/quickstart.md` (SC-010)
+- [X] T065 [P] [US3] (SC-007) Write user-facing `README.md`: install, relationship to the native World Info editor, workspace and tree, WI roots and sync semantics, markdown convention and limits (images/folders never export), assistant prerequisites and confirmation model (FR-013)
+- [X] T066 [P] [US3] Document environment requirements and known limits in `README.md`: markdown linking only on desktop Chromium over a secure page; the assistant requires the Connection Manager extension (FR-015)
+- [X] T067 [P] [US3] Write the extension-author hook reference in `docs/hooks.md` from `contracts/hooks.md`: every event, payload, firing condition, guarantees and the additive-only promise (FR-014)
+- [X] T068 [US3] Create `CHANGELOG.md` seeded with one "0.4.11 and earlier" summary entry referencing specs 002–005, per `contracts/maintenance-process.md` (FR-019)
+- [X] T069 [US3] Update `AGENTS.md` with the new hook surface, the new modules (`core/state/nodeIndex.ts`, `core/state/sharing.ts`, `core/hooks/**`, `adapters/hooks.ts`, `ui/VirtualList.tsx`, `ui/useDraftField.ts`, `tests/perf/**`) and the structural-sharing store contract
+- [X] T070 [US3] Record the docs-updated-in-the-same-change rule (FR-016) in `AGENTS.md` and `specs/006-hardening-interop/contracts/maintenance-process.md`, then verify docs match code — every documented event exists and fires, every documented limit is real — and record the diff result in `specs/006-hardening-interop/quickstart.md` (SC-010)
 
 **Checkpoint**: US3 independently testable — documentation stands alone.
 
@@ -218,9 +218,9 @@ entry → WI root → confirmed sync → markdown link using only the docs.
 **Independent Test**: Run one real fix end to end through the path and verify it produced
 a changelog entry with no spec written.
 
-- [ ] T071 [US4] Amend `.specify/memory/constitution.md` to 1.3.0: qualify Principle VIII with the bounded maintenance path per `contracts/maintenance-process.md` §7, plus a sync impact report and rationale in the header (Governance requires both) (FR-024)
-- [ ] T072 [US4] Add the maintenance mechanics to `AGENTS.md`: the contract-based threshold with its worked examples, the report template, changelog and rationale-record formats, and the backlog (FR-017, FR-018, FR-020, FR-021)
-- [ ] T073 [P] [US4] Create the deferred-items backlog file at `specs/006-hardening-interop/backlog.md` (deferred items only; items fixed immediately never get an entry) (FR-022)
+- [X] T071 [US4] Amend `.specify/memory/constitution.md` to 1.3.0: qualify Principle VIII with the bounded maintenance path per `contracts/maintenance-process.md` §7, plus a sync impact report and rationale in the header (Governance requires both) (FR-024)
+- [X] T072 [US4] Add the maintenance mechanics to `AGENTS.md`: the contract-based threshold with its worked examples, the report template, changelog and rationale-record formats, and the backlog (FR-017, FR-018, FR-020, FR-021)
+- [X] T073 [P] [US4] Create the deferred-items backlog file at `specs/006-hardening-interop/backlog.md` (deferred items only; items fixed immediately never get an entry) (FR-022)
 - [ ] T074 [US4] Carry one real fix end to end through the path — report with the template, triage against the threshold, fix, add its `CHANGELOG.md` entry and a regression test — with no spec written (SC-009, FR-023)
 - [ ] T075 [US4] Triage a sample set of ≥ 5 changes spanning both sides of the threshold using the written rule alone and record the routing results in `specs/006-hardening-interop/quickstart.md` (SC-009)
 

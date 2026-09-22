@@ -22,7 +22,17 @@ export type HookEmitter = (event: string, payload: unknown) => void;
 export function createHookEmitter(ctx: SillyTavernContext): HookEmitter {
     return (event, payload) => {
         try {
-            void ctx.eventSource.emit(event, payload);
+            const pending: unknown = ctx.eventSource.emit(event, payload);
+            // NOT awaited — a slow subscriber must not stall an edit — but the
+            // rejection IS handled. Discarding it with `void` produced an
+            // unhandled promise rejection, which is not "contained" in any
+            // useful sense: it surfaces as a console error and can trip the
+            // host's error reporting.
+            if (pending instanceof Promise) {
+                pending.catch((error: unknown) => {
+                    debugLog(`hook ${event} subscriber rejected: ${String(error)}`);
+                });
+            }
         } catch (error) {
             debugLog(`hook ${event} failed: ${String(error)}`);
         }

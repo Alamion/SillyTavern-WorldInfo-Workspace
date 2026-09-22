@@ -57,6 +57,45 @@ vendored app source in `context/SillyTavern/`.
 All four gates (`typecheck`, `lint`, `test`, `build`) MUST pass before any commit
 (constitution III/IV/V/VI).
 
+## Maintenance changes (constitution 1.3.0)
+
+Not every change needs a spec. A change may take the **maintenance path** only if it adds
+**no new user capability** and alters **no delivered contract**:
+
+| Delivered contract | Defined in |
+| ------------------ | ---------- |
+| Persistence schema (`extensionSettings['WorldInfoWorkspace']`, v1) | `specs/003-core-workspace-mvp/contracts/persistence-schema.md` |
+| Markdown convention | `specs/004-markdown-folder-sync/contracts/markdown-convention.md` |
+| Assistant protocol | `specs/005-ai-lore-assistant/contracts/assistant-protocol.md` |
+| Native WI sync semantics | spec 003 + this file |
+| Hook names and payloads | `specs/006-hardening-interop/contracts/hooks.md`, `docs/hooks.md` |
+
+Anything touching those goes to a spec — always, not usually. When it is genuinely
+unclear, it goes to a spec: an unnecessary spec costs time, a wrongly skipped one costs a
+broken contract. A label fix, a drag-drop edge case, a preview rendering bug, a perf fix
+are maintenance. A new hook field, a new action, changed retry behaviour are not.
+
+**Report template** (in conversation, several at once is fine):
+
+```
+**Did:**       <what you did, enough to reproduce>
+**Expected:**  <what should have happened>
+**Actual:**    <what happened>
+**Area:**      <tree | editor | sync | markdown | assistant | lorebooks | other>
+```
+
+**Triage** gives exactly one outcome: fix now, route to a spec (naming the contract it
+touches), or defer to `specs/006-hardening-interop/backlog.md`.
+
+**Records**: every user-visible change gets one line in `CHANGELOG.md` under its release.
+A change that embeds a non-obvious decision also gets a short rationale note (decision,
+why, what was rejected). A change without such a decision gets none — that is what keeps
+the common case to a single line.
+
+**Always**: a regression test where the behaviour is testable, documentation updated in
+the SAME change as the behaviour it describes, and all four gates green before commit.
+The maintenance path shortens documentation, never verification.
+
 ## Constitution
 
 `.specify/memory/constitution.md` — principles I–IX:
@@ -83,7 +122,9 @@ needs them.
 src/
 ├── core/                # Pure logic (Vitest-first, no app imports)
 │   ├── state/           # schema.ts (WorkspaceState v1 + migrate), store.ts, layout.ts
-│   │                    #   (saved region sizes, repaired field by field)
+│   │                    #   (saved region sizes, repaired field by field),
+│   │                    #   sharing.ts (path-copy: a mutation copies only the
+│   │                    #   root→node spine), nodeIndex.ts (opt-in identity cache)
 │   ├── tree/            # operations.ts, browse.ts, validation.ts, imageLinks.ts (image
 │   │                    #   references in content: img:<id>, names, paths, ![[…]], URLs)
 │   ├── sync/            # flatten.ts, fingerprint.ts, divergence.ts, import.ts,
@@ -103,6 +144,8 @@ src/
 │   │                    #   rules.ts (destructive/duplicate/stale), plan.ts (order, blocked,
 │   │                    #   accept-all), undo.ts, failures.ts, settingsOps.ts, editReply.ts
 │   │                    #   (edit a message: re-parse, keep decisions/undo of kept blocks)
+│   ├── hooks/           # events.ts (wi-workspace:* names + payload types),
+│   │                    #   treeDiff.ts (previous→next diff, bookkeeping filtered out)
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
 │   ├── fieldSchema.ts   # Typed field schema + drawer layout (from Phase 0)
 │   ├── preview.ts       # Markdown renderer: CommonMark/GFM blocks + inline, Obsidian wikilinks/
@@ -135,6 +178,8 @@ src/
 │   ├── mdExport.ts / mdImport.ts  # One-off export / import runners
 │   ├── mdLink.ts            # Linked folder: pull, debounced auto-push, conflicts, reconnect
 │   ├── mdController.ts      # UI-facing markdown surface (busy, reports, decisions)
+│   ├── hooks.ts             # The one contained wi-workspace:* emitter (never awaited)
+│   ├── draftRegistry.ts     # Uncommitted field drafts + flush points
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
@@ -146,6 +191,9 @@ src/
 │   ├── BookList.tsx         # Shared book list: useBookFacts, search, filter chips, pager
 │   ├── NodeHeader.tsx       # Unified item header (icon, enable, name, duplicate/delete)
 │   ├── Sheet.tsx            # Mobile bottom sheet (reaches the drawer top, snap animation)
+│   ├── VirtualList.tsx      # Fixed-row windowing (inactive below 200 rows)
+│   ├── useDraftField.ts     # Local text draft + debounced commit; flushes on blur,
+│   │                        #   unmount, generation start and workspace close
 │   ├── Splitter.tsx         # usePointerResize + <Splitter>: DOM writes while dragging,
 │   │                        #   commit on release (tree/assistant/preview splitters, sheet)
 │   ├── layoutContext.ts     # Saved region sizes for nested components
@@ -187,6 +235,9 @@ tests/
 │                                #   discrepancy becomes a scenario here)
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
+docs/hooks.md   # Extension-author hook reference (public)
+README.md       # User-facing documentation
+CHANGELOG.md    # User-visible changes per release
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
 manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.11)
 ```
@@ -334,6 +385,28 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
 - **Hooks** (additive): `wi-workspace:assistant-applied` `{ conversationId, batchId,
   operations: [{ op, nodeId, name }], failed? }`, `wi-workspace:assistant-undone`
   `{ conversationId, batchId, reverted: string[], skipped: string[] }`.
+
+## Interop hooks (public surface)
+
+Complete list, payload types in `src/core/hooks/events.ts`, consumer docs in
+`docs/hooks.md`, contract in `specs/006-hardening-interop/contracts/hooks.md`:
+
+| Event | Fires when |
+| ----- | ---------- |
+| `wi-workspace:tree-changed` | A user-visible tree change (coalesced per microtask). NOT for bookkeeping: sync status, assigned uid, tombstones, expand state, settings |
+| `wi-workspace:book-pushed` | A native book push reaches a terminal state (`success`, `save-failed`, `conflict-blocked`, `validation-blocked`, `book-missing`) |
+| `wi-workspace:root-changed` | A folder's WI root designation changes (`designated`, `undesignated`, `book-renamed`, `book-deleted`, `imported`) |
+| `wi-workspace:workspace-shown` / `-hidden` | The workspace surface becomes visible / stops being visible (drawer and mode switch) |
+| `wi-workspace:md-link-changed`, `wi-workspace:md-synced` | Markdown link state and sync reports (spec 004) |
+| `wi-workspace:assistant-applied`, `wi-workspace:assistant-undone` | Assistant batches (spec 005) |
+
+Rules: emitted through `adapters/hooks.ts` only, NEVER awaited (a slow subscriber must not
+block an edit) and wrapped in try/catch; payloads carry identity, never content; tree
+events are derived from a store-level diff because `applyTreeChange` is **not** the
+universal funnel. Additive only — `docs/hooks.md` and `WI_EVENTS` are asserted to match.
+
+**Documentation moves with the code**: a change that alters what `README.md`,
+`docs/hooks.md` or this file states is not finished until those files state the new truth.
 
 ## SillyTavern Integration
 
