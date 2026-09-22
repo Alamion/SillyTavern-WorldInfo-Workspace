@@ -106,7 +106,7 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 - [X] T015 [P] [US1] Perf budget tests P-5…P-9 in `tests/perf/scale.bench.test.ts` (push, fingerprint memo, markdown render, reconcile, memory stability)
 - [X] T016 [P] [US1] Unit tests for draft-field flush semantics in `tests/unit/draft-field.test.ts`: commit on blur, commit on debounce, and **flush on demand** (generation start / panel close) with no lost text
 - [X] T017 [P] [US1] Unit tests for identity-keyed fingerprint memoization in `tests/unit/fingerprint.test.ts` (extend): unchanged entry hashes once, changed entry re-hashes
-- [ ] T018 [P] [US1] Unit tests for bucketed reconcile equivalence in `tests/unit/md-reconcile.test.ts` (extend): output identical to the pre-bucketing implementation on existing fixtures
+- [X] T018 [P] [US1] Unit tests for bucketed reconcile equivalence in `tests/unit/md-reconcile.test.ts` (extend): output identical to the pre-bucketing implementation on existing fixtures
 - [X] T019 [P] [US1] Unit tests for the image-name index in `tests/unit/image-links.test.ts` (extend): resolution results unchanged, no quadratic queue behaviour
 - [ ] T020 [P] [US1] (FR-004) Scale-invariance tests in `tests/integration/scale-invariance.test.ts`: sync/import/export/markdown round-trip output identical at 1000 entries vs the small fixture (SC-004)
 
@@ -141,10 +141,10 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 
 ### Implementation — markdown at scale
 
-- [ ] T041 [US1] Gate `renderWorkspace` on per-node identity and key the entry cache by node identity instead of `stableStringify` in `src/core/md/linkRender.ts` (line 71)
-- [ ] T042 [US1] Batch `crypto.subtle.digest` calls with a bounded pool (8–16) instead of sequential awaits in `src/core/md/linkRender.ts` (lines 68, 75, 85)
-- [ ] T043 [US1] Add bounded-concurrency reads and skip re-hashing files whose `(size, lastModified)` match the baseline in `src/core/md/scan.ts` (lines 98-150)
-- [ ] T044 [US1] Pre-bucket `disk` and `baseItems` into `Map`s to remove the two O(n²) matching passes in `src/core/md/reconcile.ts` (lines 134-180)
+- [X] T041 [US1] Gate `renderWorkspace` on per-node identity and key the entry cache by node identity instead of `stableStringify` in `src/core/md/linkRender.ts` (line 71)
+- [X] T042 [US1] Batch `crypto.subtle.digest` calls with a bounded pool (8–16) instead of sequential awaits in `src/core/md/linkRender.ts` (lines 68, 75, 85)
+- [X] T043 [US1] Add bounded-concurrency reads and skip re-hashing files whose `(size, lastModified)` match the baseline in `src/core/md/scan.ts` (lines 98-150)
+- [X] T044 [US1] Pre-bucket `disk` and `baseItems` into `Map`s to remove the two O(n²) matching passes in `src/core/md/reconcile.ts` (lines 134-180)
 
 ### Implementation — long operations and lifecycle
 

@@ -1,7 +1,14 @@
 import { applyPull } from '../core/md/applyPull';
 import { bytesToDataUri } from '../core/md/dataUri';
 import { decodeText, textBytes } from '../core/md/hash';
-import { describeDisk, recordPath, renderWorkspace, type WorkspaceRender, type WsRenderItem } from '../core/md/linkRender';
+import {
+    describeDisk,
+    recordPath,
+    renderWorkspace,
+    type EntryRenderCache,
+    type WorkspaceRender,
+    type WsRenderItem,
+} from '../core/md/linkRender';
 import { EXT_MIME } from '../core/md/naming';
 import {
     DiskError,
@@ -111,7 +118,7 @@ export function createMdLink(deps: MdLinkDeps): MdLink {
     const debounceMs = deps.debounceMs ?? 1000;
     const listeners = new Set<() => void>();
     const imageHashCache = new Map<string, string | null>();
-    const entryCache = new Map<string, { text: string; hash: string }>();
+    const entryCache: EntryRenderCache = new WeakMap();
     /** State the last complete push rendered; unchanged state → nothing to do. */
     let lastPushedState: unknown = null;
     let link: StoredLink | null = null;

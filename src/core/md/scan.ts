@@ -95,45 +95,104 @@ export async function scanFolder(
     }
     const files = visible.filter((entry) => entry.kind === 'file');
     let done = 0;
-    for (const file of files) {
+
+    /**
+     * Read + digest concurrently, then APPLY IN THE ORIGINAL ORDER (spec 006 R8).
+     * Each file was previously read and hashed one after another — a full
+     * round-trip per file. Results are collected into fixed slots so the
+     * resulting entry/image/warning order is byte-for-byte what it was.
+     */
+    const loaded: Array<{ bytes: Uint8Array; hash: string } | { error: unknown } | null> =
+        files.map(() => null);
+    const READ_CONCURRENCY = 12;
+    let cursor = 0;
+    const readWorker = async (): Promise<void> => {
+        while (cursor < files.length) {
+            const at = cursor;
+            cursor += 1;
+            const file = files[at];
+            if (!file) {
+                continue;
+            }
+            const name = baseName(file.path);
+            const { ext } = splitName(name);
+            const wanted =
+                name === FOLDER_RECORD_NAME ||
+                ext.toLowerCase() === ENTRY_EXT ||
+                isImageFileName(name);
+            if (!wanted) {
+                continue;
+            }
+            try {
+                const bytes = await folder.readBytes(file.path);
+                loaded[at] = { bytes, hash: await options.digest(bytes) };
+            } catch (error) {
+                loaded[at] = { error };
+            }
+            done += 1;
+            options.onProgress?.(done, files.length);
+            if (options.yieldNow && done % YIELD_EVERY === 0) {
+                await options.yieldNow();
+            }
+        }
+    };
+    await Promise.all(
+        Array.from({ length: Math.min(READ_CONCURRENCY, files.length) }, readWorker)
+    );
+
+    for (let at = 0; at < files.length; at += 1) {
+        const file = files[at];
+        if (!file) {
+            continue;
+        }
+        const slot = loaded[at];
+        if (slot && 'error' in slot) {
+            const error = slot.error;
+            lines.push({
+                path: file.path,
+                outcome: 'skipped',
+                message:
+                    error instanceof DecodeError
+                        ? 'Unreadable: the file is not valid UTF-8 text.'
+                        : `Unreadable: ${error instanceof Error ? error.message : String(error)}`,
+            });
+            continue;
+        }
         const name = baseName(file.path);
         const dir = parentPath(file.path);
         const { stem, ext } = splitName(name);
         try {
-            if (name === FOLDER_RECORD_NAME) {
-                const bytes = await folder.readBytes(file.path);
-                const record = parseFolderRecord(decodeText(bytes), options.yaml);
+            if (!slot) {
+                lines.push({ path: file.path, outcome: 'skipped', message: 'Not a markdown or image file.' });
+            } else if (name === FOLDER_RECORD_NAME) {
+                const record = parseFolderRecord(decodeText(slot.bytes), options.yaml);
                 const target = folders.get(dir);
                 if (target) {
                     target.record = record;
-                    target.diskHash = await options.digest(bytes);
+                    target.diskHash = slot.hash;
                 }
                 record.warnings.forEach((message) => lines.push({ path: file.path, outcome: 'warning', message }));
             } else if (ext.toLowerCase() === ENTRY_EXT) {
-                const bytes = await folder.readBytes(file.path);
-                const model = parseEntryFile(decodeText(bytes), stem, options.yaml);
+                const model = parseEntryFile(decodeText(slot.bytes), stem, options.yaml);
                 entries.push({
                     kind: 'entry',
                     path: file.path,
                     parentPath: dir,
                     stem,
-                    diskHash: await options.digest(bytes),
+                    diskHash: slot.hash,
                     model,
                 });
                 model.warnings.forEach((message) => lines.push({ path: file.path, outcome: 'warning', message }));
-            } else if (isImageFileName(name)) {
-                const bytes = await folder.readBytes(file.path);
+            } else {
                 images.push({
                     kind: 'image',
                     path: file.path,
                     parentPath: dir,
                     fileName: name,
                     ext: ext.toLowerCase(),
-                    diskHash: await options.digest(bytes),
-                    bytes,
+                    diskHash: slot.hash,
+                    bytes: slot.bytes,
                 });
-            } else {
-                lines.push({ path: file.path, outcome: 'skipped', message: 'Not a markdown or image file.' });
             }
         } catch (error) {
             const message =
@@ -141,11 +200,6 @@ export async function scanFolder(
                     ? 'Unreadable: the file is not valid UTF-8 text.'
                     : `Unreadable: ${error instanceof Error ? error.message : String(error)}`;
             lines.push({ path: file.path, outcome: 'skipped', message });
-        }
-        done += 1;
-        options.onProgress?.(done, files.length);
-        if (options.yieldNow && done % YIELD_EVERY === 0) {
-            await options.yieldNow();
         }
     }
     return { folders, entries, images, lines };

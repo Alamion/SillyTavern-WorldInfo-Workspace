@@ -130,16 +130,34 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
         }
     }
 
+    // Pre-bucketed lookups (spec 006 R8). Passes 3 and 4 used to re-scan every
+    // baseline item and re-materialize the whole disk map for EVERY unmatched
+    // item, which is quadratic on a large vault.
+    const baseByParent = new Map<string, typeof baseItems>();
+    for (const item of baseItems) {
+        if (item.path === null) {
+            continue;
+        }
+        const parent = parentPath(item.path);
+        const bucket = baseByParent.get(parent);
+        if (bucket) {
+            bucket.push(item);
+        } else {
+            baseByParent.set(parent, [item]);
+        }
+    }
+    const diskFolders = [...disk.values()].filter((item) => item.kind === 'folder');
+
     // 3. Folder moves: a missing directory whose record or direct children reappear elsewhere.
     for (const base of baseItems) {
         if (base.kind !== 'folder' || base.path === null || base.id === rootId || matches.has(base.id)) {
             continue;
         }
-        const childNames = baseItems
-            .filter((item) => item.path !== null && item.path !== base.path && parentPath(item.path) === base.path)
+        const childNames = (baseByParent.get(base.path) ?? [])
+            .filter((item) => item.path !== null && item.path !== base.path)
             .map((item) => baseName(item.path!));
-        const candidates = [...disk.values()].filter((item) => {
-            if (item.kind !== 'folder' || matchedPaths.has(item.path) || item.path === '') {
+        const candidates = diskFolders.filter((item) => {
+            if (matchedPaths.has(item.path) || item.path === '') {
                 return false;
             }
             if (base.diskHash !== NO_RECORD && item.hash === base.diskHash) {
@@ -169,12 +187,28 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
     const unmatchedBase = baseItems.filter(
         (base) => base.kind !== 'folder' && base.path !== null && !matches.has(base.id) && !disk.has(base.path)
     );
+    const kindHash = (kind: string, hash: string): string => `${kind}\u0000${hash}`;
+    const diskByKindHash = new Map<string, DiskItem[]>();
+    for (const item of disk.values()) {
+        const key = kindHash(item.kind, item.hash);
+        const bucket = diskByKindHash.get(key);
+        if (bucket) {
+            bucket.push(item);
+        } else {
+            diskByKindHash.set(key, [item]);
+        }
+    }
+    const rivalCount = new Map<string, number>();
     for (const base of unmatchedBase) {
-        const candidates = [...disk.values()].filter(
-            (item) => item.kind === base.kind && !matchedPaths.has(item.path) && item.hash === base.diskHash
+        const key = kindHash(base.kind, base.diskHash);
+        rivalCount.set(key, (rivalCount.get(key) ?? 0) + 1);
+    }
+    for (const base of unmatchedBase) {
+        const key = kindHash(base.kind, base.diskHash);
+        const candidates = (diskByKindHash.get(key) ?? []).filter(
+            (item) => !matchedPaths.has(item.path)
         );
-        const rivals = unmatchedBase.filter((other) => other.kind === base.kind && other.diskHash === base.diskHash);
-        if (candidates.length === 1 && rivals.length === 1) {
+        if (candidates.length === 1 && (rivalCount.get(key) ?? 0) === 1) {
             match(base.id, candidates[0]!.path, 'content-move');
         }
     }

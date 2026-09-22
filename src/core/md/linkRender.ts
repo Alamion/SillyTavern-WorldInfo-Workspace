@@ -2,7 +2,6 @@ import { buildNodeIndex, createEntryNode, type TreeNode, type WorkspaceState } f
 import { renderEntryFile } from './convention';
 import { planFolderTree } from './exportPlan';
 import { hashText } from './hash';
-import { stableStringify } from '../sync/fingerprint';
 import { FOLDER_RECORD_NAME, splitName } from './naming';
 import { baseName, type BaselineItem, type Digest, type MdItemKind, type RelPath, type YamlCodec } from './ports';
 import { NO_RECORD, type DiskItem, type WsItem } from './reconcile';
@@ -38,14 +37,48 @@ export function baselinePaths(baseline: Readonly<Record<string, BaselineItem>>):
     return paths;
 }
 
+/**
+ * Memo of entry renderings, keyed by the entry NODE (spec 006 R8).
+ *
+ * The key used to be `stableStringify([stem, name, native, md])` — a full
+ * serialization of every entry just to look one up, so the cache cost what it
+ * saved. Structural sharing keeps unedited entries reference-identical, so the
+ * node itself is a correct key: an edit produces a new node and misses. A
+ * WeakMap needs no size cap, since entries die with their state version.
+ */
+export type EntryRenderCache = WeakMap<TreeNode, { stem: string; text: string; hash: string }>;
+
+/** Runs `task` over `items` with at most `limit` in flight. */
+async function mapWithConcurrency<T>(
+    items: readonly T[],
+    limit: number,
+    task: (item: T) => Promise<void>
+): Promise<void> {
+    let next = 0;
+    const workers: Promise<void>[] = [];
+    const run = async (): Promise<void> => {
+        while (next < items.length) {
+            const item = items[next];
+            next += 1;
+            if (item !== undefined) {
+                await task(item);
+            }
+        }
+    };
+    for (let index = 0; index < Math.min(limit, items.length); index += 1) {
+        workers.push(run());
+    }
+    await Promise.all(workers);
+}
+
 export async function renderWorkspace(input: {
     state: WorkspaceState;
     baseline: Readonly<Record<string, BaselineItem>>;
     yaml: YamlCodec;
     digest: Digest;
     imageHash: ImageBytesHash;
-    /** Memo of entry renderings keyed by their inputs (auto-push renders on every pause). */
-    entryCache?: Map<string, { text: string; hash: string }>;
+    /** Memo of entry renderings (auto-push renders on every typing pause). */
+    entryCache?: EntryRenderCache;
 }): Promise<WorkspaceRender> {
     const { state } = input;
     const plan = planFolderTree(state.root, '', true, input.yaml, baselinePaths(input.baseline));
@@ -57,35 +90,39 @@ export async function renderWorkspace(input: {
             recordByFolder.set(file.nodeId, file.text);
         }
     }
-    for (const [id, path] of plan.paths) {
+    // Hashing is a WebCrypto round-trip per item; doing them one after another
+    // meant up to 2000 sequential awaits per push (spec 006 R8).
+    await mapWithConcurrency([...plan.paths], 12, async ([id, path]) => {
         const node = index.get(id);
         if (!node) {
-            continue;
+            return;
         }
         const base = { id, kind: node.kind as MdItemKind, path, parentId: node.parentId, name: node.name };
         if (node.kind === 'folder') {
             const text = recordByFolder.get(id) ?? null;
-            items.set(id, { ...base, text, hash: text === null ? NO_RECORD : await hashText(text, input.digest) });
-        } else if (node.kind === 'entry') {
-            const stem = splitName(baseName(path)).stem;
-            const key = input.entryCache ? stableStringify([stem, node.name, node.native, node.md ?? null]) : '';
-            let cached = input.entryCache?.get(key);
-            if (!cached) {
-                const text = renderEntryFile(node, stem, input.yaml);
-                cached = { text, hash: await hashText(text, input.digest) };
-                if (input.entryCache) {
-                    if (input.entryCache.size > 5000) {
-                        input.entryCache.clear();
-                    }
-                    input.entryCache.set(key, cached);
-                }
-            }
-            items.set(id, { ...base, text: cached.text, hash: cached.hash });
-        } else {
-            const hash = await input.imageHash(node.src);
-            items.set(id, { ...base, text: null, src: node.src, hash: hash ?? `unresolved:${node.src}` });
+            items.set(id, {
+                ...base,
+                text,
+                hash: text === null ? NO_RECORD : await hashText(text, input.digest),
+            });
+            return;
         }
-    }
+        if (node.kind === 'entry') {
+            const stem = splitName(baseName(path)).stem;
+            const cached = input.entryCache?.get(node);
+            if (cached && cached.stem === stem) {
+                items.set(id, { ...base, text: cached.text, hash: cached.hash });
+                return;
+            }
+            const text = renderEntryFile(node, stem, input.yaml);
+            const fresh = { stem, text, hash: await hashText(text, input.digest) };
+            input.entryCache?.set(node, fresh);
+            items.set(id, { ...base, text: fresh.text, hash: fresh.hash });
+            return;
+        }
+        const hash = await input.imageHash(node.src);
+        items.set(id, { ...base, text: null, src: node.src, hash: hash ?? `unresolved:${node.src}` });
+    });
     return { items, urlOnlyImageIds: plan.urlOnlyImageIds };
 }
 
