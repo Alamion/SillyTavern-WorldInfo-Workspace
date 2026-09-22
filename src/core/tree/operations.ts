@@ -7,12 +7,23 @@ import {
     type TreeNode,
     type WorkspaceState,
 } from '../state/schema';
+import {
+    copyNode,
+    withNodeCopied,
+    withNodeDetached,
+    withNodesCopied,
+} from '../state/sharing';
 
 /**
  * Pure tree mutations (US1, FR-002..FR-006, FR-011). Every function takes a state
  * and returns a NEW state (immutable update, never in-place) or `null` when the
- * operation is rejected. The store clones before running these; UI layers then
- * mark the sync engine dirty.
+ * operation is rejected. UI layers then mark the sync engine dirty.
+ *
+ * These used to `structuredClone` the ENTIRE workspace per call (spec 006 R1) —
+ * 48.5 ms for one field commit on the 1000-entry dataset, paid per keystroke.
+ * They now path-copy: only the root→target spine is copied, every other subtree
+ * keeps its object identity. Callers must therefore never mutate a node they did
+ * not obtain from a copy helper, or they would write into the previous state.
  */
 
 export type CreateKind = 'folder' | 'entry' | 'image';
@@ -29,24 +40,17 @@ export function resetPlaceholderUidSeed(seed: number): void {
     nativeUidSeed = seed;
 }
 
-function clone(state: WorkspaceState): WorkspaceState {
-    return structuredClone(state);
-}
-
-function detachFromParent(state: WorkspaceState, nodeId: string): TreeNode | null {
-    let detached: TreeNode | null = null;
-    const walk = (folder: WorkspaceState['root']): boolean => {
-        const at = folder.children.findIndex((child) => child.id === nodeId);
-        if (at >= 0) {
-            detached = folder.children.splice(at, 1)[0] ?? null;
-            return true;
-        }
-        return folder.children.some((child) => child.kind === 'folder' && walk(child));
-    };
-    if (!walk(state.root)) {
+/** Detaches `nodeId`, returning a writable copy of it ready to be re-attached. */
+function detach(
+    state: WorkspaceState,
+    nodeId: string
+): { state: WorkspaceState; node: TreeNode } | null {
+    const removed = withNodeDetached(state, nodeId);
+    if (!removed) {
         return null;
     }
-    return detached;
+    // The detached node still belongs to the previous state; copy before writing.
+    return { state: removed.state, node: copyNode(removed.detached) };
 }
 
 export function createChild(
@@ -61,15 +65,11 @@ export function createChild(
     if (trimmed === '') {
         return null;
     }
-    const parent = findNode(state, parentId);
-    if (parent?.kind !== 'folder') {
+    const copied = withNodeCopied(state, parentId);
+    if (!copied || copied.node.kind !== 'folder') {
         return null;
     }
-    const next = clone(state);
-    const target = findNode(next, parentId);
-    if (target?.kind !== 'folder') {
-        return null;
-    }
+    const target = copied.node;
     const now = new Date().toISOString();
     const id = newId();
     const node =
@@ -86,7 +86,7 @@ export function createChild(
               : createImageNode({ id, parentId, name: trimmed, now });
     target.children.push(node);
     target.expanded = true;
-    return next;
+    return copied.state;
 }
 
 export function renameNode(
@@ -98,20 +98,20 @@ export function renameNode(
     if (trimmed === '') {
         return null;
     }
-    if (!findNode(state, nodeId) || nodeId === state.root.id) {
+    if (nodeId === state.root.id) {
         return null;
     }
-    const next = clone(state);
-    const node = findNode(next, nodeId);
-    if (!node) {
+    const copied = withNodeCopied(state, nodeId);
+    if (!copied) {
         return null;
     }
+    const node = copied.node;
     node.name = trimmed;
     node.updatedAt = new Date().toISOString();
     if (node.kind === 'entry') {
         node.native.comment = trimmed;
     }
-    return next;
+    return copied.state;
 }
 
 export function moveNode(
@@ -144,20 +144,24 @@ export function moveNode(
             return null;
         }
     }
-    const next = clone(state);
-    const detached = detachFromParent(next, nodeId);
-    if (!detached) {
+    const removed = detach(state, nodeId);
+    if (!removed) {
         return null;
     }
-    const targetParent = findNode(next, newParentId);
-    if (targetParent?.kind !== 'folder') {
+    const copied = withNodeCopied(removed.state, newParentId);
+    if (!copied || copied.node.kind !== 'folder') {
         return null;
     }
-    detached.parentId = newParentId;
-    detached.updatedAt = new Date().toISOString();
-    const at = Math.min(Math.max(indexInParent ?? targetParent.children.length, 0), targetParent.children.length);
-    targetParent.children.splice(at, 0, detached);
-    return next;
+    const targetParent = copied.node;
+    const moved = removed.node;
+    moved.parentId = newParentId;
+    moved.updatedAt = new Date().toISOString();
+    const at = Math.min(
+        Math.max(indexInParent ?? targetParent.children.length, 0),
+        targetParent.children.length
+    );
+    targetParent.children.splice(at, 0, moved);
+    return copied.state;
 }
 
 export function reorderChild(
@@ -166,35 +170,37 @@ export function reorderChild(
     fromIndex: number,
     toIndex: number
 ): WorkspaceState {
-    const next = clone(state);
-    const parent = findNode(next, parentId);
-    if (parent?.kind !== 'folder' || parent.children.length === 0) {
-        return next;
+    const copied = withNodeCopied(state, parentId);
+    if (!copied || copied.node.kind !== 'folder' || copied.node.children.length === 0) {
+        return state;
     }
-    const children = parent.children;
+    const children = copied.node.children;
     const from = Math.min(Math.max(fromIndex, 0), children.length - 1);
     const to = Math.min(Math.max(toIndex, 0), children.length - 1);
     const moved = children.splice(from, 1)[0];
     if (moved) {
         children.splice(to, 0, moved);
     }
-    return next;
+    return copied.state;
 }
 
 export function deleteSubtree(state: WorkspaceState, nodeId: string): WorkspaceState {
     if (nodeId === state.root.id) {
         return state;
     }
-    const next = clone(state);
-    detachFromParent(next, nodeId);
-    return next;
+    const removed = withNodeDetached(state, nodeId);
+    return removed ? removed.state : state;
 }
 
 export function bulkDeleteNodes(state: WorkspaceState, nodeIds: readonly string[]): WorkspaceState {
     let next = state;
     for (const id of nodeIds) {
-        if (id !== next.root.id && findNode(next, id)) {
-            next = deleteSubtree(next, id);
+        if (id === next.root.id) {
+            continue;
+        }
+        const removed = withNodeDetached(next, id);
+        if (removed) {
+            next = removed.state;
         }
     }
     return next;
@@ -238,22 +244,32 @@ export function bulkMoveNodes(
         return null;
     }
 
-    const next = clone(state);
     const now = new Date().toISOString();
-    const block = blockIds
-        .map((id) => detachFromParent(next, id))
-        .filter((node): node is TreeNode => node !== null);
-    const target = findNode(next, targetParentId);
-    if (target?.kind !== 'folder') {
+    let working = state;
+    const block: TreeNode[] = [];
+    for (const id of blockIds) {
+        const removed = detach(working, id);
+        if (!removed) {
+            continue;
+        }
+        working = removed.state;
+        block.push(removed.node);
+    }
+    const copied = withNodeCopied(working, targetParentId);
+    if (!copied || copied.node.kind !== 'folder') {
         return null;
     }
+    const target = copied.node;
     for (const node of block) {
         node.parentId = targetParentId;
         node.updatedAt = now;
     }
-    const at = Math.min(Math.max(indexInParent ?? target.children.length, 0), target.children.length);
+    const at = Math.min(
+        Math.max(indexInParent ?? target.children.length, 0),
+        target.children.length
+    );
     target.children.splice(at, 0, ...block);
-    return next;
+    return copied.state;
 }
 
 export function bulkSetDisable(
@@ -261,17 +277,21 @@ export function bulkSetDisable(
     nodeIds: readonly string[],
     disabled: boolean
 ): WorkspaceState {
-    const next = clone(state);
     const now = new Date().toISOString();
-    for (const id of nodeIds) {
-        const node = findNode(next, id);
-        if (node?.kind === 'entry' && node.native.disable !== disabled) {
-            node.native.disable = disabled;
-            node.updatedAt = now;
-            markEntryBooksDirty(node);
+    // Only ids that actually change are path-copied: an unchanged entry must keep
+    // its identity so downstream memoization stays valid.
+    const changing = nodeIds.filter((id) => {
+        const node = findNode(state, id);
+        return node?.kind === 'entry' && node.native.disable !== disabled;
+    });
+    return withNodesCopied(state, changing, (node) => {
+        if (node.kind !== 'entry') {
+            return;
         }
-    }
-    return next;
+        node.native.disable = disabled;
+        node.updatedAt = now;
+        markEntryBooksDirty(node);
+    });
 }
 
 /** Every book copy of the entry must be re-pushed (the engine pushes dirty books). */
@@ -290,18 +310,18 @@ export function commitEntryField(
     name: string,
     value: unknown
 ): WorkspaceState {
-    const next = clone(state);
-    const node = findNode(next, entryId);
-    if (node?.kind !== 'entry') {
-        return next;
+    const copied = withNodeCopied(state, entryId);
+    if (!copied || copied.node.kind !== 'entry') {
+        return state;
     }
+    const node = copied.node;
     (node.native as unknown as Record<string, unknown>)[name] = value;
     node.updatedAt = new Date().toISOString();
     if (name === 'comment') {
         node.name = String(value ?? '');
     }
     markEntryBooksDirty(node);
-    return next;
+    return copied.state;
 }
 
 export function commitImage(
@@ -309,11 +329,11 @@ export function commitImage(
     imageId: string,
     patch: { src?: string; caption?: string }
 ): WorkspaceState {
-    const next = clone(state);
-    const node = findNode(next, imageId);
-    if (node?.kind !== 'image') {
-        return next;
+    const copied = withNodeCopied(state, imageId);
+    if (!copied || copied.node.kind !== 'image') {
+        return state;
     }
+    const node = copied.node;
     if (patch.src !== undefined) {
         node.src = patch.src;
     }
@@ -321,7 +341,7 @@ export function commitImage(
         node.caption = patch.caption;
     }
     node.updatedAt = new Date().toISOString();
-    return next;
+    return copied.state;
 }
 
 /**
@@ -359,16 +379,18 @@ export function insertSubtree(
     if (incoming.some((id) => existing.has(id))) {
         return null;
     }
-    const next = clone(state);
-    const target = findNode(next, parentId);
-    if (target?.kind !== 'folder') {
+    const copied = withNodeCopied(state, parentId);
+    if (!copied || copied.node.kind !== 'folder') {
         return null;
     }
+    const target = copied.node;
+    // The incoming subtree comes from outside this state (an undo record), so it
+    // is cloned rather than shared.
     const node = structuredClone(subtree);
     node.parentId = parentId;
     const at = Math.min(Math.max(index, 0), target.children.length);
     target.children.splice(at, 0, node);
-    return next;
+    return copied.state;
 }
 
 export function setExpanded(
@@ -376,10 +398,14 @@ export function setExpanded(
     folderId: string,
     expanded: boolean
 ): WorkspaceState {
-    const next = clone(state);
-    const folder = findNode(next, folderId);
-    if (folder?.kind === 'folder') {
-        folder.expanded = expanded;
+    const existing = findNode(state, folderId);
+    if (existing?.kind !== 'folder' || existing.expanded === expanded) {
+        return state;
     }
-    return next;
+    const copied = withNodeCopied(state, folderId);
+    if (!copied || copied.node.kind !== 'folder') {
+        return state;
+    }
+    copied.node.expanded = expanded;
+    return copied.state;
 }

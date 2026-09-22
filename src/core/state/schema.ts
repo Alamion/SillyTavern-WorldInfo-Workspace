@@ -10,6 +10,7 @@ import {
     type ContextSettings,
 } from '../assistant/types';
 import { fingerprintEntry } from '../sync/fingerprint';
+import { buildNodeIndex } from './nodeIndex';
 
 /**
  * Persisted workspace schema (v1) — shape contract in
@@ -424,18 +425,18 @@ export function createImageNode(input: {
     };
 }
 
-export function buildNodeIndex(root: TreeNode): Map<string, TreeNode> {
-    const index = new Map<string, TreeNode>();
-    const walk = (node: TreeNode): void => {
-        index.set(node.id, node);
-        if (node.kind === 'folder') {
-            node.children.forEach(walk);
-        }
-    };
-    walk(root);
-    return index;
-}
+export { buildNodeIndex };
 
+/**
+ * Resolves a node by id with a fresh walk.
+ *
+ * Deliberately NOT backed by the identity-keyed cache in `nodeIndex.ts`: several
+ * call sites (notably `core/md/applyPull.ts`) mutate a state's tree IN PLACE and
+ * then look ids up on that same object, where a root-keyed cache would serve a
+ * stale index — a node added during the pass would not be found and its change
+ * would be silently skipped. Callers that know their state is immutable during a
+ * hot loop opt into `getNodeIndex` explicitly instead.
+ */
 export function findNode(state: WorkspaceState, nodeId: string): TreeNode | undefined {
     if (nodeId === state.root.id) {
         return state.root;

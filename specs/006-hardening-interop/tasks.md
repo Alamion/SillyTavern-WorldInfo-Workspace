@@ -74,19 +74,19 @@ existing suite is green.
 
 ### Tests (write first, must fail)
 
-- [ ] T005 [P] Unit tests for path-copy structural sharing in `tests/unit/state-sharing.test.ts`: changed spine is fresh, every untouched sibling subtree is reference-identical, no shared mutable state between published versions
-- [ ] T006 [P] Unit tests for the node index cache in `tests/unit/node-index.test.ts`: warm-cache lookup, cache miss on a new root object, no stale entries after mutation
+- [X] T005 [P] Unit tests for path-copy structural sharing in `tests/unit/state-sharing.test.ts`: changed spine is fresh, every untouched sibling subtree is reference-identical, no shared mutable state between published versions
+- [X] T006 [P] Unit tests for the node index cache in `tests/unit/node-index.test.ts`: warm-cache lookup, cache miss on a new root object, no stale entries after mutation
 
 ### Implementation
 
-- [ ] T007 [P] Implement identity-keyed node index in `src/core/state/nodeIndex.ts` (`WeakMap<FolderNode, Map<string, TreeNode>>`)
-- [ ] T008 Implement `updateNodePath(state, id, fn)` path-copy helper in `src/core/state/sharing.ts`
-- [ ] T009 Rewrite `findNode` to use the cached index and accept an optional pre-built index in `src/core/state/schema.ts` (replaces the per-call `buildNodeIndex` at lines 439-444)
-- [ ] T010 Replace `structuredClone(this.state)` with structural sharing in `WorkspaceStore.update` in `src/core/state/store.ts` (line 39), preserving the documented recipe contract
-- [ ] T011 Replace `clone(state)` with path-copy in every operation in `src/core/tree/operations.ts` (lines 32-34 and all call sites incl. `setExpanded`, which currently clones the whole state to flip one boolean)
-- [ ] T012 Rewrite `bulkDeleteNodes` and `bulkSetDisable` in `src/core/tree/operations.ts` to do one path-copy pass and one shared index instead of clone-plus-`findNode` per id (currently O(k·n))
-- [ ] T013 Run the full existing suite (57 files, incl. the real-engine scenarios A–W in `tests/integration/sync-engine.test.ts`) and fix every regression — no behavioural change is intended
-- [ ] T014 Re-measure P-1…P-4 in `tests/perf/scale.bench.test.ts` and assert the budgets
+- [X] T007 [P] Implement identity-keyed node index in `src/core/state/nodeIndex.ts` (`WeakMap<FolderNode, Map<string, TreeNode>>`)
+- [X] T008 Implement `updateNodePath(state, id, fn)` path-copy helper in `src/core/state/sharing.ts`
+- [X] T009 Rewrite `findNode` to use the cached index and accept an optional pre-built index in `src/core/state/schema.ts` (replaces the per-call `buildNodeIndex` at lines 439-444)
+- [X] T010 Replace `structuredClone(this.state)` with structural sharing in `WorkspaceStore.update` in `src/core/state/store.ts` (line 39), preserving the documented recipe contract
+- [X] T011 Replace `clone(state)` with path-copy in every operation in `src/core/tree/operations.ts` (lines 32-34 and all call sites incl. `setExpanded`, which currently clones the whole state to flip one boolean)
+- [X] T012 Rewrite `bulkDeleteNodes` and `bulkSetDisable` in `src/core/tree/operations.ts` to do one path-copy pass and one shared index instead of clone-plus-`findNode` per id (currently O(k·n))
+- [X] T013 Run the full existing suite (57 files, incl. the real-engine scenarios A–W in `tests/integration/sync-engine.test.ts`) and fix every regression — no behavioural change is intended
+- [X] T014 Re-measure P-1…P-4 in `tests/perf/scale.bench.test.ts` and assert the budgets
 
 **Checkpoint**: Mutations no longer clone the workspace; unchanged subtrees keep identity.
 The image-GC early-out in `src/core/md/imageRefs.ts` is live again (verify it now hits).

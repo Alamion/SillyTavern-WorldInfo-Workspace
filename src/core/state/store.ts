@@ -1,4 +1,5 @@
-import type { WorkspaceState } from './schema';
+import type { TreeNode, WorkspaceState } from './schema';
+import { withNodeCopied } from './sharing';
 
 /**
  * Framework-free observable store holding the immutable WorkspaceState.
@@ -34,6 +35,13 @@ export class WorkspaceStore {
     /**
      * Applies the recipe to a clone and publishes it. Recipes must not capture
      * the draft beyond the call (the draft becomes the new state by reference).
+     *
+     * This still deep-clones, and deliberately so: the recipe is opaque, so there
+     * is no way to know which nodes it will touch, and a shared draft would let a
+     * recipe write into the previous state. It is NOT on the typing path — edits
+     * go through the pure operations in `core/tree/operations.ts` and `replace`,
+     * which path-copy (spec 006 R1). Callers that mutate exactly one known node
+     * should prefer `updateNode`.
      */
     update(recipe: (draft: WorkspaceState) => void): WorkspaceState {
         const draft = structuredClone(this.state);
@@ -41,6 +49,21 @@ export class WorkspaceStore {
         this.state = draft;
         this.notify();
         return this.state;
+    }
+
+    /**
+     * Mutates ONE node by id, copying only the root→node spine and leaving every
+     * other subtree reference-identical. Returns false when the node is gone.
+     */
+    updateNode(nodeId: string, mutate: (node: TreeNode) => void): boolean {
+        const copied = withNodeCopied(this.state, nodeId);
+        if (!copied) {
+            return false;
+        }
+        mutate(copied.node);
+        this.state = copied.state;
+        this.notify();
+        return true;
     }
 
     /** Publishes an already-immutable state (result of pure tree operations). */

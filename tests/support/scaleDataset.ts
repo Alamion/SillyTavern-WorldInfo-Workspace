@@ -71,7 +71,7 @@ function makeText(rand: () => number, chars: number): string {
     const parts: string[] = [];
     let length = 0;
     while (length < chars) {
-        const word = WORDS[Math.floor(rand() * WORDS.length)];
+        const word = WORDS[Math.floor(rand() * WORDS.length)] ?? 'lore';
         parts.push(word);
         length += word.length + 1;
         if (parts.length % 12 === 0) {
@@ -151,7 +151,7 @@ export function buildScaleDataset(options: ScaleDatasetOptions = {}): ScaleDatas
             });
             entry.native.content = makeText(rand, config.contentChars);
             entry.native.key = [
-                WORDS[Math.floor(rand() * WORDS.length)],
+                WORDS[Math.floor(rand() * WORDS.length)] ?? 'lore',
                 `${label.toLowerCase()}-${index}`,
             ];
             entry.sync.books[bookName] = { uid: index, hash: null, status: 'dirty' };
@@ -204,6 +204,15 @@ export function buildScaleDataset(options: ScaleDatasetOptions = {}): ScaleDatas
     }
 
     return { state, primaryBookName, secondaryBookName, primaryEntryIds, nodeCount };
+}
+
+/** Reads an id at a position, failing loudly instead of yielding undefined. */
+export function idAt(ids: readonly string[], index: number): string {
+    const id = ids[index];
+    if (id === undefined) {
+        throw new Error(`no id at index ${index}`);
+    }
+    return id;
 }
 
 /** Collects every node of a state (test helper for assertions over the whole tree). */
