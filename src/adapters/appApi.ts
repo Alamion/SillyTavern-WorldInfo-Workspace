@@ -36,3 +36,19 @@ export function getAppContext(): SillyTavernContext {
     }
     return cached;
 }
+/**
+ * Whether Enter sends in a text input, as in the app's chat: the user's "Send on
+ * Enter" setting, whose Auto mode never sends on phones and tablets — Enter is
+ * their only way to start a new line (owner request 2026-09-22).
+ */
+export function sendsOnEnter(): boolean {
+    try {
+        const decide = getAppContext().shouldSendOnEnter;
+        if (typeof decide === 'function') {
+            return decide();
+        }
+    } catch {
+        // no app context: fall through to the pointer check
+    }
+    return !(typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches);
+}

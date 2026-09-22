@@ -75,6 +75,16 @@ prepared by the owner for development and validation.
   the latest user turn inside a `<workspace>` block, as data the user shares; the system
   message carries only instructions and protocol. Models (DeepSeek via OpenRouter) treated
   a separate system message as hidden rules and claimed no lore had been shown.
+- Q: (owner review 2026-09-22, after own testing) How do the input and the message tools
+  behave like the app's chat? → A: Enter follows the app's "Send on Enter" setting — on
+  phones Enter is the newline key and only the Send button sends. When the conversation
+  ends with a user message (the replies below it were deleted), Send with an empty input
+  asks for a reply to it without adding anything. Every message gets an edit tool next to
+  fork and delete: a user message is edited as text; an assistant reply is edited as its
+  raw text — prose AND operation blocks, never the thinking — and saving re-parses it
+  without losing decisions or undo: unchanged blocks keep their proposals, changed or new
+  blocks become fresh proposals, and applied changes whose block was removed stay listed
+  and undoable.
 - Q: Which edits, besides deletions, need their own confirmation? → A: Edits that remove
   more than half of an entry's content, or remove any of its keywords; all other edits
   apply through the batch-level accept.
@@ -383,6 +393,18 @@ proposals are produced.
   which the user can switch between (versions of the last reply only); the user MUST be
   able to delete any single message and to fork the conversation at any message
   (clarification 2026-09-16).
+- **FR-004a**: The message input MUST follow the app's "Send on Enter" setting (on phones
+  and tablets Enter inserts a newline; only the Send button sends). When the last message
+  of the conversation is the user's, sending an empty input MUST request a reply to that
+  message without adding a new one (clarification 2026-09-22).
+- **FR-004b**: The user MUST be able to edit any user or assistant message in place.
+  Assistant replies are edited as raw text including operation blocks and excluding the
+  thinking; saving MUST re-derive the reply's prose and proposals while keeping the
+  decisions of unchanged blocks and every applied change's undo record (clarification
+  2026-09-22).
+- **FR-004c**: The assistant context chosen last (structure, entry contents, chat sources)
+  MUST be remembered in the assistant settings and used by new conversations, so it does
+  not reset to the built-in default (owner request 2026-09-22).
 - **FR-005**: Replies MUST be able to reference existing tree items; a reference opens the
   item in the editor, and a reference to a missing item says so.
 

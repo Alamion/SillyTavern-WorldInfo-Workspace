@@ -5,6 +5,7 @@ import { parseReply } from '../core/assistant/parser';
 import { acceptAllSelection, applyOrder, canApplyAgain, withBlocked } from '../core/assistant/plan';
 import { stalenessOf } from '../core/assistant/rules';
 import { toProposals } from '../core/assistant/validate';
+import { editMessage, type EditedReply } from '../core/assistant/editReply';
 import { forkedMessage, showVariant, variantIndex, withNewVariant } from '../core/assistant/variants';
 import type { SyncEngine } from './syncEngine';
 import type { ApplyOutcome } from './assistantApply';
@@ -91,10 +92,20 @@ export interface AssistantController {
     setMode(mode: AssistantMode): Promise<void>;
     updateSettings(patch: Partial<AssistantSettings>): boolean;
     resetInstructions(): boolean;
-    saveContextAsDefault(): boolean;
+    /**
+     * Changes the active conversation's context. The result is also remembered as
+     * the default for new conversations (owner request 2026-09-22), unless settings
+     * are locked by a pending recovery.
+     */
     updateConversationContext(patch: Partial<ContextSettings>): Promise<void>;
     setSelection(nodeIds: readonly string[]): void;
+    /**
+     * Sends a request. An empty text answers the last message when it is the
+     * user's (after the replies below it were deleted) without adding anything.
+     */
     send(text: string): Promise<void>;
+    /** Whether an empty send would re-trigger the model (see `send`). */
+    canAnswerLast(): boolean;
     stop(): void;
     retry(seq: number): Promise<void>;
     retryNow(seq: number): Promise<void>;
@@ -122,6 +133,12 @@ export interface AssistantController {
     deleteMessage(seq: number): Promise<void>;
     /** Copies the messages up to `seq` into a new conversation and opens it. */
     forkConversation(seq: number): Promise<string | null>;
+    /**
+     * Replaces a message's text (owner request 2026-09-22). A reply is re-parsed;
+     * its proposals and undo records are carried over (`core/assistant/editReply`).
+     * Null when the message cannot be edited now.
+     */
+    editMessage(seq: number, text: string): Promise<EditedReply | null>;
 }
 
 const TITLE_LIMIT = 60;
@@ -473,6 +490,34 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
     };
 
+    /** The last message of the active conversation, when it is the user's. */
+    const lastUserMessage = (): Message | undefined => {
+        if (activeConversationId === null) {
+            return undefined;
+        }
+        const last = messagesOf(activeConversationId).at(-1);
+        return last?.role === 'user' ? last : undefined;
+    };
+
+    /** Answers the last user message again: only an assistant reply is added. */
+    const answerLast = async (userMessage: Message): Promise<void> => {
+        let conversation = activeConversationOrThrow();
+        const assistantSeq = conversation.nextSeq;
+        conversation = await touchConversation({ ...conversation, nextSeq: assistantSeq + 1 });
+        await putMessage({
+            conversationId: conversation.id,
+            seq: assistantSeq,
+            role: 'assistant',
+            text: '',
+            status: 'pending',
+            mode: conversation.mode,
+            createdAt: deps.now(),
+        });
+        notify();
+        const built = buildForConversation(conversation, userMessage.text, userMessage.seq);
+        await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
+    };
+
     /** Full request for a conversation turn (context builder, research R6). */
     const buildForConversation = (
         conversation: Conversation,
@@ -806,24 +851,17 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         },
         updateSettings: writeSettings,
         resetInstructions: () => writeSettings({ instructions: null }),
-        saveContextAsDefault() {
-            const conversation = conversations.find((item) => item.id === activeConversationId);
-            if (!conversation) {
-                return false;
-            }
-            return writeSettings({ defaultContext: structuredClone(conversation.context) });
-        },
         async updateConversationContext(patch) {
             await ensure();
             const conversation = conversations.find((item) => item.id === activeConversationId);
             if (!conversation) {
                 return;
             }
-            await putConversation({
-                ...conversation,
-                context: { ...conversation.context, ...patch },
-                updatedAt: deps.now(),
-            });
+            const context: ContextSettings = { ...conversation.context, ...patch };
+            await putConversation({ ...conversation, context, updatedAt: deps.now() });
+            // The last choice is the start of the next conversation: no more resets to
+            // "current folder, by keys" (owner request 2026-09-22).
+            writeSettings({ defaultContext: structuredClone(context) });
             notify();
         },
         setSelection(nodeIds) {
@@ -831,13 +869,14 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         },
         async send(text) {
             const trimmed = text.trim();
-            if (trimmed === '' || busy) {
+            const answered = trimmed === '' ? lastUserMessage() : undefined;
+            if ((trimmed === '' && answered === undefined) || busy) {
                 return;
             }
             busy = true;
             abortController = new AbortController();
             try {
-                await sendInternal(trimmed);
+                await (answered !== undefined ? answerLast(answered) : sendInternal(trimmed));
             } finally {
                 busy = false;
                 abortController = null;
@@ -1091,6 +1130,27 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             activeConversationId = fork.id;
             notify();
             return fork.id;
+        },
+        canAnswerLast: () => !busy && lastUserMessage() !== undefined,
+        async editMessage(seq, text) {
+            const message = messageAt(seq);
+            const trimmed = text.trim();
+            if (
+                !message ||
+                message.role === 'note' ||
+                trimmed === '' ||
+                (busy && activeRequest?.seq === seq) ||
+                message.status === 'pending' ||
+                message.status === 'receiving' ||
+                message.status === 'retry-wait'
+            ) {
+                return null;
+            }
+            const edited = editMessage(message, trimmed, deps.store.getState());
+            await putMessage(edited.message);
+            await deps.conversations.flush(message.conversationId);
+            notify();
+            return edited;
         },
         async askToFix(seq) {
             const message = messageAt(seq);

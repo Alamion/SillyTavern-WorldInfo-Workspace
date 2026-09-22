@@ -77,7 +77,9 @@ describe('replyHtml (live run 2026-09-16)', () => {
     it('escapes html in prose and ignores malformed references', () => {
         const html = replyHtml('<script>x</script> [[e1 ]] [[f2]]');
         expect(html).toContain('&lt;script&gt;');
-        expect(html).toContain('[[e1 ]]');
+        // Not a reference button: a malformed handle reads as a plain wikilink label.
+        expect(html).not.toContain('data-handle="e1');
+        expect(html).toContain('<span class="wiw-md-wikilink" title="e1 ">e1 </span>');
         expect(html).toContain('data-handle="f2"');
     });
 });

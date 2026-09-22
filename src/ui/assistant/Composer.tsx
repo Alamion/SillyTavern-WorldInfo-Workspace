@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { sendsOnEnter } from '../../adapters/appApi';
 import { createComposerDraft } from '../../adapters/composerDraft';
 import type { AssistantMode } from '../../core/assistant/types';
 
@@ -17,14 +18,17 @@ function fitToContent(textarea: HTMLTextAreaElement): void {
 }
 
 /**
- * Request composer (spec 005 FR-002, FR-003): Enter sends on desktop,
- * Shift+Enter inserts a newline, and Send turns into Stop while a request runs.
- * Unsent text survives closing and reopening the workspace (FR-002a).
+ * Request composer (spec 005 FR-002, FR-003): Enter sends where the app's chat
+ * sends on Enter (never on phones: Enter is their newline key), Shift+Enter
+ * inserts a newline, and Send turns into Stop while a request runs. Unsent text
+ * survives closing and reopening the workspace (FR-002a). With an empty input,
+ * Send answers the last message when it is the user's (`canSendEmpty`).
  */
 export function Composer({
     mode,
     busy,
     disabled,
+    canSendEmpty,
     contextSummary,
     onSend,
     onStop,
@@ -34,6 +38,8 @@ export function Composer({
     mode: AssistantMode;
     busy: boolean;
     disabled: boolean;
+    /** The conversation ends with a user message: an empty send asks for its reply. */
+    canSendEmpty: boolean;
     contextSummary: string;
     onSend: (text: string) => void;
     onStop: () => void;
@@ -55,7 +61,7 @@ export function Composer({
     };
     const send = (): void => {
         const trimmed = text.trim();
-        if (trimmed === '' || busy || disabled) {
+        if ((trimmed === '' && !canSendEmpty) || busy || disabled) {
             return;
         }
         setText('');
@@ -101,7 +107,7 @@ export function Composer({
                     setText(event.target.value);
                 }}
                 onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
+                    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && sendsOnEnter()) {
                         event.preventDefault();
                         send();
                     }
@@ -113,7 +119,17 @@ export function Composer({
                         <i className="fa-solid fa-stop" /> Stop
                     </button>
                 ) : (
-                    <button type="button" className="wiw-button" disabled={disabled} onClick={send}>
+                    <button
+                        type="button"
+                        className="wiw-button"
+                        disabled={disabled}
+                        title={
+                            text.trim() === '' && canSendEmpty
+                                ? 'Ask for a reply to your last message'
+                                : undefined
+                        }
+                        onClick={send}
+                    >
                         <i className="fa-solid fa-paper-plane" /> Send
                     </button>
                 )}

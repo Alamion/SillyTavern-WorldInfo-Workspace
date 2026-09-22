@@ -15,7 +15,7 @@ schema v1 (`migrate` fills defaults; no version bump).
 | `responseTokens` | `number` | `2000` | Integer 64..32768 |
 | `contextTokens` | `number` | `16000` | Integer 1000..1000000, ≥ `responseTokens` + 500 |
 | `instructions` | `string \| null` | `null` | `null` = built-in default; reset sets `null` |
-| `defaultContext` | `ContextSettings` | see below | Copied into each new conversation; "Save as default" in the context menu overwrites it |
+| `defaultContext` | `ContextSettings` | see below | Copied into each new conversation; every context change of a conversation also overwrites it (owner request 2026-09-22 — the former "Save as default" button is gone); not written while a recovery is pending |
 
 ## ContextSettings (per conversation)
 
@@ -125,6 +125,7 @@ switching back to that version.
 | `invalidReason` | `string?` | Set ⇒ `decision = 'invalid'` |
 | `decision` | `Decision` | see below |
 | `revisionOf` | `string?` | Proposal replaced by a feedback revision (FR-017) |
+| `source` | `string?` | The operation block the proposal was parsed from, verbatim; editing the reply keeps proposals whose block is unchanged (FR-004b). Missing on proposals stored before 2026-09-22: paired by block order |
 
 ### Decision state machine
 

@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { displayText, replyHtml, statusText } from '../../core/assistant/display';
+import { editableText } from '../../core/assistant/editReply';
 import type { Message } from '../../core/assistant/types';
 import { variantCount, variantIndex } from '../../core/assistant/variants';
 import { FailureCard } from './FailureCard';
@@ -19,6 +20,8 @@ export interface MessageActions {
     onNewVariant: (seq: number) => void;
     onFork: (seq: number) => void;
     onDelete: (message: Message) => void;
+    /** Saves an edited message text (owner request 2026-09-22). */
+    onEdit: (message: Message, text: string) => void;
 }
 
 /** Row state that decides which message tools are usable. */
@@ -31,15 +34,17 @@ interface RowTools {
     blocked: boolean;
 }
 
-/** Version arrows, fork and delete — the icons of the app's own chat. */
+/** Version arrows, edit, fork and delete — the icons of the app's own chat. */
 function MessageTools({
     message,
     actions,
     tools,
+    onStartEdit,
 }: {
     message: Message;
     actions: MessageActions;
     tools: RowTools;
+    onStartEdit: () => void;
 }): JSX.Element {
     const running = message.status === 'pending' || message.status === 'receiving';
     const count = variantCount(message);
@@ -77,6 +82,19 @@ function MessageTools({
             <button
                 type="button"
                 className="wiw-message-tool"
+                title={
+                    message.role === 'assistant'
+                        ? 'Edit the raw reply (text and operation blocks)'
+                        : 'Edit message'
+                }
+                disabled={tools.busy || running || message.status === 'retry-wait'}
+                onClick={onStartEdit}
+            >
+                <i className="fa-solid fa-pencil" />
+            </button>
+            <button
+                type="button"
+                className="wiw-message-tool"
                 title="Fork: continue in a new conversation from this message"
                 disabled={tools.busy || running}
                 onClick={() => actions.onFork(message.seq)}
@@ -93,6 +111,58 @@ function MessageTools({
                 <i className="fa-solid fa-trash-can" />
             </button>
         </span>
+    );
+}
+
+/** In-place editor of a message, like the app's chat: Save / Cancel, Escape cancels. */
+function MessageEditor({
+    initial,
+    onSave,
+    onCancel,
+}: {
+    initial: string;
+    onSave: (text: string) => void;
+    onCancel: () => void;
+}): JSX.Element {
+    const [text, setText] = useState(initial);
+    const ref = useRef<HTMLTextAreaElement | null>(null);
+    useEffect(() => {
+        const textarea = ref.current;
+        if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }
+    }, []);
+    const empty = text.trim() === '';
+    return (
+        <div className="wiw-message-editor">
+            <textarea
+                ref={ref}
+                value={text}
+                spellCheck={false}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onCancel();
+                    }
+                }}
+            />
+            <div className="wiw-message-editor-actions">
+                <button
+                    type="button"
+                    className="wiw-button"
+                    disabled={empty}
+                    title={empty ? 'A message cannot be empty: delete it instead' : 'Save'}
+                    onClick={() => (text.trim() === initial.trim() ? onCancel() : onSave(text))}
+                >
+                    <i className="fa-solid fa-check" /> Save
+                </button>
+                <button type="button" className="wiw-button" onClick={onCancel}>
+                    <i className="fa-solid fa-xmark" /> Cancel
+                </button>
+            </div>
+        </div>
     );
 }
 
@@ -116,14 +186,29 @@ const MessageRow = memo(function MessageRow({
         const timer = setInterval(() => setTick((value) => value + 1), 1000);
         return () => clearInterval(timer);
     }, [message.status]);
+    const [editing, setEditing] = useState(false);
     const status = statusText(message);
     const shown = displayText(message);
     const handles = message.context?.handles ?? {};
+    if (editing) {
+        return (
+            <div className={`wiw-bubble wiw-bubble-${message.role} wiw-bubble-editing`}>
+                <MessageEditor
+                    initial={editableText(message)}
+                    onSave={(text) => {
+                        setEditing(false);
+                        actions.onEdit(message, text);
+                    }}
+                    onCancel={() => setEditing(false)}
+                />
+            </div>
+        );
+    }
     return (
         <div className={`wiw-bubble wiw-bubble-${message.role}`}>
             {shown !== '' && (
                 <div
-                    className="wiw-bubble-text"
+                    className="wiw-bubble-text wiw-markdown"
                     onClick={(event) => {
                         const handle = (event.target as HTMLElement).closest<HTMLElement>('[data-handle]')?.dataset['handle'];
                         if (handle !== undefined) {
@@ -157,7 +242,14 @@ const MessageRow = memo(function MessageRow({
                     </span>
                 )}
                 {status !== null && <span className="wiw-assistant-status">{status}</span>}
-                {message.role !== 'note' && <MessageTools message={message} actions={actions} tools={tools} />}
+                {message.role !== 'note' && (
+                    <MessageTools
+                        message={message}
+                        actions={actions}
+                        tools={tools}
+                        onStartEdit={() => setEditing(true)}
+                    />
+                )}
             </div>
         </div>
     );

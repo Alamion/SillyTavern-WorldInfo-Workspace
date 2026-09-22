@@ -57,6 +57,14 @@ pnpm run typecheck && pnpm run lint && pnpm run build
 | A27 | Apply an undone change again | Ask for a new folder with an entry in it; accept the folder, undo its batch; press Retry on the entry; press "Apply again" on the folder, then Retry on the entry; decline a proposed deletion, then use "Confirm delete…" again | The entry fails naming the folder; after "Apply again" the folder is back and the entry lands inside it; the declined deletion asks for confirmation again and then applies |
 | A28 | Undo after accepting one by one | Ask for a folder with two entries in it; accept all three one by one; press "Undo last", then "Undo all" | One "Undo last" and one "Undo all (3)" instead of three buttons; "Undo last" removes the last entry only; "Undo all" removes the rest (entries before the folder, nothing skipped); one "reverted 3" badge |
 | A29 | Growing input | On a phone (and in Firefox) type a request of several lines; keep typing past a third of the screen; send | The input grows line by line, stops growing at about 40% of the screen height and scrolls inside; after sending it is back to two lines |
+| A30 | Enter and empty send | On a phone type two lines with Enter; on desktop press Enter (app setting "Send on Enter: Auto"); delete the last reply of a conversation and press Send with an empty input | Phone: Enter adds a line, only Send sends. Desktop: Enter sends. The empty send adds no user message and a new reply to the last user message appears |
+| A31 | Edit messages | Edit a user message, then regenerate its reply; accept one of two proposals of a reply, edit the reply: change the other block's content and the prose; then remove the accepted block's text and save; undo all | The regenerated reply answers the edited text. The editor shows prose and `<op>` blocks but no thinking; after saving the accepted proposal is still applied (same card), the changed one is a new pending proposal; the removed applied block stays listed and "Undo all" reverts it |
+| A32 | Splitters | Drag the tree, assistant and preview splitters; reload the page; double-click the assistant splitter | Dragging is smooth; every size is back after the reload; the double-click resets the assistant width |
+| A33 | Mobile sheet | On a phone open the assistant, drag the sheet up to the top, then release half-way; scroll the conversation to its end and keep swiping | Full size covers the whole World Info drawer up to the app's top bar; after release the sheet glides to the nearest size; the page behind never scrolls; the input clears the home indicator |
+| A34 | Diff | Open the diff of an edit proposal in the assistant panel and of a markdown conflict in its dialog | Narrow: one column with −/+ lines, line numbers and the changed words marked. Wide: side-by-side rows that stay level when a line wraps |
+| A35 | Remembered context | Choose "Whole workspace" + "All entries" + chat 10 in the context dialog; reload the page; start a new conversation | The new conversation starts with the same choices; the dialog shows "New conversations start with these choices." |
+| A36 | Preview | Open "Тестовая сущность (Markdown demo)" with the preview on | Nested lists, table, strikethrough, three quote levels and the rule render; the code block has no "python" line; comments are invisible; http/https/mailto and the anchor are links, relative/javascript/data/ftp are text; `{{variable}}` in code stays literal |
+| A37 | Preview edge cases | Preview an entry with CRLF line endings, `#####` headings, `Title` over `===`, task and loose lists, a `> [!warning]` callout, `==mark==`, `_em_`, `\*literal\*`, `&copy;`, `[[Note|Alias]]`, `<https://…>`, a `~~~` fence, a link to `…/Foo_(bar)`, `[x](&#106;avascript:…)` | Every construct renders as in Obsidian/GitHub; checkboxes sit inline; the fence has no inline-code frame; no link or image ever runs script |
 
 ## Success criteria mapping
 
@@ -172,3 +180,23 @@ entries of A4/A6 disappeared that way, not through the extension.
 | # | Result | Notes |
 |---|--------|-------|
 | A25 | PASS | Unsent text kept across closing and reopening the workspace; cleared after sending |
+
+### 2026-09-22 — owner check and live run (build 0.4.9)
+
+| # | Result | Notes |
+|---|--------|-------|
+| A30 | PASS | Owner: Enter makes a new line on the phone, Send sends; empty Send after deleting the reply asks for a new one |
+| A31 | PASS | Owner + live run (openrouter free provider): the reply editor showed prose and the `<op>` block without thinking; adding an `edit_entry` block kept the pending creation (same card) and added one pending edit ("1 changed or new proposal(s) to review") |
+| A32 | PASS | Owner + live run: tree width committed on release (360 px), restored after a reload, then reset |
+| A33 | PASS | Owner + live run at 412×880: full size reaches the drawer top (sheet top = `#WorldInfo` top); release half-way glides 839 → 552 → 420 px |
+| A34 | PASS | Owner + live run: the edit diff in the proposal dialog is unified with marked words ("grey stone" → "black basalt", "truly"); at 1100 px width it switches to aligned side-by-side rows |
+| A35 | PASS | Live run: "Whole workspace" + "All entries" written to `defaultContext` at once; after a reload a new conversation showed "Whole workspace · all contents"; the default was then set back to current folder / by keys |
+| A36 | PASS after fix | Live run after T090: lists, table, strikethrough, three quote levels, rule, links (http/https/mailto/anchor) and the code block without "python" render as intended; comments hidden; relative/javascript/data/ftp stay text |
+| A37 | PASS after fix | Edge-case review of the renderer (T091): CRLF broke headings and lists, `…/Foo_(bar)` and titled links broke, `** x **` became bold, several constructs were missing; after the fix a live sample showed callout, tasks, highlight, wikilink, autolink and `~~~` correctly — task checkboxes needed `inline-grid` (the app's checkbox is `display: grid`) and fenced code lost the app's `code` border |
+
+Owner review of the "Markdown demo" entry (A36) found preview gaps, fixed in T090: the fence info
+string "python" was shown as the first code line, `<!-- … -->` comments were shown as text, bare
+http(s)/mailto addresses were not links, the `#section-id` anchor opened a new tab. Not defects: `![[i1]]`
+and `[[e5]]` are assistant handles, which exist only inside one request, so the entry shows a missing
+image and plain text; `img: https://…` without `![](…)` is not markdown image syntax (now a plain link).
+

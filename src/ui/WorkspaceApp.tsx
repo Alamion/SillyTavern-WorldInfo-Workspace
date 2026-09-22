@@ -1,18 +1,30 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getAppContext } from '../adapters/appApi';
 import { confirmDialog, inputDialog } from '../adapters/popups';
 import { onSaveEvent } from '../adapters/saveEvents';
 import { openNativeMode } from '../adapters/shell';
 import { notifyError, notifySuccess } from '../adapters/logger';
-import { discardRecovered, restoreRecovered, type WorkspaceStateServices } from '../adapters/settingsStore';
+import {
+    discardRecovered,
+    isRecoveryPending,
+    restoreRecovered,
+    type WorkspaceStateServices,
+} from '../adapters/settingsStore';
 import { applyTreeChange, deleteNodes } from '../adapters/workspaceActions';
 import type { NativeWorldInfoEntry } from '../global';
 import { createDemoState } from '../core/demo/dataset';
 import {
+    clampLayoutSize,
+    getLayoutSettings,
+    LAYOUT_LIMITS,
+    setLayoutSettings,
+    TREE_COLLAPSE_BELOW,
+} from '../core/state/layout';
+import {
     buildNodeIndex,
     findNode,
     type FolderNode,
+    type LayoutSettings,
     type TreeNode,
     type WorkspaceState,
 } from '../core/state/schema';
@@ -34,16 +46,13 @@ import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
+import { LayoutContext, type LayoutContextValue } from './layoutContext';
 import Sheet from './Sheet';
+import { Splitter } from './Splitter';
 import { StructureTree, type TreeMenuAction, type TreeMenuState } from './StructureTree';
 
-const TREE_MIN = 140;
-const TREE_COLLAPSE_BELOW = 120;
-const TREE_MAX = 640;
-const ASSISTANT_DEFAULT = 360;
-const ASSISTANT_MIN = 260;
-/** The assistant never takes more than this share of the workspace width. */
-const ASSISTANT_MAX_SHARE = 0.6;
+/** Width of the collapsed tree strip. */
+const TREE_COLLAPSED_WIDTH = 44;
 
 const BASE_NAMES: Record<CreateKind, string> = {
     folder: 'New Folder',
@@ -62,14 +71,33 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     const [lastFailure, setLastFailure] = useState<{ message: string; bookName?: string } | null>(null);
     const [retrying, setRetrying] = useState(false);
     const [assistantOpen, setAssistantOpen] = useState(false);
-    const [treeWidth, setTreeWidth] = useState(300);
-    const [treeCollapsed, setTreeCollapsed] = useState(false);
-    const [assistantWidth, setAssistantWidth] = useState(ASSISTANT_DEFAULT);
-    const [dragging, setDragging] = useState<{
-        target: 'tree' | 'assistant';
-        startX: number;
-        startWidth: number;
-    } | null>(null);
+    // Region sizes are saved in the workspace settings (2026-09-22); while a data
+    // recovery is pending nothing may be published, so they only live here.
+    const [unsavedLayout, setUnsavedLayout] = useState<Partial<LayoutSettings>>({});
+    const layout: LayoutSettings = { ...getLayoutSettings(state), ...unsavedLayout };
+    const { treeWidth, treeCollapsed, assistantWidth } = layout;
+    const saveLayout = useCallback(
+        (patch: Partial<LayoutSettings>): void => {
+            if (isRecoveryPending()) {
+                setUnsavedLayout((previous) => ({ ...previous, ...patch }));
+                return;
+            }
+            setUnsavedLayout({});
+            const next = setLayoutSettings(store.getState(), patch);
+            if (next !== store.getState()) {
+                store.replace(next);
+            }
+        },
+        [store]
+    );
+    const layoutContext: LayoutContextValue = useMemo(
+        () => ({ layout, saveLayout }),
+        // `layout` is rebuilt every render: its values are the dependencies.
+        [layout.treeWidth, layout.treeCollapsed, layout.assistantWidth, layout.previewWidth, saveLayout]
+    );
+    const setTreeCollapsed = (collapsed: boolean): void => saveLayout({ treeCollapsed: collapsed });
+    const treeRef = useRef<HTMLElement | null>(null);
+    const assistantRef = useRef<HTMLElement | null>(null);
     const [mobileSheet, setMobileSheet] = useState<'none' | 'editor' | 'assistant'>('none');
     const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
 
@@ -526,43 +554,6 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
 
     const membershipLine = computeMembershipLine(selected, index);
 
-    const onSplitterDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        if (treeCollapsed) {
-            return;
-        }
-        setDragging({ target: 'tree', startX: event.clientX, startWidth: treeWidth });
-        event.currentTarget.setPointerCapture(event.pointerId);
-    };
-
-    const onSplitterMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        if (dragging?.target !== 'tree') {
-            return;
-        }
-        const width = dragging.startWidth + (event.clientX - dragging.startX);
-        if (width < TREE_COLLAPSE_BELOW) {
-            setTreeCollapsed(true);
-            setDragging(null);
-            return;
-        }
-        setTreeWidth(Math.min(Math.max(width, TREE_MIN), TREE_MAX));
-    };
-
-    // The assistant splitter sits on the panel's left edge: dragging left widens it.
-    const onAssistantSplitterDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        setDragging({ target: 'assistant', startX: event.clientX, startWidth: assistantWidth });
-        event.currentTarget.setPointerCapture(event.pointerId);
-    };
-
-    const onAssistantSplitterMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        if (dragging?.target !== 'assistant') {
-            return;
-        }
-        const container = event.currentTarget.parentElement?.clientWidth ?? window.innerWidth;
-        const max = Math.max(ASSISTANT_MIN, container * ASSISTANT_MAX_SHARE);
-        const width = dragging.startWidth - (event.clientX - dragging.startX);
-        setAssistantWidth(Math.min(Math.max(width, ASSISTANT_MIN), max));
-    };
-
     const isEmpty = state.root.children.length === 0;
     const treeProps = {
         root: state.root,
@@ -626,205 +617,227 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     };
 
     return (
-        <div className="wiw-surface">
-            <header className="wiw-header">
-                <button
-                    type="button"
-                    className="wiw-button wiw-mode-button"
-                    title="Switch to the native Worlds/Lorebooks editor"
-                    onClick={() => openNativeMode()}
-                >
-                    <i className="fa-solid fa-book-atlas" /> Worlds/Lorebooks
-                </button>
-                <div className="wiw-header-spacer" />
-                <MarkdownControl
-                    md={services.md}
-                    exportScopeId={selected?.kind === 'folder' ? selected.id : state.root.id}
-                    exportScopeLabel={selected?.kind === 'folder' ? `"${selected.name}"` : 'workspace'}
-                    importTargetId={importTarget().id}
-                    importTargetLabel={importTarget().id === state.root.id ? 'workspace root' : `"${importTarget().name}"`}
-                />
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title="Lorebooks: activation, import and deletion of native books"
-                    onClick={() => setLorebooksOpen(true)}
-                >
-                    <i className="fa-solid fa-book-bookmark" />
-                </button>
-                <button
-                    type="button"
-                    className="wiw-button wiw-icon-button"
-                    title={isMobile || !assistantOpen ? 'Show assistant' : 'Hide assistant'}
-                    onClick={() => {
-                        if (isMobile) {
-                            setMobileSheet('assistant');
-                        } else {
-                            setAssistantOpen((prev) => !prev);
-                        }
-                    }}
-                >
-                    <i className="fa-solid fa-wand-magic-sparkles" />
-                </button>
-            </header>
-            <div className="wiw-regions">
-                {!isMobile && (
-                    <>
-                        <aside
-                            className={`wiw-region wiw-region-tree${treeCollapsed ? ' wiw-tree-collapsed' : ''}`}
-                            style={{ flexBasis: treeCollapsed ? 44 : treeWidth }}
-                        >
-                            {treeCollapsed ? (
-                                <button
-                                    type="button"
-                                    className="wiw-tree-expand"
-                                    title="Show tree"
-                                    onClick={() => setTreeCollapsed(false)}
-                                >
-                                    <i className="fa-solid fa-angles-right" />
-                                </button>
-                            ) : (
-                                <>
-                                    <StructureTree {...treeProps} />
-                                    {selectedIds.size > 1 && (
-                                        <div className="wiw-bulk-bar">
-                                            <span>{selectedIds.size} selected</span>
-                                            <button type="button" className="wiw-button" title="Move selected" onClick={() => handleBulk('move')}>
-                                                <i className="fa-solid fa-folder-open" />
-                                            </button>
-                                            <button type="button" className="wiw-button" title="Enable selected entries" onClick={() => handleBulk('enable')}>
-                                                <i className="fa-solid fa-toggle-on" />
-                                            </button>
-                                            <button type="button" className="wiw-button" title="Disable selected entries" onClick={() => handleBulk('disable')}>
-                                                <i className="fa-solid fa-toggle-off" />
-                                            </button>
-                                            <button type="button" className="wiw-button wiw-danger-button" title="Delete selected" onClick={() => handleBulk('delete')}>
-                                                <i className="fa-solid fa-trash-can" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="wiw-button wiw-icon-button"
-                                                title="Clear selection"
-                                                onClick={() => setSelectedIds(new Set())}
-                                            >
-                                                <i className="fa-solid fa-xmark" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
+        <LayoutContext.Provider value={layoutContext}>
+            <div className="wiw-surface">
+                <header className="wiw-header">
+                    <button
+                        type="button"
+                        className="wiw-button wiw-mode-button"
+                        title="Switch to the native Worlds/Lorebooks editor"
+                        onClick={() => openNativeMode()}
+                    >
+                        <i className="fa-solid fa-book-atlas" /> Worlds/Lorebooks
+                    </button>
+                    <div className="wiw-header-spacer" />
+                    <MarkdownControl
+                        md={services.md}
+                        exportScopeId={selected?.kind === 'folder' ? selected.id : state.root.id}
+                        exportScopeLabel={selected?.kind === 'folder' ? `"${selected.name}"` : 'workspace'}
+                        importTargetId={importTarget().id}
+                        importTargetLabel={importTarget().id === state.root.id ? 'workspace root' : `"${importTarget().name}"`}
+                    />
+                    <button
+                        type="button"
+                        className="wiw-button wiw-icon-button"
+                        title="Lorebooks: activation, import and deletion of native books"
+                        onClick={() => setLorebooksOpen(true)}
+                    >
+                        <i className="fa-solid fa-book-bookmark" />
+                    </button>
+                    <button
+                        type="button"
+                        className="wiw-button wiw-icon-button"
+                        title={isMobile || !assistantOpen ? 'Show assistant' : 'Hide assistant'}
+                        onClick={() => {
+                            if (isMobile) {
+                                setMobileSheet('assistant');
+                            } else {
+                                setAssistantOpen((prev) => !prev);
+                            }
+                        }}
+                    >
+                        <i className="fa-solid fa-wand-magic-sparkles" />
+                    </button>
+                </header>
+                <div className="wiw-regions">
+                    {!isMobile && (
+                        <>
+                            <aside
+                                ref={treeRef}
+                                className={`wiw-region wiw-region-tree${treeCollapsed ? ' wiw-tree-collapsed' : ''}`}
+                                style={{ flexBasis: treeCollapsed ? TREE_COLLAPSED_WIDTH : treeWidth }}
+                            >
+                                {treeCollapsed ? (
+                                    <button
+                                        type="button"
+                                        className="wiw-tree-expand"
+                                        title="Show tree"
+                                        onClick={() => setTreeCollapsed(false)}
+                                    >
+                                        <i className="fa-solid fa-angles-right" />
+                                    </button>
+                                ) : (
+                                    <>
+                                        <StructureTree {...treeProps} />
+                                        {selectedIds.size > 1 && (
+                                            <div className="wiw-bulk-bar">
+                                                <span>{selectedIds.size} selected</span>
+                                                <button type="button" className="wiw-button" title="Move selected" onClick={() => handleBulk('move')}>
+                                                    <i className="fa-solid fa-folder-open" />
+                                                </button>
+                                                <button type="button" className="wiw-button" title="Enable selected entries" onClick={() => handleBulk('enable')}>
+                                                    <i className="fa-solid fa-toggle-on" />
+                                                </button>
+                                                <button type="button" className="wiw-button" title="Disable selected entries" onClick={() => handleBulk('disable')}>
+                                                    <i className="fa-solid fa-toggle-off" />
+                                                </button>
+                                                <button type="button" className="wiw-button wiw-danger-button" title="Delete selected" onClick={() => handleBulk('delete')}>
+                                                    <i className="fa-solid fa-trash-can" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="wiw-button wiw-icon-button"
+                                                    title="Clear selection"
+                                                    onClick={() => setSelectedIds(new Set())}
+                                                >
+                                                    <i className="fa-solid fa-xmark" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </aside>
+                            {!treeCollapsed && (
+                                <Splitter
+                                    axis="x"
+                                    title="Drag to resize; double-click to collapse"
+                                    start={() => treeWidth}
+                                    clamp={(width) => clampLayoutSize('treeWidth', width)}
+                                    preview={(width) => {
+                                        if (treeRef.current) {
+                                            treeRef.current.style.flexBasis = `${String(width)}px`;
+                                        }
+                                    }}
+                                    commit={(width) => saveLayout({ treeWidth: width })}
+                                    collapse={{ at: TREE_COLLAPSE_BELOW, onCollapse: () => setTreeCollapsed(true) }}
+                                    onDoubleClick={() => setTreeCollapsed(true)}
+                                />
                             )}
-                        </aside>
-                        {!treeCollapsed && (
-                            <div
-                                className="wiw-splitter"
-                                title="Drag to resize; double-click to collapse"
-                                onPointerDown={onSplitterDown}
-                                onPointerMove={onSplitterMove}
-                                onPointerUp={() => setDragging(null)}
-                                onDoubleClick={() => setTreeCollapsed(true)}
+                        </>
+                    )}
+                    {!isMobile && (
+                        <main className="wiw-region wiw-region-editor">
+                            {isEmpty ? (
+                                <EmptyState onLoadDemo={() => void handleLoadDemo()} />
+                            ) : (
+                                <ItemEditor {...editorProps} />
+                            )}
+                        </main>
+                    )}
+                    {!isMobile && assistantOpen && (
+                        // On the panel's left edge: dragging left widens it.
+                        <Splitter
+                            axis="x"
+                            title="Drag to resize; double-click to reset"
+                            start={() => assistantWidth}
+                            toDelta={(movement) => -movement}
+                            clamp={(width, container) =>
+                                clampLayoutSize('assistantWidth', width, container?.clientWidth ?? window.innerWidth)
+                            }
+                            preview={(width) => {
+                                if (assistantRef.current) {
+                                    assistantRef.current.style.flexBasis = `${String(width)}px`;
+                                }
+                            }}
+                            commit={(width) => saveLayout({ assistantWidth: width })}
+                            onDoubleClick={() => saveLayout({ assistantWidth: LAYOUT_LIMITS.assistantWidth.fallback })}
+                        />
+                    )}
+                    {!isMobile && assistantOpen && (
+                        <aside
+                            ref={assistantRef}
+                            className="wiw-region wiw-region-assistant"
+                            style={{ flexBasis: assistantWidth }}
+                        >
+                            <AssistantPanel
+                                services={services}
+                                state={state}
+                                selectedIds={selectedIds}
+                                onOpenNode={(nodeId) => {
+                                    setSelectedIds(new Set([nodeId]));
+                                    if (isMobile) {
+                                        setMobileSheet('editor');
+                                    }
+                                }}
                             />
-                        )}
-                    </>
-                )}
-                {!isMobile && (
-                    <main className="wiw-region wiw-region-editor">
+                        </aside>
+                    )}
+                    {isMobile && (
+                        <main className="wiw-mobile-tree">
+                            {isEmpty ? (
+                                <EmptyState onLoadDemo={() => void handleLoadDemo()} />
+                            ) : (
+                                <StructureTree {...treeProps} />
+                            )}
+                        </main>
+                    )}
+                </div>
+                {isMobile && mobileSheet === 'editor' && (
+                    <Sheet key="editor-sheet" onClose={() => setMobileSheet('none')}>
                         {isEmpty ? (
                             <EmptyState onLoadDemo={() => void handleLoadDemo()} />
                         ) : (
                             <ItemEditor {...editorProps} />
                         )}
-                    </main>
+                    </Sheet>
                 )}
-                {!isMobile && assistantOpen && (
-                    <div
-                        className="wiw-splitter"
-                        title="Drag to resize; double-click to reset"
-                        onPointerDown={onAssistantSplitterDown}
-                        onPointerMove={onAssistantSplitterMove}
-                        onPointerUp={() => setDragging(null)}
-                        onDoubleClick={() => setAssistantWidth(ASSISTANT_DEFAULT)}
-                    />
-                )}
-                {!isMobile && assistantOpen && (
-                    <aside className="wiw-region wiw-region-assistant" style={{ flexBasis: assistantWidth }}>
+                {isMobile && mobileSheet === 'assistant' && (
+                    <Sheet key="assistant-sheet" onClose={() => setMobileSheet('none')}>
                         <AssistantPanel
                             services={services}
                             state={state}
                             selectedIds={selectedIds}
                             onOpenNode={(nodeId) => {
                                 setSelectedIds(new Set([nodeId]));
-                                if (isMobile) {
-                                    setMobileSheet('editor');
-                                }
+                                setMobileSheet('editor');
                             }}
                         />
-                    </aside>
+                    </Sheet>
                 )}
-                {isMobile && (
-                    <main className="wiw-mobile-tree">
-                        {isEmpty ? (
-                            <EmptyState onLoadDemo={() => void handleLoadDemo()} />
-                        ) : (
-                            <StructureTree {...treeProps} />
-                        )}
-                    </main>
-                )}
-            </div>
-            {isMobile && mobileSheet === 'editor' && (
-                <Sheet key="editor-sheet" onClose={() => setMobileSheet('none')}>
-                    {isEmpty ? (
-                        <EmptyState onLoadDemo={() => void handleLoadDemo()} />
-                    ) : (
-                        <ItemEditor {...editorProps} />
-                    )}
-                </Sheet>
-            )}
-            {isMobile && mobileSheet === 'assistant' && (
-                <Sheet key="assistant-sheet" onClose={() => setMobileSheet('none')}>
-                    <AssistantPanel
-                        services={services}
-                        state={state}
-                        selectedIds={selectedIds}
-                        onOpenNode={(nodeId) => {
-                            setSelectedIds(new Set([nodeId]));
-                            setMobileSheet('editor');
-                        }}
+                {movePickerFor && (
+                    <FolderPicker
+                        root={state.root}
+                        excludeIds={new Set(movePickerFor.ids)}
+                        onPick={handlePickMoveTarget}
+                        onClose={() => setMovePickerFor(null)}
                     />
-                </Sheet>
-            )}
-            {movePickerFor && (
-                <FolderPicker
-                    root={state.root}
-                    excludeIds={new Set(movePickerFor.ids)}
-                    onPick={handlePickMoveTarget}
-                    onClose={() => setMovePickerFor(null)}
+                )}
+                {lorebooksOpen && (
+                    <LorebooksPanel
+                        services={services}
+                        importTarget={importTarget()}
+                        onDeleteBoundBook={handleDeleteBoundBook}
+                        onClose={() => setLorebooksOpen(false)}
+                    />
+                )}
+                {state._recovered !== undefined && (
+                    <RecoveryBanner onRestore={handleRestoreBackup} onDiscard={() => void handleDiscardBackup()} />
+                )}
+                <SaveFailureBanner
+                    failure={lastFailure}
+                    retrying={retrying}
+                    onRetry={() => void handleRetry()}
+                    onDismiss={() => setLastFailure(null)}
                 />
-            )}
-            {lorebooksOpen && (
-                <LorebooksPanel
-                    services={services}
-                    importTarget={importTarget()}
-                    onDeleteBoundBook={handleDeleteBoundBook}
-                    onClose={() => setLorebooksOpen(false)}
+                <DivergenceBanners
+                    tick={reportsTick}
+                    reports={[...sync.getReports().values()]}
+                    onPushAnyway={(book) => void sync.overridePush(book)}
+                    onImport={() => setLorebooksOpen(true)}
+                    onDismiss={(book) => sync.dismissReport(book)}
                 />
-            )}
-            {state._recovered !== undefined && (
-                <RecoveryBanner onRestore={handleRestoreBackup} onDiscard={() => void handleDiscardBackup()} />
-            )}
-            <SaveFailureBanner
-                failure={lastFailure}
-                retrying={retrying}
-                onRetry={() => void handleRetry()}
-                onDismiss={() => setLastFailure(null)}
-            />
-            <DivergenceBanners
-                tick={reportsTick}
-                reports={[...sync.getReports().values()]}
-                onPushAnyway={(book) => void sync.overridePush(book)}
-                onImport={() => setLorebooksOpen(true)}
-                onDismiss={(book) => sync.dismissReport(book)}
-            />
-        </div>
+            </div>
+        </LayoutContext.Provider>
     );
 }
 

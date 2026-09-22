@@ -80,7 +80,8 @@ needs them.
 ```
 src/
 ├── core/                # Pure logic (Vitest-first, no app imports)
-│   ├── state/           # schema.ts (WorkspaceState v1 + migrate), store.ts
+│   ├── state/           # schema.ts (WorkspaceState v1 + migrate), store.ts, layout.ts
+│   │                    #   (saved region sizes, repaired field by field)
 │   ├── tree/            # operations.ts, browse.ts, validation.ts, imageLinks.ts (image
 │   │                    #   references in content: img:<id>, names, paths, ![[…]], URLs)
 │   ├── sync/            # flatten.ts, fingerprint.ts, divergence.ts, import.ts,
@@ -98,11 +99,15 @@ src/
 │   │                    #   prompts.ts (instructions, decision notes), handles.ts, scope.ts,
 │   │                    #   context.ts (request + budget), validate.ts (blocks → proposals),
 │   │                    #   rules.ts (destructive/duplicate/stale), plan.ts (order, blocked,
-│   │                    #   accept-all), undo.ts, failures.ts, settingsOps.ts
+│   │                    #   accept-all), undo.ts, failures.ts, settingsOps.ts, editReply.ts
+│   │                    #   (edit a message: re-parse, keep decisions/undo of kept blocks)
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
 │   ├── fieldSchema.ts   # Typed field schema + drawer layout (from Phase 0)
-│   ├── preview.ts       # Markdown renderer + placeholder hook (FR-010)
-│   └── diff/            # lineDiff.ts — shared LCS line diff (any before/after view)
+│   ├── preview.ts       # Markdown renderer: CommonMark/GFM blocks + inline, Obsidian wikilinks/
+│   │                    #   embeds/callouts/highlights, hidden comments, escaped raw HTML, safe
+│   │                    #   link/image schemes, literal code spans; placeholder hook (FR-010) —
+│   │                    #   own renderer, not showdown
+│   └── diff/            # lineDiff.ts — shared Myers diff: lines, words (diffWords), rows
 ├── adapters/            # App boundary — the ONLY host-facing modules
 │   ├── shell.ts             # Host drawer composition (#WorldInfo mount)
 │   ├── appApi.ts            # getAppContext() (memoized API) + getLiveAppContext()
@@ -138,11 +143,15 @@ src/
 │   │                        #   resolution), delete (bound book = book + folder)
 │   ├── BookList.tsx         # Shared book list: useBookFacts, search, filter chips, pager
 │   ├── NodeHeader.tsx       # Unified item header (icon, enable, name, duplicate/delete)
-│   ├── Sheet.tsx            # Mobile bottom sheet
+│   ├── Sheet.tsx            # Mobile bottom sheet (reaches the drawer top, snap animation)
+│   ├── Splitter.tsx         # usePointerResize + <Splitter>: DOM writes while dragging,
+│   │                        #   commit on release (tree/assistant/preview splitters, sheet)
+│   ├── layoutContext.ts     # Saved region sizes for nested components
 │   ├── fieldGroups/FieldGroups.tsx  # Essentials/Content/Advanced rows (store-bound)
 │   ├── fieldGroups/MultiSelect.tsx  # Chip multi-select; CharacterFilterControl (chars + tags)
 │   ├── MarkdownControl.tsx  # Header chip + menu: link/sync/export/import/reference
-│   ├── DiffView.tsx         # SHARED side-by-side diff (assistant proposals, conflicts, …)
+│   ├── DiffView.tsx         # SHARED diff (proposals, conflicts, …): row-aligned split view,
+│   │                        #   unified below 560 px, line numbers, +/−, changed words
 │   ├── ConflictDialog.tsx   # Per-item keep workspace / keep file / skip
 │   ├── OperationReport.tsx  # Import/export/sync report modal
 │   ├── MappingReference.tsx # Convention tables + sample entry
@@ -177,14 +186,17 @@ tests/
 └── unit/                # state (+recovery), tree, sync, books listing, preview,
                          #   fingerprint, naming, demo, diff
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.3)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.10)
 ```
 
 ## Settings
 
 Workspace state persists under `extensionSettings['WorldInfoWorkspace']` (schema v1,
 saved via `saveSettingsDebounced` after every mutation): `{ version: 1, root:
-FolderNode-tree, settings: { sortMode, assistant? }, _recovered? }`. `settings.assistant`
+FolderNode-tree, settings: { sortMode, assistant?, layout? }, _recovered? }`. `settings.layout`
+(2026-09-22, optional/additive) = `{ treeWidth, treeCollapsed, assistantWidth, previewWidth }`,
+repaired by `getLayoutSettings`; like the assistant settings it is not saved while a recovery
+is pending (sizes then live only in the UI). `settings.assistant`
 (spec 005, optional/additive) = `{ profileId, responseTokens, contextTokens, instructions,
 defaultContext }`, repaired field by field by `getAssistantSettings`; it is NOT saved while
 a data recovery is unresolved (`settingsStore.isRecoveryPending()`). Conversations never
@@ -287,6 +299,17 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
   activated entries, history with decision notes; budget by ~3.5 chars/token; everything
   left out is reported. The workspace part goes into the latest user turn as a
   `<workspace>` block — system messages carry only rules (models ignore lore there).
+- **Context default**: every context change of a conversation is also written to
+  `settings.assistant.defaultContext` (not while a recovery is pending), so new conversations
+  start with the last choice.
+- **Input**: Enter follows the app's "Send on Enter" setting (`getContext().shouldSendOnEnter`,
+  never on phones); an empty Send answers the last message when it is the user's
+  (`canAnswerLast`) without adding a message.
+- **Editing**: any message is editable in place (`editMessage`); a reply is edited as its raw
+  text without thinking. Saving re-parses it: proposals of unchanged blocks
+  (`OperationProposal.source`) keep id/decision/user edits, changed or new blocks become fresh
+  pending proposals, and applied/reverted proposals whose block was removed stay in the batch
+  so undo keeps working.
 - **Messages**: the last reply keeps versions (`Message.variants`, `core/assistant/variants.ts`;
   the shown one is mirrored in the message fields); any message can be deleted
   (`deleteMessage`) or start a fork (`forkConversation`, copies marked `forkedFrom`, no undo

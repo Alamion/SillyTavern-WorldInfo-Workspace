@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { NativeWorldInfoEntry } from '../../global';
 import type { SampleFieldMeta, SampleFieldName } from '../../core/fieldSchema';
 import { ADVANCED_LAYOUT, FIELD_SCHEMA } from '../../core/fieldSchema';
 import { renderMarkdown, type ImageResolver } from '../../core/preview';
+import { clampLayoutSize, LAYOUT_LIMITS } from '../../core/state/layout';
+import { useLayout } from '../layoutContext';
 import { NodeHeader } from '../NodeHeader';
+import { Splitter } from '../Splitter';
 import { CharacterFilterControl, MultiSelectControl } from './MultiSelect';
 
 type Values = Record<string, unknown>;
@@ -299,8 +302,8 @@ function ContentSection({
 }): JSX.Element {
     const isMobile = window.matchMedia('(max-width: 900px)').matches;
     const [previewVisible, setPreviewVisible] = useState(!isMobile);
-    const [previewWidth, setPreviewWidth] = useState(40);
-    const [dragging, setDragging] = useState<{ startX: number; startWidth: number } | null>(null);
+    const { layout, saveLayout } = useLayout();
+    const previewRef = useRef<HTMLDivElement | null>(null);
     const html = useMemo(
         () =>
             renderMarkdown(content, {
@@ -309,20 +312,6 @@ function ContentSection({
             }),
         [content, resolveImage, substitute]
     );
-    const onSplitterDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        setDragging({ startX: event.clientX, startWidth: previewWidth });
-        event.currentTarget.setPointerCapture(event.pointerId);
-    };
-    const onSplitterMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-        if (!dragging) {
-            return;
-        }
-        const containerWidth =
-            event.currentTarget.parentElement?.clientWidth ??
-            event.currentTarget.ownerDocument.body.clientWidth;
-        const delta = ((event.clientX - dragging.startX) / Math.max(containerWidth, 1)) * 100;
-        setPreviewWidth(Math.min(Math.max(dragging.startWidth - delta, 20), 80));
-    };
     return (
         <section className="wiw-content-section">
             <header className="wiw-content-header">
@@ -343,20 +332,31 @@ function ContentSection({
                     onChange={(event) => onContentChange(event.target.value)}
                 />
                 {previewVisible && !isMobile && (
-                    <div
+                    // Sizes in percent of the editor; the preview is on the right, so
+                    // dragging left widens it.
+                    <Splitter
                         className="wiw-content-splitter"
-                        title="Drag to resize the preview"
-                        onPointerDown={onSplitterDown}
-                        onPointerMove={onSplitterMove}
-                        onPointerUp={() => setDragging(null)}
+                        axis="x"
+                        title="Drag to resize the preview; double-click to reset"
+                        start={() => layout.previewWidth}
+                        toDelta={(movement, container) => (-movement / Math.max(container?.clientWidth ?? 1, 1)) * 100}
+                        clamp={(width) => clampLayoutSize('previewWidth', width)}
+                        preview={(width) => {
+                            if (previewRef.current) {
+                                previewRef.current.style.flexBasis = `${String(width)}%`;
+                            }
+                        }}
+                        commit={(width) => saveLayout({ previewWidth: width })}
+                        onDoubleClick={() => saveLayout({ previewWidth: LAYOUT_LIMITS.previewWidth.fallback })}
                     />
                 )}
                 {previewVisible && (
                     <div
-                        className="wiw-md-preview"
+                        ref={previewRef}
+                        className="wiw-md-preview wiw-markdown"
                         style={
                             previewVisible && !isMobile
-                                ? { flexBasis: `${previewWidth}%` }
+                                ? { flexBasis: `${String(layout.previewWidth)}%` }
                                 : undefined
                         }
                         dangerouslySetInnerHTML={{ __html: html }}

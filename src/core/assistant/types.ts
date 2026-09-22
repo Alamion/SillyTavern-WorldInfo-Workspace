@@ -208,6 +208,11 @@ export interface OperationProposal {
     failedReason?: string;
     decision: Decision;
     revisionOf?: string;
+    /**
+     * The operation block this proposal was parsed from, verbatim. Editing a reply
+     * keeps the proposals whose block is unchanged (owner request 2026-09-22).
+     */
+    source?: string;
     /** Human-readable summary rendered in the proposal card. */
     summary: string;
 }

@@ -209,21 +209,18 @@ export function ContextMenu({
     state,
     selectedIds,
     onChange,
-    onSaveAsDefault,
     onClose,
 }: {
     snapshot: AssistantSnapshot;
     state: WorkspaceState;
     selectedIds: readonly string[];
     onChange: (patch: Partial<ContextSettings>) => void;
-    onSaveAsDefault: () => void;
     onClose: () => void;
 }): JSX.Element | null {
     const context = snapshot.activeConversation?.context;
     const [chatCount, setChatCount] = useState(
         context && context.chatMessages > 0 ? context.chatMessages : DEFAULT_CHAT_MESSAGES
     );
-    const [savedDefault, setSavedDefault] = useState(false);
     if (!context) {
         return null;
     }
@@ -370,19 +367,11 @@ export function ContextMenu({
                 </div>
 
                 <div className="wiw-context-footer">
-                    <button
-                        type="button"
-                        className="wiw-button"
-                        disabled={snapshot.settingsLocked}
-                        title="New conversations start with these choices"
-                        onClick={() => {
-                            onSaveAsDefault();
-                            setSavedDefault(true);
-                        }}
-                    >
-                        <i className={`fa-solid ${savedDefault ? 'fa-check' : 'fa-floppy-disk'}`} />{' '}
-                        {savedDefault ? 'Saved as default' : 'Use as default'}
-                    </button>
+                    <span className="wiw-context-hint">
+                        {snapshot.settingsLocked
+                            ? 'Kept for this conversation; new conversations keep their start until the recovery banner is resolved.'
+                            : 'New conversations start with these choices.'}
+                    </span>
                     <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
                         Done
                     </button>

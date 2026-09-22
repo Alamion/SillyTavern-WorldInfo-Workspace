@@ -1,6 +1,6 @@
 {
     "name": "sillytavern-worldinfo-workspace",
-    "version": "0.4.8",
+    "version": "0.4.10",
     "private": true,
     "type": "module",
     "scripts": {

@@ -114,7 +114,7 @@ const EXAMPLE_HANDLES: ReadonlySet<string> = new Set(['HANDLE', 'HANDLE_OR_REF']
  * edit). Echoed examples and exact repeats are dropped; everything else is kept,
  * however broken, so real mistakes still get a reason.
  */
-function usableBlocks(blocks: readonly ParsedBlock[]): ParsedBlock[] {
+export function usableBlocks(blocks: readonly ParsedBlock[]): ParsedBlock[] {
     const seen = new Set<string>();
     return blocks.filter((block) => {
         if (['id', 'parent'].some((name) => EXAMPLE_HANDLES.has(block.attrs[name] ?? ''))) {
@@ -357,6 +357,7 @@ export function toProposals(
         if (invalidReason !== undefined) {
             proposal.invalidReason = invalidReason;
         }
+        proposal.source = block.raw;
         proposals.push(proposal);
     }
     return proposals;

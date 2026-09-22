@@ -63,6 +63,23 @@ export function AssistantPanel({
         onShowVariant: (seq, index) => void assistant.showVariant(seq, index),
         onNewVariant: (seq) => void assistant.regenerate(seq),
         onFork: (seq) => void assistant.forkConversation(seq),
+        onEdit: (message, text) => {
+            void assistant.editMessage(message.seq, text).then((edited) => {
+                if (edited === null) {
+                    notifyWarning('This message cannot be edited while its request is running.');
+                    return;
+                }
+                const notes = [
+                    edited.fresh > 0 ? `${String(edited.fresh)} changed or new proposal(s) to review` : '',
+                    edited.kept > 0
+                        ? `${String(edited.kept)} applied change(s) whose block was removed stay listed and can still be undone`
+                        : '',
+                ].filter((note) => note !== '');
+                if (notes.length > 0) {
+                    notifySuccess(`Reply edited: ${notes.join('; ')}.`);
+                }
+            });
+        },
         onDelete: (message) => {
             const applied = (message.variants ?? [message]).some((variant) =>
                 (variant.batch?.applied ?? []).some((batch) => batch.undone === undefined)
@@ -185,6 +202,7 @@ export function AssistantPanel({
                 mode={snapshot.activeConversation?.mode ?? 'propose'}
                 busy={busy}
                 disabled={blocked}
+                canSendEmpty={snapshot.messages.at(-1)?.role === 'user'}
                 contextSummary={
                     snapshot.activeConversation
                         ? contextSummary(snapshot.activeConversation.context, state, [...selectedIds])
@@ -218,7 +236,6 @@ export function AssistantPanel({
                     state={state}
                     selectedIds={[...selectedIds]}
                     onChange={(patch) => void assistant.updateConversationContext(patch)}
-                    onSaveAsDefault={() => void assistant.saveContextAsDefault()}
                     onClose={() => setContextOpen(false)}
                 />
             )}

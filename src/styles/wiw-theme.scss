@@ -797,69 +797,234 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 }
 
 // ---------------------------------------------------------------------------
+// Rendered markdown (core/preview.ts) — entry preview, assistant replies and
+// proposal contents share these block styles (2026-09-22: lists, tables, rules).
+// ---------------------------------------------------------------------------
+
+.wiw-markdown {
+    ul,
+    ol {
+        margin: 0.25rem 0;
+        padding-left: 1.4rem;
+    }
+
+    li > ul,
+    li > ol {
+        margin: 0.1rem 0;
+    }
+
+    table {
+        border-collapse: collapse;
+        margin: 0.4rem 0;
+        max-width: 100%;
+        display: block;
+        overflow-x: auto;
+    }
+
+    th,
+    td {
+        padding: 0.2rem 0.5rem;
+        border: 1px solid var(--SmartThemeBorderColor);
+        vertical-align: top;
+    }
+
+    th {
+        background: var(--SmartThemeBlurTintColor);
+    }
+
+    hr {
+        border: none;
+        border-top: 1px solid var(--SmartThemeBorderColor);
+        margin: 0.5rem 0;
+    }
+
+    del {
+        opacity: 0.7;
+    }
+
+    // Headings start at h3 (core/preview.ts); the deepest levels stay readable.
+    h5,
+    h6 {
+        font-size: 0.95em;
+    }
+
+        mark {
+        color: inherit;
+        background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 65%);
+        border-radius: 2px;
+        padding: 0 0.1em;
+    }
+
+    // Task items: the checkbox takes the bullet's place.
+    li.wiw-md-task {
+        list-style: none;
+        margin-left: -1.2rem;
+
+        // The app's themed checkbox is `display: grid`, which breaks the line.
+        input[type='checkbox'] {
+            display: inline-grid;
+            margin: 0 0.3rem 0 0;
+            vertical-align: -0.15em;
+        }
+    }
+
+    // Obsidian [[wikilinks]]: shown like links, but they lead nowhere in the preview.
+    .wiw-md-wikilink {
+        color: var(--SmartThemeQuoteColor);
+        border-bottom: 1px dashed currentColor;
+    }
+
+    // Obsidian callouts (> [!note] …): a titled quote.
+    blockquote.wiw-md-callout {
+        padding: 0.35rem 0.7rem;
+        border-radius: 0 6px 6px 0;
+        background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 88%);
+    }
+
+    .wiw-md-callout-title {
+        margin: 0 0 0.2rem;
+        font-weight: 600;
+        color: var(--SmartThemeBodyColor);
+    }
+
+        // A fenced block is one box: its code element carries no inline-code chip.
+    pre code {
+        background: none;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    blockquote > :first-child {
+        margin-top: 0;
+    }
+
+    blockquote > :last-child {
+        margin-bottom: 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Diff view — the shared before/after comparison (ui/DiffView.tsx).
 // ---------------------------------------------------------------------------
 
 .wiw-diff {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
+    // One scroll container; every row holds both sides (2026-09-22).
+    --wiw-diff-number: 2.6em;
+    --wiw-diff-marker: 1.1em;
     flex: 1 1 auto;
     min-height: 0;
-}
-
-.wiw-diff-pane {
+    overflow: auto;
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 6px;
-    overflow-y: auto;
-    min-width: 0;
-}
-
-.wiw-diff-pane-title {
-    position: sticky;
-    top: 0;
-    padding: 0.15rem 0.5rem;
-    background: var(--SmartThemeBlurTintColor);
-    font-size: 0.78em;
-    font-weight: 600;
-    text-transform: uppercase;
-    z-index: 1;
+    font-family: var(--monoFontFamily, monospace);
+    font-size: 0.8em;
 }
 
 .wiw-diff-line {
-    min-height: 1.1em;
+    display: grid;
+    grid-template-columns: var(--wiw-diff-number) var(--wiw-diff-marker) minmax(0, 1fr);
+    min-height: 1.3em;
 
-    pre {
-        margin: 0;
-        padding: 0.05rem 0.5rem;
-        font-family: var(--monoFontFamily, monospace);
-        font-size: 0.8em;
-        white-space: pre-wrap;
-        word-break: break-word;
+    .wiw-diff-split > & {
+        grid-template-columns:
+            var(--wiw-diff-number) var(--wiw-diff-marker) minmax(0, 1fr)
+            var(--wiw-diff-number) var(--wiw-diff-marker) minmax(0, 1fr);
+    }
+}
+
+.wiw-diff-title {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.15rem 0.5rem;
+    background: var(--SmartThemeBlurTintColor);
+    backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    font-family: var(--mainFontFamily, sans-serif);
+    font-weight: 600;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+
+    &.wiw-diff-line {
+        padding: 0;
     }
 
-    &.wiw-diff-removed pre {
+    .wiw-diff-heading {
+        grid-column: span 3;
+        padding: 0.15rem 0.5rem;
+    }
+
+    .wiw-diff-removed {
+        color: var(--warning);
+    }
+
+    .wiw-diff-added {
+        color: color-mix(in srgb, var(--okGreen70a), var(--SmartThemeBodyColor) 45%);
+    }
+}
+
+// Gutter: line number + marker, quiet and never selected with the text.
+.wiw-diff-number,
+.wiw-diff-marker {
+    padding: 0.05rem 0.3rem 0;
+    color: var(--SmartThemeEmColor);
+    opacity: 0.7;
+    text-align: right;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.wiw-diff-marker {
+    padding: 0.05rem 0 0;
+    text-align: center;
+    font-weight: 700;
+}
+
+.wiw-diff-text {
+    margin: 0;
+    padding: 0.05rem 0.5rem 0.05rem 0.2rem;
+    font: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.wiw-diff-number,
+.wiw-diff-marker,
+.wiw-diff-text {
+    &.wiw-diff-removed {
         background: var(--crimson70a);
     }
 
-    &.wiw-diff-added pre {
+    &.wiw-diff-added {
         background: var(--okGreen70a);
     }
 
-    &.wiw-diff-empty pre {
-        opacity: 0.3;
+    &.wiw-diff-empty {
+        background: color-mix(in srgb, var(--SmartThemeBorderColor), transparent 75%);
     }
+}
+
+// Words that differ inside a changed line: a stronger shade of the line color.
+.wiw-diff-word-removed,
+.wiw-diff-word-added {
+    color: inherit;
+    border-radius: 2px;
+}
+
+.wiw-diff-word-removed {
+    background: color-mix(in srgb, var(--crimson70a), var(--fullred) 45%);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, currentColor, transparent 40%);
+}
+
+.wiw-diff-word-added {
+    background: color-mix(in srgb, var(--okGreen70a), var(--SmartThemeBodyColor) 30%);
 }
 
 .wiw-diff-compact {
     flex: 0 0 auto;
     max-height: 260px;
-}
-
-@media (max-width: 900px) {
-    .wiw-diff {
-        grid-template-columns: 1fr;
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -956,6 +1121,31 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         resize: vertical;
         field-sizing: content;
     }
+}
+
+// In-place message editor (owner request 2026-09-22): sized to the content, like
+// the composer, so a long raw reply with operation blocks stays editable.
+.wiw-message-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    textarea {
+        width: 100%;
+        min-height: 4rem;
+        max-height: 60vh;
+        max-height: 60dvh;
+        resize: vertical;
+        field-sizing: content;
+        font-family: var(--monoFontFamily, monospace);
+        font-size: 0.85em;
+    }
+}
+
+.wiw-message-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
 }
 
 .wiw-assistant-composer-row {
@@ -1419,6 +1609,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 
 .wiw-context-footer {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: $spacing-sm;
     flex-wrap: wrap;

@@ -234,7 +234,7 @@ describe('availability and settings (US3)', () => {
         expect(harness.controller.updateSettings({ profileId: FAKE_PROFILE.id })).toBe(true);
     });
 
-    it('resets instructions and saves the conversation context as default', async () => {
+    it('resets instructions and remembers the last context for new conversations', async () => {
         const harness = createHarness();
         await ready(harness);
         harness.controller.updateSettings({ instructions: 'custom' });
@@ -243,8 +243,27 @@ describe('availability and settings (US3)', () => {
         expect(getAssistantSettings(harness.store.getState()).instructions).toBeNull();
         await harness.controller.createConversation();
         await harness.controller.updateConversationContext({ chatMessages: 6 });
-        expect(harness.controller.saveContextAsDefault()).toBe(true);
-        expect(getAssistantSettings(harness.store.getState()).defaultContext.chatMessages).toBe(6);
+        await harness.controller.updateConversationContext({ scope: { kind: 'workspace' }, entryContents: 'all' });
+        expect(getAssistantSettings(harness.store.getState()).defaultContext).toMatchObject({
+            chatMessages: 6,
+            scope: { kind: 'workspace' },
+            entryContents: 'all',
+        });
+        await harness.controller.createConversation();
+        expect(harness.controller.getSnapshot().activeConversation?.context).toMatchObject({
+            chatMessages: 6,
+            scope: { kind: 'workspace' },
+        });
+    });
+
+    it('keeps the context of the conversation but not the default while a recovery is pending', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        await harness.controller.createConversation();
+        harness.recovery.pending = true;
+        await harness.controller.updateConversationContext({ entryContents: 'all' });
+        expect(harness.controller.getSnapshot().activeConversation?.context.entryContents).toBe('all');
+        expect(getAssistantSettings(harness.store.getState()).defaultContext.entryContents).toBe('triggered');
     });
 
     it('fails a request when the selected profile is gone', async () => {
@@ -908,5 +927,106 @@ describe('reply versions, message deletion and forks (owner request 2026-09-16)'
         const appliedId = harness.controller.getSnapshot().messages[1]?.batch?.applied[0]?.id ?? '';
         await harness.controller.undoBatch(seq, appliedId);
         expect(JSON.stringify(harness.store.getState())).not.toContain('Forked Tavern');
+    });
+});
+
+describe('message editing and answering the last message (owner request 2026-09-22)', () => {
+    const ENTRY = (title: string): string =>
+        `<op type="create_entry" parent="f2"><title>${title}</title><content>x</content></op>`;
+
+    async function chatWith(reply: string) {
+        const harness = createHarness();
+        await ready(harness);
+        harness.controller.setSelection([NODE_IDS.hearth]);
+        harness.llm.reply(reply);
+        await harness.controller.createConversation();
+        await harness.controller.send('Add taverns');
+        const seq = harness.controller.getSnapshot().messages.at(-1)?.seq ?? 1;
+        return { harness, seq };
+    }
+    const last = (harness: Harness) => harness.controller.getSnapshot().messages.at(-1);
+
+    it('an empty send answers the last user message without adding one', async () => {
+        const { harness, seq } = await chatWith('first answer');
+        expect(harness.controller.canAnswerLast()).toBe(false);
+        await harness.controller.send('');
+        expect(harness.llm.requests).toHaveLength(1);
+
+        await harness.controller.deleteMessage(seq);
+        expect(harness.controller.canAnswerLast()).toBe(true);
+        harness.llm.reply('second answer');
+        await harness.controller.send('   ');
+        const messages = harness.controller.getSnapshot().messages;
+        expect(messages.map((message) => [message.role, message.text])).toEqual([
+            ['user', 'Add taverns'],
+            ['assistant', 'second answer'],
+        ]);
+        // The request ends with the user's text once, not twice.
+        const request = harness.llm.requests[1]?.messages ?? [];
+        expect(request.filter((message) => message.content.includes('Add taverns'))).toHaveLength(1);
+        expect(request.at(-1)?.role).toBe('user');
+    });
+
+    it('edits a user message; a later plain regenerate uses the new text', async () => {
+        const { harness, seq } = await chatWith('answer');
+        await harness.controller.editMessage(seq - 1, 'Add inns');
+        expect(harness.controller.getSnapshot().messages[0]?.text).toBe('Add inns');
+        harness.llm.reply('again');
+        await harness.controller.regenerate(seq);
+        expect(harness.llm.requests[1]?.messages.at(-1)?.content).toContain('Add inns');
+    });
+
+    it('keeps unchanged proposals with their decisions and re-parses changed blocks', async () => {
+        const { harness, seq } = await chatWith(`Two taverns.\n${ENTRY('Kept Tavern')}\n${ENTRY('Old Tavern')}`);
+        const [kept] = last(harness)?.batch?.proposals ?? [];
+        await harness.controller.accept(seq, kept?.id ?? '');
+        const text = last(harness)?.text ?? '';
+
+        const edited = await harness.controller.editMessage(
+            seq,
+            text.replace('Old Tavern', 'New Tavern').replace('Two taverns.', 'Two inns.')
+        );
+        expect(edited).toMatchObject({ fresh: 1, kept: 0 });
+        const message = last(harness);
+        expect(message?.prose).toBe('Two inns.');
+        expect(message?.batch?.proposals.map((proposal) => [proposal.values.title, proposal.decision])).toEqual([
+            ['Kept Tavern', 'applied'],
+            ['New Tavern', 'pending'],
+        ]);
+        expect(message?.batch?.proposals[0]?.id).toBe(kept?.id);
+        expect(new Set(message?.batch?.proposals.map((proposal) => proposal.id)).size).toBe(2);
+        // The undo record still works for the kept proposal.
+        await harness.controller.undoAll(seq);
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Kept Tavern');
+        expect(last(harness)?.batch?.proposals[0]?.decision).toBe('reverted');
+    });
+
+    it('keeps an applied proposal whose block was removed, so it can still be undone', async () => {
+        const { harness, seq } = await chatWith(ENTRY('Applied Tavern'));
+        await harness.controller.acceptAll(seq);
+        const edited = await harness.controller.editMessage(seq, 'Only prose now.');
+        expect(edited).toMatchObject({ fresh: 0, kept: 1 });
+        expect(last(harness)?.text).toBe('Only prose now.');
+        expect(last(harness)?.batch?.proposals[0]?.decision).toBe('applied');
+        await harness.controller.undoAll(seq);
+        expect(JSON.stringify(harness.store.getState())).not.toContain('Applied Tavern');
+    });
+
+    it('drops pending proposals whose block was removed and keeps the thinking', async () => {
+        const { harness, seq } = await chatWith(`<think>plan</think>Here.\n${ENTRY('Dropped Tavern')}`);
+        expect(last(harness)?.reasoning).toBe('plan');
+        const edited = await harness.controller.editMessage(seq, 'Here, nothing.');
+        expect(edited).toMatchObject({ fresh: 0, kept: 0 });
+        expect(last(harness)?.batch?.proposals).toEqual([]);
+        expect(last(harness)?.reasoning).toBe('plan');
+        // The persisted copy matches.
+        const stored = await harness.conversations.listMessages(last(harness)?.conversationId ?? '');
+        expect(stored.at(-1)?.text).toBe('Here, nothing.');
+    });
+
+    it('refuses to edit a message whose request is running or to save an empty text', async () => {
+        const { harness, seq } = await chatWith('answer');
+        expect(await harness.controller.editMessage(seq, '   ')).toBeNull();
+        expect(last(harness)?.text).toBe('answer');
     });
 });

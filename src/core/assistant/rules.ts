@@ -1,4 +1,4 @@
-import { diffLines } from '../diff/lineDiff';
+import { diffLines, diffSequences } from '../diff/lineDiff';
 import { findNode, type EntryNode, type TreeNode, type WorkspaceState } from '../state/schema';
 import type { OperationProposal, ProposedValues } from './types';
 
@@ -19,55 +19,11 @@ const WORD_LIMIT = 4000;
 function removedCharacters(before: string, after: string): number {
     const beforeWords = before.split(/(\s+)/).filter((part) => part.trim() !== '');
     const afterWords = after.split(/(\s+)/).filter((part) => part.trim() !== '');
-    if (beforeWords.length > WORD_LIMIT || afterWords.length > WORD_LIMIT) {
-        let removed = 0;
-        for (const op of diffLines(before, after)) {
-            if (op.type === 'removed') {
-                removed += op.text.length;
-            }
-        }
-        return removed;
-    }
-    // Longest common subsequence of words; whatever is not matched is removed.
-    const rows = beforeWords.length;
-    const columns = afterWords.length;
-    let previous = new Array<number>(columns + 1).fill(0);
-    let current = new Array<number>(columns + 1).fill(0);
-    const kept = new Array<number>(rows).fill(0);
-    // Track matches by walking the table back: store the full table only when it
-    // is small enough, otherwise recompute kept characters from the LCS length.
-    const table: number[][] = [previous.slice()];
-    for (let row = 1; row <= rows; row += 1) {
-        for (let column = 1; column <= columns; column += 1) {
-            const same = beforeWords[row - 1] === afterWords[column - 1];
-            current[column] = same
-                ? (previous[column - 1] ?? 0) + 1
-                : Math.max(previous[column] ?? 0, current[column - 1] ?? 0);
-        }
-        table.push(current.slice());
-        previous = current;
-        current = new Array<number>(columns + 1).fill(0);
-    }
-    let row = rows;
-    let column = columns;
-    while (row > 0 && column > 0) {
-        if (beforeWords[row - 1] === afterWords[column - 1]) {
-            kept[row - 1] = 1;
-            row -= 1;
-            column -= 1;
-        } else if ((table[row - 1]?.[column] ?? 0) >= (table[row]?.[column - 1] ?? 0)) {
-            row -= 1;
-        } else {
-            column -= 1;
-        }
-    }
-    let removed = 0;
-    beforeWords.forEach((word, index) => {
-        if (kept[index] !== 1) {
-            removed += word.length;
-        }
-    });
-    return removed;
+    const ops =
+        beforeWords.length > WORD_LIMIT || afterWords.length > WORD_LIMIT
+            ? diffLines(before, after).map((op) => ({ type: op.type, item: op.text }))
+            : diffSequences(beforeWords, afterWords);
+    return ops.filter((op) => op.type === 'removed').reduce((sum, op) => sum + op.item.length, 0);
 }
 
 /**

@@ -243,6 +243,11 @@ export interface SillyTavernContext {
         options?: SillyTavernSubstituteParamsOptions
     ): string;
     powerUserSettings: Record<string, unknown>;
+    /**
+     * The app's "Send on Enter" user setting (Auto = not on phones and tablets);
+     * the assistant composer follows it like the chat input (2026-09-22).
+     */
+    shouldSendOnEnter?(): boolean;
     /** Data snapshots: read through getLiveAppContext(), never the memoized context. */
     characters: SillyTavernCharacter[];
     characterId: string | number | undefined;

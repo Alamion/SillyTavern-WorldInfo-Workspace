@@ -111,6 +111,21 @@ export interface WorkspaceSettings {
      * defaults. Conversations are NOT stored here (they live per device).
      */
     assistant?: AssistantSettings;
+    /**
+     * Region sizes (2026-09-22). Optional and additive; repaired field by field by
+     * `getLayoutSettings` (core/state/layout.ts).
+     */
+    layout?: LayoutSettings;
+}
+
+export interface LayoutSettings {
+    /** Structure tree width in px (desktop). */
+    treeWidth: number;
+    treeCollapsed: boolean;
+    /** Assistant panel width in px (desktop). */
+    assistantWidth: number;
+    /** Markdown preview share of the content editor, in percent. */
+    previewWidth: number;
 }
 
 export interface WorkspaceState {

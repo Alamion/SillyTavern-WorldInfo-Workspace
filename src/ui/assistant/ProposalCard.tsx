@@ -107,7 +107,7 @@ export function ProposalCard({
                     )}
                     {values.content !== undefined && (
                         <div
-                            className="wiw-proposal-preview"
+                            className="wiw-proposal-preview wiw-markdown"
                             dangerouslySetInnerHTML={{ __html: renderMarkdown(values.content) }}
                         />
                     )}
