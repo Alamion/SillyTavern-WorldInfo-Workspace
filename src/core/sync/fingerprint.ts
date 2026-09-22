@@ -32,6 +32,27 @@ export function fnv1a(input: string): string {
     return hash.toString(16).padStart(8, '0');
 }
 
+/**
+ * Identity-keyed fingerprint memo (spec 006 R6).
+ *
+ * One push of a 1000-entry book runs three independent full passes that each
+ * stringify and hash every entry (divergence analysis, bound-import planning and
+ * flatten) — 43 ms of pure re-hashing for a single edited entry. The granularity
+ * was already right; nothing cached it.
+ *
+ * Correct only because structural sharing keeps unchanged entries' `native`
+ * objects reference-identical (core/state/sharing.ts): an edit produces a fresh
+ * `native`, which is a fresh key, so a stale hash can never be served. A WeakMap
+ * lets the memo die with the entry version it describes.
+ */
+const fingerprintCache = new WeakMap<NativeWorldInfoEntry, string>();
+
 export function fingerprintEntry(entry: NativeWorldInfoEntry): string {
-    return fnv1a(stableStringify(entry));
+    const cached = fingerprintCache.get(entry);
+    if (cached !== undefined) {
+        return cached;
+    }
+    const hash = fnv1a(stableStringify(entry));
+    fingerprintCache.set(entry, hash);
+    return hash;
 }

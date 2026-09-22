@@ -32,17 +32,54 @@ describe('fingerprint (research R6)', () => {
     });
 
     it('fingerprints change when any field changes', () => {
+        // Each variant is a NEW object: fingerprints are memoized by identity, so
+        // the contract is "replace, do not mutate" (spec 006 R6).
         const entry = makeEntry(1);
         const before = fingerprintEntry(entry);
-        entry.content = 'new text';
-        expect(fingerprintEntry(entry)).not.toBe(before);
-        entry.content = '';
-        expect(fingerprintEntry(entry)).toBe(before);
+        expect(fingerprintEntry({ ...entry, content: 'new text' })).not.toBe(before);
+        expect(fingerprintEntry({ ...entry, content: '' })).toBe(before);
     });
 
     it('is whitespace-insensitive for equivalent objects', () => {
         const a = fingerprintEntry(makeEntry(3));
         const clone = JSON.parse(JSON.stringify(makeEntry(3))) as NativeWorldInfoEntry;
         expect(fingerprintEntry(clone)).toBe(a);
+    });
+});
+describe('identity-keyed memoization (spec 006 R6)', () => {
+    it('returns the same hash for the same object without rehashing', () => {
+        const entry = createDefaultNativeEntry(1);
+        entry.content = 'lore';
+        const first = fingerprintEntry(entry);
+        expect(fingerprintEntry(entry)).toBe(first);
+    });
+
+    it('hashes a fresh object independently, so edits are never stale', () => {
+        const entry = createDefaultNativeEntry(1);
+        entry.content = 'before';
+        const before = fingerprintEntry(entry);
+        // Structural sharing gives an edited entry a NEW native object.
+        const edited = { ...entry, content: 'after' };
+        expect(fingerprintEntry(edited)).not.toBe(before);
+    });
+
+    it('distinguishes two objects that differ only in content', () => {
+        const a = createDefaultNativeEntry(2);
+        a.content = 'x';
+        const b = { ...a, content: 'y' };
+        expect(fingerprintEntry(a)).not.toBe(fingerprintEntry(b));
+    });
+
+    it('DOCUMENTED LIMIT: an already-hashed object mutated in place keeps its hash', () => {
+        // The memo is keyed by object identity, so callers must replace `native`
+        // rather than mutate it — which is exactly what structural sharing does.
+        // This test pins the contract so a future in-place mutator fails loudly
+        // here instead of silently skipping a sync.
+        const entry = createDefaultNativeEntry(3);
+        entry.content = 'first';
+        const first = fingerprintEntry(entry);
+        entry.content = 'mutated in place';
+        expect(fingerprintEntry(entry)).toBe(first);
+        expect(fingerprintEntry({ ...entry })).not.toBe(first);
     });
 });

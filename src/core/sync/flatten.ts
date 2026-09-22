@@ -23,8 +23,14 @@ export interface FlattenInput {
     bookName: string;
     existingBook: WorldInfoBook;
     orphans: OrphanedEntry[];
-    /** Assigns a fresh uid from the book's free pool (0..999999). */
-    allocateUid(used: ReadonlySet<number>): number;
+    /**
+     * Assigns a fresh uid from the book's free pool (0..999999): the lowest free
+     * uid at or above `from`. Within one flatten pass `used` only
+     * grows, so the lowest free uid never decreases and threading the previous
+     * result back in is EXACTLY equivalent to rescanning from 0 — a pure
+     * optimization, not a change in which uid an entry receives (spec 006 R7).
+     */
+    allocateUid(used: ReadonlySet<number>, from: number): number;
 }
 
 export interface FlattenSkipped {
@@ -103,6 +109,7 @@ export function flattenRoot(input: FlattenInput): FlattenResult {
     const exported: FlattenExported[] = [];
     const skipped: FlattenSkipped[] = [];
 
+    let uidCursor = 0;
     const writeNode = (node: EntryNode): void => {
         const violations = validateNode(node);
         if (violations.length > 0) {
@@ -114,7 +121,8 @@ export function flattenRoot(input: FlattenInput): FlattenResult {
         if (ownSync !== undefined && keepIds.has(node.id) && ownSync.uid !== null) {
             uid = ownSync.uid;
         } else {
-            uid = input.allocateUid(used);
+            uid = input.allocateUid(used, uidCursor);
+            uidCursor = uid + 1;
         }
         used.add(uid);
         const native = structuredClone(node.native);

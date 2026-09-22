@@ -37,16 +37,27 @@ export function cleanReference(raw: string): string {
 }
 
 function findByName(scope: TreeNode, wanted: string): ImageNode | undefined {
+    // Breadth-first, but with a read cursor instead of `queue.shift()`: shifting
+    // an array is O(n), which made this O(n^2) over the scope — and it runs twice
+    // per ancestor folder, inside the markdown preview render (spec 006 R8).
+    // Traversal ORDER is unchanged, so which image wins is unchanged.
     const queue: TreeNode[] = [scope];
-    while (queue.length > 0) {
-        const node = queue.shift()!;
+    for (let at = 0; at < queue.length; at += 1) {
+        const node = queue[at];
+        if (!node) {
+            continue;
+        }
         if (node.kind === 'image' && node.src !== '') {
             const name = normalizeName(node.name);
             if (name === wanted || normalizeName(stripExtension(node.name)) === wanted) {
                 return node;
             }
         } else if (node.kind === 'folder') {
-            queue.push(...node.children);
+            // Push one by one: spreading a large children array can overflow the
+            // argument limit.
+            for (const child of node.children) {
+                queue.push(child);
+            }
         }
     }
     return undefined;

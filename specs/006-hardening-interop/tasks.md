@@ -103,21 +103,21 @@ select, type, move, search, sync) and verify budgets and typing fidelity.
 
 ### Tests (write first, must fail)
 
-- [ ] T015 [P] [US1] Perf budget tests P-5…P-9 in `tests/perf/scale.bench.test.ts` (push, fingerprint memo, markdown render, reconcile, memory stability)
+- [X] T015 [P] [US1] Perf budget tests P-5…P-9 in `tests/perf/scale.bench.test.ts` (push, fingerprint memo, markdown render, reconcile, memory stability)
 - [ ] T016 [P] [US1] Unit tests for draft-field flush semantics in `tests/unit/draft-field.test.ts`: commit on blur, commit on debounce, and **flush on demand** (generation start / panel close) with no lost text
-- [ ] T017 [P] [US1] Unit tests for identity-keyed fingerprint memoization in `tests/unit/fingerprint.test.ts` (extend): unchanged entry hashes once, changed entry re-hashes
+- [X] T017 [P] [US1] Unit tests for identity-keyed fingerprint memoization in `tests/unit/fingerprint.test.ts` (extend): unchanged entry hashes once, changed entry re-hashes
 - [ ] T018 [P] [US1] Unit tests for bucketed reconcile equivalence in `tests/unit/md-reconcile.test.ts` (extend): output identical to the pre-bucketing implementation on existing fixtures
 - [ ] T019 [P] [US1] Unit tests for the image-name index in `tests/unit/image-links.test.ts` (extend): resolution results unchanged, no quadratic queue behaviour
 - [ ] T020 [P] [US1] (FR-004) Scale-invariance tests in `tests/integration/scale-invariance.test.ts`: sync/import/export/markdown round-trip output identical at 1000 entries vs the small fixture (SC-004)
 
 ### Implementation — sync and core hot paths
 
-- [ ] T021 [P] [US1] Add `WeakMap<NativeWorldInfoEntry, string>` memoization to `fingerprintEntry` in `src/core/sync/fingerprint.ts`
-- [ ] T022 [US1] Hoist `entitiesOfRoot` out of the tombstone filter predicate into a `Set<uid>` computed once per root in `src/adapters/syncEngine.ts` (lines 235-237)
-- [ ] T023 [US1] Make the dirty-book set incremental via `pendingBooks` instead of re-walking every root per push tick in `src/adapters/syncEngine.ts` (lines 250-265)
-- [ ] T024 [US1] Merge the two consecutive post-save `store.update` calls into one in `src/adapters/syncEngine.ts` (lines 387, 405) — also removes a redundant double store notification (bookkeeping-only, so it produces no hook event either way)
-- [ ] T025 [US1] Replace `allocateLowestUid`'s linear-scan-from-zero with a stateful cursor in `src/adapters/syncEngine.ts` (lines 86-93)
-- [ ] T026 [P] [US1] Replace the `queue.shift()` BFS with an index pointer and add a name→images map in `src/core/tree/imageLinks.ts` (lines 38-52, 82-90)
+- [X] T021 [P] [US1] Add `WeakMap<NativeWorldInfoEntry, string>` memoization to `fingerprintEntry` in `src/core/sync/fingerprint.ts`
+- [X] T022 [US1] Hoist `entitiesOfRoot` out of the tombstone filter predicate into a `Set<uid>` computed once per root in `src/adapters/syncEngine.ts` (lines 235-237)
+- [X] T023 [US1] Make the dirty-book set incremental via `pendingBooks` instead of re-walking every root per push tick in `src/adapters/syncEngine.ts` (lines 250-265)
+- [X] T024 [US1] Merge the two consecutive post-save `store.update` calls into one in `src/adapters/syncEngine.ts` (lines 387, 405) — also removes a redundant double store notification (bookkeeping-only, so it produces no hook event either way)
+- [X] T025 [US1] Replace `allocateLowestUid`'s linear-scan-from-zero with a stateful cursor in `src/adapters/syncEngine.ts` (lines 86-93)
+- [X] T026 [P] [US1] Replace the `queue.shift()` BFS with an index pointer and add a name→images map in `src/core/tree/imageLinks.ts` (lines 38-52, 82-90)
 
 ### Implementation — typing and preview
 

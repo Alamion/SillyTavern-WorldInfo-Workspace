@@ -696,8 +696,13 @@ function repairMissingSync(node: TreeNode): void {
         // missing native fields additively (same rule as import — research R1).
         // Hashes that described the pre-normalization entry are carried over,
         // so a pure shape repair never reads as a native change or a conflict.
+        // Normalize into a FRESH object rather than in place: fingerprints are
+        // memoized by object identity (core/sync/fingerprint.ts), so re-hashing a
+        // mutated object would return the pre-normalization hash and this repair
+        // would never carry the hash over — every migrated entry would then read
+        // as a native change on the next sync.
         const before = fingerprintEntry(node.native);
-        normalizeNativeEntry(node.native);
+        node.native = normalizeNativeEntry(structuredClone(node.native));
         const after = fingerprintEntry(node.native);
         if (after !== before) {
             for (const bookSync of Object.values(node.sync.books)) {

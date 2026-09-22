@@ -83,8 +83,13 @@ function nextPlaceholderUid(): number {
     return PLACEHOLDER_UID_BASE + placeholderSeed;
 }
 
-function allocateLowestUid(used: ReadonlySet<number>): number {
-    for (let uid = 0; uid < MAX_UID; uid++) {
+/**
+ * Lowest free uid, scanning from `from` instead of restarting at 0 (spec 006 R7).
+ * Callers assigning many uids in one pass thread the returned value back in, which
+ * turns a first push or import of a 1000-entry book from O(n^2) into O(n).
+ */
+function allocateLowestUid(used: ReadonlySet<number>, from = 0): number {
+    for (let uid = Math.max(0, from); uid < MAX_UID; uid++) {
         if (!used.has(uid)) {
             return uid;
         }
@@ -107,11 +112,12 @@ function rootsWithBooks(state: WorkspaceState): FolderNode[] {
     return roots;
 }
 
-function entitiesOfRoot(state: WorkspaceState, rootId: string): EntryNode[] {
-    const root = findNode(state, rootId);
-    if (root?.kind !== 'folder') {
-        return [];
-    }
+/**
+ * Entities under a folder already in hand. Prefer this over `entitiesOfRoot`
+ * wherever the node is known: that variant pays an O(n) `findNode` first, which
+ * compounded badly in loops (spec 006 R7).
+ */
+function entitiesOfFolder(root: FolderNode): EntryNode[] {
     // Images are workspace-only organizational items — they never sync.
     const found: EntryNode[] = [];
     const walk = (node: TreeNode): void => {
@@ -125,6 +131,14 @@ function entitiesOfRoot(state: WorkspaceState, rootId: string): EntryNode[] {
     };
     walk(root);
     return found;
+}
+
+function entitiesOfRoot(state: WorkspaceState, rootId: string): EntryNode[] {
+    const root = findNode(state, rootId);
+    if (root?.kind !== 'folder') {
+        return [];
+    }
+    return entitiesOfFolder(root);
 }
 
 interface EntitySyncRef {
@@ -232,11 +246,16 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                 if (!root.book?.tombstones?.length) {
                     continue;
                 }
-                root.book.tombstones = root.book.tombstones.filter((uid) => {
-                    return !entitiesOfRoot(draft, root.id).some(
-                        (candidate) => candidate.native.uid === uid
-                    );
-                });
+                // entitiesOfRoot used to be called INSIDE this predicate, i.e.
+                // once per tombstone, each time walking the whole tree (spec 006
+                // R7). Compute the live uid set once per root instead.
+                const liveUids = new Set<number>();
+                for (const candidate of entitiesOfFolder(root)) {
+                    liveUids.add(candidate.native.uid);
+                }
+                root.book.tombstones = root.book.tombstones.filter(
+                    (uid) => !liveUids.has(uid)
+                );
             }
             for (const bookName of touchedBooks) {
                 pendingBooks.add(bookName);
@@ -254,7 +273,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                 continue;
             }
             const bookName = root.book.bookName;
-            const needs = entitiesOfRoot(state, root.id).some((entity) =>
+            const needs = entitiesOfFolder(root).some((entity) =>
                 isEntityDirtyForBook(entity, bookName)
             );
             if (needs) {
@@ -384,12 +403,15 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             return;
         }
         const byNode = new Map(result.exported.map((row) => [row.nodeId, row]));
+        // One update, not two: this used to publish twice per push, costing a
+        // second whole-state clone and a second store notification for a single
+        // logical outcome (spec 006 R7).
         store.update((draft) => {
             const nextRoot = findNode(draft, root.id);
             if (nextRoot?.kind !== 'folder' || !nextRoot.book) {
                 return;
             }
-            for (const entity of entitiesOfRoot(draft, nextRoot.id)) {
+            for (const entity of entitiesOfFolder(nextRoot)) {
                 const row = byNode.get(entity.id);
                 if (!row) {
                     continue;
@@ -399,15 +421,12 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
                     hash: row.hash,
                     status: 'in-sync',
                 };
-                entity.native.uid = row.uid;
+                // Replace rather than mutate: fingerprints are memoized by object
+                // identity (core/sync/fingerprint.ts).
+                entity.native = { ...entity.native, uid: row.uid };
             }
-        });
-        store.update((draft) => {
-            const nextRoot = findNode(draft, root.id);
-            if (nextRoot?.kind === 'folder' && nextRoot.book) {
-                // FR-021 fulfilled: the flattened save removed the tombstoned uids.
-                nextRoot.book.tombstones = [];
-            }
+            // FR-021 fulfilled: the flattened save removed the tombstoned uids.
+            nextRoot.book.tombstones = [];
         });
         pendingBooks.delete(bookName);
         reports.delete(bookName);
