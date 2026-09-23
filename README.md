@@ -22,17 +22,6 @@ the same tree.
 - **Keeps every native field.** Keys, strategy, order, position, depth, role, character
   filters, triggers — the full World Info entry, grouped so the common fields are up front.
 
-<table>
-  <tr>
-    <td><img src="docs/images/wi-root.png" alt="A folder designated as a World Info root, with its bound native book" width="470"></td>
-    <td><img src="docs/images/assistant.png" alt="The assistant proposing a folder and an entry, each pending your decision" width="250"></td>
-  </tr>
-  <tr>
-    <td align="center">A folder bound to a native book</td>
-    <td align="center">Proposals wait for you</td>
-  </tr>
-</table>
-
 ## Install
 
 In SillyTavern: **Extensions → Install extension**, and paste
@@ -64,7 +53,11 @@ The content field is markdown, rendered as you type — headings, emphasis, list
 callouts, and Obsidian-style `[[wikilinks]]` and `![[embeds]]` that resolve against your own
 tree.
 
-![Typing markdown with the preview updating beside it](docs/images/markdown-preview.gif)
+![Markdown source beside its live preview: a callout, a table, wikilinks and an embedded image](docs/images/markdown-preview.png)
+
+Lore is usually written line by line, so **every line is its own paragraph** — you do not
+need a blank line between them. Wikilinks resolve against your tree, and `![[an image]]`
+embeds an image item you already have.
 
 ## World Info sync
 
@@ -79,6 +72,8 @@ A folder becomes a real lorebook when you designate it a **World Info root**.
   rename the book — the name is just a handle.
 - Moving an entry out removes it from the book on the next sync; moving one in adds it.
 - Deleting tells you first exactly what will disappear from which book.
+
+![A folder designated as a World Info root, bound to the native book it fills](docs/images/wi-root.png)
 
 Changes made outside the workspace merge in silently when they do not collide. If the same
 entry changed on both sides you get a conflict banner and decide. If a save fails, a banner
@@ -123,10 +118,20 @@ and says so — one-off export and import still work everywhere.
 The assistant writes and reorganises lore with you, using the connection profile you pick in
 its settings.
 
-**Nothing is applied until you accept it.** Each proposal can be reviewed as a diff, edited
-before accepting, accepted with the rest, or denied. Any applied batch can be undone while
-the conversation exists. Deletions and heavy content removals always ask separately and are
-never part of "Accept all".
+<table>
+  <tr>
+    <td><img src="docs/images/assistant.png" alt="Two proposed entries, each pending your decision, with Accept, Deny, Edit and Diff" width="360"></td>
+    <td valign="top">
+      <b>Nothing is applied until you accept it.</b><br><br>
+      Each proposal can be reviewed as a diff, edited before accepting, accepted with the
+      rest, or denied. Any applied batch can be undone while the conversation exists.
+      Deletions and heavy content removals always ask separately and are never part of
+      "Accept all".<br><br>
+      The notice above the proposals says exactly what the model was sent, so a surprising
+      answer is traceable rather than mysterious.
+    </td>
+  </tr>
+</table>
 
 You choose what it sees — the selected items, the whole structure, the current chat, the
 character card — and that choice becomes the default for new conversations. Conversations
@@ -151,15 +156,6 @@ eventSource.on('wi-workspace:tree-changed', ({ changes }) => {
 
 Full reference, payloads and stability promise: **[docs/hooks.md](docs/hooks.md)**.
 
-## Troubleshooting
-
-| Symptom | Cause |
-| --- | --- |
-| The markdown control is greyed out | Not desktop Chromium, or the page is not secure. One-off export/import still work. |
-| The assistant cannot send | The Connection Manager extension is missing, or no profile is selected in the assistant's settings. |
-| A book shows a conflict banner | The same entry changed in the workspace and outside it. Open the banner to compare and pick a side. |
-| "Workspace data could not be loaded" | The settings payload could not be read. The workspace stays empty and your stored data is untouched until you edit — use **Restore** in the banner. |
-
 ## Building from source
 
 ```bash
@@ -175,23 +171,29 @@ The built bundle is committed, because `manifest.json` points at `dist/index.js`
 
 ## Credits
 
-- **[SillyTavern](https://github.com/SillyTavern/SillyTavern)** — the host application.
-  Everything here runs through its public extension API (`getContext()`): World Info
-  loading and saving, connection profiles, popups, events and image storage. No app
-  internals are forked or patched.
-- **[SillyTavern-3DDiceRolls](https://github.com/Alamion/SillyTavern-3DDiceRolls)** — the
-  structural baseline for this extension: React + Webpack + SCSS with theme variables, the
-  settings and logging modules, and the single-bundle manifest layout.
-- **[SillyTavern-WorldInfoDrawer](https://github.com/LenAnderson/SillyTavern-WorldInfoDrawer)**
-  by LenAnderson — the drawer-based lore editor this project learned from, including
-  re-binding the native World Info entry point so the editor opens in place.
-- **[SillyTavern-WorldInfo-Recommender](https://github.com/bmen25124/SillyTavern-WorldInfo-Recommender)**
-  by bmen25124 — the AI lore-suggestion workflow that the in-workspace assistant
-  generalises: propose first, apply only on confirmation.
-- **[Font Awesome 6 Free](https://fontawesome.com/)** — icons, the same set the host app
-  uses, so the workspace matches your theme.
-- **[Spec Kit](https://github.com/github/spec-kit)** — the spec-driven workflow this
-  project is built with; every increment lives under `specs/`.
+Projects this one took its cues from — each solved a piece of the problem first, and this
+workspace is better for having read them.
+
+### [SillyTavern-3DDiceRolls](https://github.com/Alamion/SillyTavern-3DDiceRolls)
+
+The structural baseline. This extension reuses its shape for an ST extension that ships a
+real front end: a React + Webpack + SCSS bundle behind a single manifest, styling driven
+entirely by theme variables so the UI follows the user's theme, and the small settings and
+logging modules that sit between the app and the extension's own state.
+
+### [SillyTavern-WorldInfoDrawer](https://github.com/LenAnderson/SillyTavern-WorldInfoDrawer)
+
+Showed that lore editing belongs in a roomy drawer rather than the native form, and that an
+extension can re-bind the native World Info entry point so the richer editor opens in place
+instead of living somewhere else in the UI. The mode toggle back to Worlds/Lorebooks comes
+directly from that idea.
+
+### [SillyTavern-WorldInfo-Recommender](https://github.com/bmen25124/SillyTavern-WorldInfo-Recommender)
+
+The source of the assistant's central rule: **propose first, apply only on confirmation.**
+Its workflow — ask a model for lore, show what it came up with, let the user take some of
+it — is what the in-workspace assistant generalises into reviewable batches with diffs and
+undo.
 
 ## License
 
