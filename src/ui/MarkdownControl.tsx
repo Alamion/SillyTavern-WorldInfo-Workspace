@@ -76,7 +76,13 @@ export function MarkdownControl({
         if (!menuAt) {
             return;
         }
-        const close = (): void => setMenuAt(null);
+        // A press on the menu button itself is left to its click handler (toggle);
+        // closing here would make that click reopen the menu.
+        const close = (event: PointerEvent): void => {
+            if (!buttonRef.current?.contains(event.target as Node)) {
+                setMenuAt(null);
+            }
+        };
         window.addEventListener('pointerdown', close);
         return () => window.removeEventListener('pointerdown', close);
     }, [menuAt]);

@@ -28,6 +28,7 @@ listed here — see the git history for that.
 
 - Entries restored from a workspace saved before field normalization existed no longer
   look like they were changed outside the workspace on the next sync.
+- Pressing the markdown folders button again now closes its menu instead of reopening it.
 
 ## 0.4.11 and earlier
 
