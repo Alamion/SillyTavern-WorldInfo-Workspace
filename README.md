@@ -22,6 +22,13 @@ the same tree.
 - **Keeps every native field.** Keys, strategy, order, position, depth, role, character
   filters, triggers — the full World Info entry, grouped so the common fields are up front.
 
+## In one pass
+
+A folder becomes a World Info root, its entries are edited in the workspace, and the same
+entries turn up in the native Worlds/Lorebooks editor — no export step in between.
+
+![Designating a folder as a World Info root, editing an entry, and finding it in the native book](docs/images/walkthrough.gif)
+
 ## Install
 
 In SillyTavern: **Extensions → Install extension**, and paste
