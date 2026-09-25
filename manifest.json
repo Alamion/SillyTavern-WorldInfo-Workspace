@@ -6,6 +6,6 @@
     "js": "dist/index.js",
     "css": "",
     "author": "Alamion",
-    "version": "0.4.11",
+    "version": "0.4.12",
     "auto_update": true
 }

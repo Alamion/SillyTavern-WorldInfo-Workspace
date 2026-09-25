@@ -3,7 +3,7 @@
 User-visible changes, newest first. Internal-only work (refactors, tests, tooling) is not
 listed here — see the git history for that.
 
-## 0.4.12 — unreleased
+## 0.4.12 — 2026-09-25
 
 ### Added
 

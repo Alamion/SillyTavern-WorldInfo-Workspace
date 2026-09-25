@@ -242,7 +242,7 @@ docs/hooks.md   # Extension-author hook reference (public)
 README.md       # User-facing documentation
 CHANGELOG.md    # User-visible changes per release
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.11)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.12)
 ```
 
 ## Settings
