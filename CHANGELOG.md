@@ -35,6 +35,9 @@ listed here — see the git history for that.
 - Entries restored from a workspace saved before field normalization existed no longer
   look like they were changed outside the workspace on the next sync.
 - Pressing the markdown folders button again now closes its menu instead of reopening it.
+- Phones with UI extensions that make the page taller than the screen (AstraProjecta):
+  after the keyboard closes, an open item is no longer stuck scrolled up with its header
+  out of reach.
 
 ## 0.4.11 and earlier
 

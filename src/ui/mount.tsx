@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
+import { installViewportScrollGuard } from '../adapters/viewportScrollGuard';
 import '../styles/prototype.scss';
 import { WorkspaceApp } from './WorkspaceApp';
 
@@ -20,6 +21,7 @@ export function mountWorkspaceSurface(
     services: WorkspaceStateServices
 ): void {
     createRoot(container).render(<WorkspaceApp services={services} />);
+    installViewportScrollGuard(container);
     // Performance: the app registers many delegated jQuery handlers on `document`; every
     // keystroke bubbling out of a workspace field made jQuery match all their selectors
     // (most of the typing cost). React has already handled the event at this container

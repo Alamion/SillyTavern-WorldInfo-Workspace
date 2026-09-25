@@ -180,6 +180,9 @@ src/
 │   ├── mdController.ts      # UI-facing markdown surface (busy, reports, decisions)
 │   ├── hooks.ts             # The one contained wi-workspace:* emitter (never awaited)
 │   ├── draftRegistry.ts     # Uncommitted field drafts + flush points
+│   ├── viewportScrollGuard.ts # Restores a non-user-scrollable page root that the
+│   │                        #   browser scrolled for the mobile keyboard (host layouts
+│   │                        #   taller than the screen, e.g. AstraProjecta)
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
