@@ -31,7 +31,8 @@ function Sheet({
     onClose: () => void;
     children: ReactNode;
 }): JSX.Element {
-    const [size, setSize] = useState(0.82);
+    // Opens fully expanded (owner request 2026-09-25); drag down for smaller sizes.
+    const [size, setSize] = useState(1);
     const [reach, setReach] = useState(0);
     const sheetRef = useRef<HTMLDivElement | null>(null);
 

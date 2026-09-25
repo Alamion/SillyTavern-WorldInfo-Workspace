@@ -116,12 +116,6 @@ export const FIELD_SCHEMA: readonly SampleFieldMeta[] = [
         docs: docs('vector-storage-matching'),
     },
     {
-        name: 'selective',
-        type: 'boolean',
-        label: 'Selective',
-        info: 'Enables the secondary key filter.',
-    },
-    {
         name: 'disable',
         type: 'boolean',
         label: 'Disabled',
@@ -381,6 +375,14 @@ export const FIELD_SCHEMA: readonly SampleFieldMeta[] = [
     },
 ];
 
+
+/**
+ * `selective` is not edited directly: it follows the optional filter, on when the
+ * filter has keywords and off otherwise (the native editor hides it too).
+ */
+export function selectiveFor(keysecondary: readonly string[]): boolean {
+    return keysecondary.length > 0;
+}
 
 export const ADVANCED_LAYOUT: readonly SampleEditorSection[] = [
     {

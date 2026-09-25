@@ -657,10 +657,12 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     <button
                         type="button"
                         className="wiw-button wiw-icon-button"
-                        title={isMobile || !assistantOpen ? 'Show assistant' : 'Hide assistant'}
+                        title={(isMobile ? mobileSheet === 'assistant' : assistantOpen) ? 'Hide assistant' : 'Show assistant'}
                         onClick={() => {
                             if (isMobile) {
-                                setMobileSheet('assistant');
+                                // A second press closes the assistant sheet; from the editor
+                                // sheet it switches to the assistant.
+                                setMobileSheet((prev) => (prev === 'assistant' ? 'none' : 'assistant'));
                             } else {
                                 setAssistantOpen((prev) => !prev);
                             }

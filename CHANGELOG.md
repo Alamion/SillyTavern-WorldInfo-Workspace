@@ -22,6 +22,12 @@ listed here — see the git history for that.
   workspace, or start a generation.
 - The markdown preview no longer re-renders while you type, and no longer re-renders at
   all when the text has not changed.
+- Entry editor: the Selective checkbox is gone — it now follows the optional filter (on
+  when it has keywords). Strategy takes its place next to Keys and Logic; Order, Position,
+  Depth, Role, Probability and the group fields open Advanced. On phones only Keys stays
+  above the content.
+- Phones: sheets open fully expanded, and the assistant button closes the assistant sheet
+  when it is already open.
 - Very large folders render only the rows in view.
 
 ### Fixed

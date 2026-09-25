@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { NativeWorldInfoEntry } from '../../global';
 import type { SampleFieldMeta, SampleFieldName } from '../../core/fieldSchema';
-import { ADVANCED_LAYOUT, FIELD_SCHEMA } from '../../core/fieldSchema';
+import { ADVANCED_LAYOUT, FIELD_SCHEMA, selectiveFor } from '../../core/fieldSchema';
 import { renderMarkdown, type ImageResolver } from '../../core/preview';
 import { clampLayoutSize, LAYOUT_LIMITS } from '../../core/state/layout';
 import { useLayout } from '../layoutContext';
@@ -407,72 +407,55 @@ export function CardEditor({
         set('constant', next === 'constant');
         set('vectorized', next === 'vectorized');
     };
-    return (
-        <div className="wiw-editor-card">
-                <NodeHeader
-                kind="entry"
-                icon="fa-book"
-                name={native.comment}
-                disabled={native.disable}
-                onCommitName={onCommitName}
-                onToggleDisable={onToggleDisable}
-                onDuplicate={onDuplicate}
-                onDelete={onDelete}
+    // Phones keep only the keys above the content; everything else is under Advanced.
+    const isMobile = window.matchMedia('(max-width: 900px)').matches;
+    const filterFields = (
+        <>
+            <FieldControl
+                meta={fieldMeta('selectiveLogic')}
+                span={2}
+                value={native.selectiveLogic}
+                onChange={(next) => set('selectiveLogic', next)}
             />
-            {banner}
-            <p className="wiw-membership-line">{membershipLine}</p>
-            <div className="wiw-field-grid">
-                <FieldControl
-                    meta={fieldMeta('key')}
-                    span={4}
-                    value={native.key}
-                    onChange={(next) => set('key', next)}
-                />
-                <FieldControl
-                    meta={fieldMeta('selectiveLogic')}
-                    span={2}
-                    value={native.selectiveLogic}
-                    onChange={(next) => set('selectiveLogic', next)}
-                />
-                <FieldControl
-                    meta={fieldMeta('keysecondary')}
-                    span={4}
-                    value={native.keysecondary}
-                    onChange={(next) => set('keysecondary', next)}
-                />
-                <FieldControl
-                    meta={fieldMeta('selective')}
-                    span={2}
-                    value={native.selective}
-                    onChange={(next) => set('selective', next)}
-                />
+            <FieldControl
+                meta={fieldMeta('keysecondary')}
+                span={3}
+                value={native.keysecondary}
+                onChange={(next) => {
+                    set('keysecondary', next);
+                    set('selective', selectiveFor(next as string[]));
+                }}
+            />
+            <div className="wiw-field" style={{ gridColumn: 'span 3' }}>
+                <span className="wiw-field-label">
+                    Strategy
+                    <InfoIcon
+                        info="Entry activation strategy: constant (always on), normal (triggered by keys), vectorized (embedding similarity)."
+                        docs="https://docs.sillytavern.app/usage/core-concepts/worldinfo/#strategy"
+                    />
+                </span>
+                <StrategyControl value={strategy} onChange={setStrategy} />
             </div>
+        </>
+    );
+    const placementFields = (
+        <>
             <div className="wiw-field-grid">
-                <div className="wiw-field" style={{ gridColumn: 'span 3' }}>
-                    <span className="wiw-field-label">
-                        Strategy
-                        <InfoIcon
-                            info="Entry activation strategy: constant (always on), normal (triggered by keys), vectorized (embedding similarity)."
-                            docs="https://docs.sillytavern.app/usage/core-concepts/worldinfo/#strategy"
-                        />
-                    </span>
-                    <StrategyControl value={strategy} onChange={setStrategy} />
-                </div>
                 <FieldControl
                     meta={fieldMeta('order')}
-                    span={2}
+                    span={3}
                     value={native.order}
                     onChange={(next) => set('order', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('position')}
-                    span={3}
+                    span={4}
                     value={native.position}
                     onChange={(next) => set('position', next)}
                 />
                 <FieldControl
                     meta={fieldMeta('depth')}
-                    span={1}
+                    span={2}
                     value={native.depth}
                     onChange={(next) => set('depth', next)}
                 />
@@ -512,6 +495,31 @@ export function CardEditor({
                     onChange={(next) => set('groupWeight', next)}
                 />
             </div>
+        </>
+    );
+    return (
+        <div className="wiw-editor-card">
+                <NodeHeader
+                kind="entry"
+                icon="fa-book"
+                name={native.comment}
+                disabled={native.disable}
+                onCommitName={onCommitName}
+                onToggleDisable={onToggleDisable}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+            />
+            {banner}
+            <p className="wiw-membership-line">{membershipLine}</p>
+            <div className="wiw-field-grid">
+                <FieldControl
+                    meta={fieldMeta('key')}
+                    span={4}
+                    value={native.key}
+                    onChange={(next) => set('key', next)}
+                />
+                {!isMobile && filterFields}
+            </div>
             <ContentSection
                 content={native.content}
                 onContentChange={(next) => set('content', next)}
@@ -530,6 +538,8 @@ export function CardEditor({
                 {advancedOpen && (
                     <>
                         <p className="wiw-membership-line">{membershipLine}</p>
+                        {isMobile && <div className="wiw-field-grid">{filterFields}</div>}
+                        {placementFields}
                         <div className="wiw-field-grid">
                             {ADVANCED_LAYOUT[0]!.fields.map(({ name, span }) => (
                                 <FieldControl
