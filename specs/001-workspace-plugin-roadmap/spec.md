@@ -317,11 +317,20 @@ editable.
 | 3 — Markdown Conversion | Bidirectional md import/export, documented mapping (US6) | Round-trip fidelity verified on a sample library |
 | 4 — Hardening & Interop | Large-book performance, extension hooks, polish, documentation | Meets success criteria at scale; hooks documented |
 | 5 — AI Images | AI image generation as workspace image items; AI captioning of image items as a separate action (US7) | Generated images and confirmed captions land as regular, persisted image items |
+| 6 — Context & Retrieval | Richer assistant context (context preview with reasons and costs, per-entry summaries, catalog-based selection, fuzzy matching, named context sets); optional interop with Memory Books, Doom's Enhancement Suite and DeepLore; opt-in AI-chosen entries for main-chat generation through the native `WORLDINFO_FORCE_ACTIVATE` event | Assistant context is explainable and fits large libraries; AI-chosen entries reach main-chat prompts through the native engine without double injection |
+| 7 — Own Retrieval Engine (possible, heavy) | A full retrieval/injection engine beside or instead of native World Info: own positions/depths, deduplication, budgets, entries outside active books (DeepLore-style) | Not scheduled; revisited only after Phase 6 is in real use |
 
 Phase order is a proposal; the owner confirms or reshuffles it during review/clarification.
 
 **Order amendments**:
 
+- 2026-10-06: Phase 6 (Context & Retrieval) added and delivered next — spec 007, owner
+  decision, prompted by a tester request for AI-chosen context. Reference extensions
+  studied: DeepLore (MIT; ideas only), Memory Books and Doom's Enhancement Suite (AGPL;
+  ideas and data formats only, no code), DoomLore-Mesh (no licence; not used). Main-chat
+  retrieval stays on the native engine via `WORLDINFO_FORCE_ACTIVATE`; a full own engine
+  is recorded as possible Phase 7. Phase 5 (AI Images) references: the app's bundled
+  `caption` and `stable-diffusion` extensions.
 - 2026-09-22: Phase 4 (Hardening & Interop) is delivered next, before Phase 5 (AI
   Images) — spec 006, owner decision. Its scale target is a 1000-entry book and a
   ~2000-node workspace. Its "polish" scope is delivered as a standing maintenance-change
