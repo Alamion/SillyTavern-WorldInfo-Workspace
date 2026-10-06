@@ -324,6 +324,8 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 
 **Order amendments**:
 
+- 2026-10-07: Phase 6 (Context & Retrieval) implemented (spec 007, all five user stories);
+  live validation and the owner's release decision pending.
 - 2026-10-06: Phase 6 (Context & Retrieval) added and delivered next — spec 007, owner
   decision, prompted by a tester request for AI-chosen context. Reference extensions
   studied: DeepLore (MIT; ideas only), Memory Books and Doom's Enhancement Suite (AGPL;

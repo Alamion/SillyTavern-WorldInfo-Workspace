@@ -282,3 +282,52 @@ describe('pipeline budgets at scale', () => {
         expect(elapsed).toBeLessThan(BUDGET_MS.P8_reconcile2000);
     }, 180_000);
 });
+
+describe('spec 007 budgets at scale', () => {
+    it('P-10 building the assistant request with an Auto catalog for the scale dataset < 150 ms', async () => {
+        const { buildRequest } = await import('../../src/core/assistant/context');
+        const { DEFAULT_CONTEXT_SETTINGS } = await import('../../src/core/assistant/types');
+        const dataset = buildScaleDataset();
+        const build = (): void => {
+            buildRequest({
+                state: dataset.state,
+                mode: 'propose',
+                instructions: null,
+                context: { ...DEFAULT_CONTEXT_SETTINGS, scope: { kind: 'workspace' }, entryContents: 'all', catalog: 'auto' },
+                selection: [],
+                request: 'Which harbor ledger mentions the salt guild?',
+                history: [],
+                contextTokens: 16000,
+                responseTokens: 2000,
+            });
+        };
+        build(); // warm the BM25 document memo
+        expect(fastest(3, build)).toBeLessThan(150);
+    }, 120_000);
+
+    it('P-11 the lore-picking interceptor with picking off costs < 1 ms', async () => {
+        const { createPickingController } = await import('../../src/adapters/pickingController');
+        const dataset = buildScaleDataset();
+        const store = new WorkspaceStore(dataset.state);
+        const context = {
+            eventSource: { on: () => undefined, removeListener: () => undefined, emit: async () => undefined },
+            eventTypes: {},
+            chat: [],
+            chatMetadata: {},
+            getCurrentChatId: () => 'c',
+        };
+        const picking = createPickingController({
+            context: () => context as never,
+            store,
+            llm: { availability: () => ({ state: 'connection-manager-disabled' }), onProfilesChanged: () => () => undefined, run: async () => undefined },
+            emit: () => undefined,
+            notice: () => undefined,
+            now: () => Date.now(),
+            isRecoveryPending: () => false,
+        });
+        const elapsed = fastest(20, () => {
+            void picking.interceptor([], 8192, () => undefined, 'normal');
+        });
+        expect(elapsed).toBeLessThan(1);
+    });
+});

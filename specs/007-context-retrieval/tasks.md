@@ -198,8 +198,8 @@ and US5. **No user story starts before this phase is complete.**
 
 ## Phase 8: Polish & Live Validation
 
-- [ ] T066 Perf check: preview build for the 1000-entry scale dataset < 150 ms and interceptor overhead with picking off < 1 ms, added to `tests/perf/scale.bench.test.ts`
-- [ ] T067 Update `AGENTS.md` (current increment, structure: `core/picking`, `core/interop`, new adapters; settings `picking`, `contextSets`; protocol v2) and `specs/001-workspace-plugin-roadmap/spec.md` delivery note
+- [x] T066 Perf check: preview build for the 1000-entry scale dataset < 150 ms and interceptor overhead with picking off < 1 ms, added to `tests/perf/scale.bench.test.ts`
+- [x] T067 Update `AGENTS.md` (current increment, structure: `core/picking`, `core/interop`, new adapters; settings `picking`, `contextSets`; protocol v2) and `specs/001-workspace-plugin-roadmap/spec.md` delivery note
 - [ ] T068 Run live scenarios C0–C23 on the `dev` account and record results in `specs/007-context-retrieval/quickstart.md`
 - [ ] T069 Run live scenarios C24–C31 on the Phase 1 fixtures and record results in `specs/007-context-retrieval/quickstart.md`
 - [ ] T070 Run live scenarios C32–C40 with the free profile and record results in `specs/007-context-retrieval/quickstart.md`

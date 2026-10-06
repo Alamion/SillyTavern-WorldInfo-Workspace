@@ -26,7 +26,17 @@ amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and i
 any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
 hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
 UI contract, quickstart S0–S14).
-**Current increment (spec 005, implemented 2026-09-15; live validation A0–A37 completed
+**Current increment (spec 007, implemented 2026-10-07; live validation in
+`specs/007-context-retrieval/quickstart.md`)**: roadmap Phase 6 — Context & Retrieval.
+Context preview with per-item reasons and costs; entry summaries
+(`extensions.wiw_summary`, markdown `wi_summary`); assistant protocol v2 (catalog section,
+`read`/`open` rounds, `summary` tag); local BM25 near matches; sentence-boundary
+truncation; named context sets; optional interop with Memory Books (data-driven badges,
+field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (matches);
+opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
+interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
+contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
+**Earlier increment (spec 005, implemented 2026-09-15; live validation A0–A37 completed
 and the phase closed by the owner 2026-09-22 — results and the SC-005 rate in
 `quickstart.md`)**: roadmap
 Phase 2 — AI Lore Assistant. Requests via `ConnectionManagerRequestService` on a profile
@@ -147,6 +157,14 @@ src/
 │   │                    #   rules.ts (destructive/duplicate/stale), plan.ts (order, blocked,
 │   │                    #   accept-all), undo.ts, failures.ts, settingsOps.ts, editReply.ts
 │   │                    #   (edit a message: re-parse, keep decisions/undo of kept blocks)
+│   ├── assistant/ (spec 007) catalog.ts (catalog lines, folder narrowing), bm25.ts
+│   │                    #   (local near matches + ranking), truncate.ts (sentence cut),
+│   │                    #   contextSets.ts; context.ts returns typed ContextItems
+│   ├── picking/         # Main-chat lore picking (spec 007): request.ts (picking prompt +
+│   │                    #   catalog), pickParser.ts, decide.ts (prepared vs fresh),
+│   │                    #   forced.ts (forced-activation objects), settings.ts, display.ts
+│   ├── interop/         # memoryBooks.ts (badges, number-prefix rule), doomsTracker.ts
+│   ├── tree/summary.ts  # Entry summary in extensions.wiw_summary
 │   ├── hooks/           # events.ts (wi-workspace:* names + payload types),
 │   │                    #   treeDiff.ts (previous→next diff, bookkeeping filtered out)
 │   ├── demo/            # dataset.ts (Aldermeer seed), sampleDataset.ts (Phase 0 shapes)
@@ -186,6 +204,10 @@ src/
 │   ├── viewportScrollGuard.ts # Restores a non-user-scrollable page root that the
 │   │                        #   browser scrolled for the mobile keyboard (host layouts
 │   │                        #   taller than the screen, e.g. AstraProjecta)
+│   ├── pickingController.ts # Lore picking: interceptor, background preparation, forced
+│   │                        #   activation, per-reply record (spec 007)
+│   ├── pickIndicator.ts     # Reply icon in the app's message template + details popup
+│   ├── interopSources.ts    # Lazy probes: Memory Books commands, DES scene, DeepLore
 │   ├── popups.ts            # Confirm/input dialogs over app Popup APIs
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
@@ -245,14 +267,19 @@ docs/hooks.md   # Extension-author hook reference (public)
 README.md       # User-facing documentation
 CHANGELOG.md    # User-visible changes per release
 dist/           # Built bundle — TRACKED in git (manifest.json points here)
-manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver 0.4.12)
+manifest.json   # ST extension manifest (display_name, js: dist/index.js, semver,
+                #   generate_interceptor: wiwPickInterceptor)
 ```
 
 ## Settings
 
 Workspace state persists under `extensionSettings['WorldInfoWorkspace']` (schema v1,
 saved via `saveSettingsDebounced` after every mutation): `{ version: 1, root:
-FolderNode-tree, settings: { sortMode, assistant?, layout? }, _recovered? }`. `settings.layout`
+FolderNode-tree, settings: { sortMode, assistant?, layout? }, _recovered? }`. `settings.picking` (spec 007,
+optional/additive) = `{ defaultEnabled, profileId, timeoutSec, chatMessages, maxPicks,
+catalogTokens }`, repaired by `getPickingSettings`; per chat `chatMetadata.WorldInfoWorkspace
+.picking = 'on'|'off'`; per reply `extra.wiw_pick`. `settings.assistant` also holds
+`defaultContext.{catalog, fuzzy, sources}` and `contextSets` (spec 007). `settings.layout`
 (2026-09-22, optional/additive) = `{ treeWidth, treeCollapsed, assistantWidth, previewWidth }`,
 repaired by `getLayoutSettings`; like the assistant settings it is not saved while a recovery
 is pending (sizes then live only in the UI). `settings.assistant`
