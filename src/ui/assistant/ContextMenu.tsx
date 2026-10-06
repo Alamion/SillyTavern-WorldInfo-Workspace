@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AssistantSnapshot } from '../../adapters/assistantController';
 import { resolveScope } from '../../core/assistant/scope';
-import type { CatalogMode, ContextSettings, ContextScope, EntryContents } from '../../core/assistant/types';
+import type { CatalogMode, ContextSet, ContextSettings, ContextScope, EntryContents } from '../../core/assistant/types';
 import type { FolderNode, TreeNode, WorkspaceState } from '../../core/state/schema';
 
 /**
@@ -88,7 +88,7 @@ export function contextSummary(
 ): string {
     const parts = [
         scopeName(context, state, selection),
-        context.entryContents === 'all' ? 'all contents' : 'by keys',
+        context.entryContents === 'all' ? 'all contents' : context.fuzzy ? 'by keys + near' : 'by keys',
     ];
     if (context.catalog !== 'auto') {
         parts.push(context.catalog === 'on' ? 'catalog' : 'no catalog');
@@ -214,6 +214,7 @@ export function ContextMenu({
     onChange,
     onClose,
     onPreview,
+    sets,
 }: {
     snapshot: AssistantSnapshot;
     state: WorkspaceState;
@@ -222,6 +223,13 @@ export function ContextMenu({
     onClose: () => void;
     /** Opens the preview of the next request (spec 007 US1). */
     onPreview: () => void;
+    /** Context sets (spec 007 US3). */
+    sets: {
+        apply: (set: ContextSet) => void;
+        saveAs: () => void;
+        rename: (set: ContextSet) => void;
+        remove: (set: ContextSet) => void;
+    };
 }): JSX.Element | null {
     const context = snapshot.activeConversation?.context;
     const [chatCount, setChatCount] = useState(
@@ -265,6 +273,33 @@ export function ContextMenu({
                 <p>What this conversation sends to the model with each message.</p>
 
                 <div className="wiw-context-body">
+                    <section className="wiw-context-section">
+                        <h4>Context sets</h4>
+                        <p className="wiw-context-hint">
+                            Saved choices for this menu. Applying one copies it into this conversation.
+                        </p>
+                        {snapshot.settings.contextSets.map((set) => (
+                            <div
+                                key={set.id}
+                                className={`wiw-context-set${snapshot.activeConversation?.contextSetName === set.name ? ' wiw-context-option-checked' : ''}`}
+                            >
+                                <button type="button" className="wiw-button" title="Apply this set" onClick={() => sets.apply(set)}>
+                                    <i className="fa-solid fa-layer-group" /> {set.name}
+                                </button>
+                                <span className="wiw-context-hint">{contextSummary(set.context, state, selectedIds)}</span>
+                                <button type="button" className="wiw-button wiw-icon-button" title="Rename" onClick={() => sets.rename(set)}>
+                                    <i className="fa-solid fa-pencil" />
+                                </button>
+                                <button type="button" className="wiw-button wiw-icon-button" title="Delete" onClick={() => sets.remove(set)}>
+                                    <i className="fa-solid fa-trash-can" />
+                                </button>
+                            </div>
+                        ))}
+                        <button type="button" className="wiw-button" onClick={sets.saveAs}>
+                            <i className="fa-solid fa-floppy-disk" /> Save current choices as a set…
+                        </button>
+                    </section>
+
                     <section className="wiw-context-section">
                         <h4>Structure</h4>
                         <p className="wiw-context-hint">
@@ -324,6 +359,14 @@ export function ContextMenu({
                             title="All entries of the structure"
                             hint="For small structures. Whatever does not fit the context size is left out."
                             onChange={() => setContents('all')}
+                        />
+                        <Option
+                            type="checkbox"
+                            checked={context.fuzzy}
+                            disabled={context.entryContents === 'all'}
+                            title="Also near matches"
+                            hint="Up to 5 entries that share words with your message even when no key matches exactly (other word forms, partial names)."
+                            onChange={(checked) => onChange({ fuzzy: checked })}
                         />
                     </section>
 

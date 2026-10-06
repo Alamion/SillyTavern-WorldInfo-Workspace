@@ -130,17 +130,17 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T034 [P] [US3] BM25 tests: tokenization (Unicode, case), prefix stem, ranking, threshold 0.5, cap 5, memo by fingerprint, 1000-entry build < 100 ms in `tests/unit/assistant-bm25.test.ts`
-- [ ] T035 [P] [US3] Truncation tests: sentence ends (`.!?…。！？`, blank line), min share max(50 tok, 25 %), "[…]" marker, keptShare in `tests/unit/assistant-truncate.test.ts`
-- [ ] T036 [P] [US3] Context-set tests: repair (unique names, ≤ 50, invalid dropped), apply copies values + records name, missing folders reported, later edits do not change snapshots in `tests/unit/assistant-context-sets.test.ts`
+- [x] T034 [P] [US3] BM25 tests: tokenization (Unicode, case), prefix stem, ranking, threshold 0.5, cap 5, memo by fingerprint, 1000-entry build < 100 ms in `tests/unit/assistant-bm25.test.ts`
+- [x] T035 [P] [US3] Truncation tests: sentence ends (`.!?…。！？`, blank line), min share max(50 tok, 25 %), "[…]" marker, keptShare in `tests/unit/assistant-truncate.test.ts`
+- [x] T036 [P] [US3] Context-set tests: repair (unique names, ≤ 50, invalid dropped), apply copies values + records name, missing folders reported, later edits do not change snapshots in `tests/unit/assistant-context-sets.test.ts`
 
 ### Implementation
 
-- [ ] T037 [P] [US3] Create `src/core/assistant/bm25.ts`; use it for fuzzy additions in `src/core/assistant/context.ts` (reason `fuzzy`, after key-triggered) and for catalog ranking in `src/core/assistant/catalog.ts`
-- [ ] T038 [P] [US3] Create `src/core/assistant/truncate.ts` and apply it to the last non-fitting entry in `src/core/assistant/context.ts`
-- [ ] T039 [P] [US3] Create `src/core/assistant/contextSets.ts`; persist `settings.assistant.contextSets` via `src/adapters/settingsStore.ts` (not while recovery is pending)
-- [ ] T040 [US3] Fuzzy toggle and context-set UI (apply / save as / rename / delete; set name on the context chip) in `src/ui/assistant/ContextMenu.tsx`
-- [ ] T041 [US3] Document fuzzy matches and context sets in `README.md`
+- [x] T037 [P] [US3] Create `src/core/assistant/bm25.ts`; use it for fuzzy additions in `src/core/assistant/context.ts` (reason `fuzzy`, after key-triggered) and for catalog ranking in `src/core/assistant/catalog.ts`
+- [x] T038 [P] [US3] Create `src/core/assistant/truncate.ts` and apply it to the last non-fitting entry in `src/core/assistant/context.ts`
+- [x] T039 [P] [US3] Create `src/core/assistant/contextSets.ts`; persist `settings.assistant.contextSets` via `src/adapters/settingsStore.ts` (not while recovery is pending)
+- [x] T040 [US3] Fuzzy toggle and context-set UI (apply / save as / rename / delete; set name on the context chip) in `src/ui/assistant/ContextMenu.tsx`
+- [x] T041 [US3] Document fuzzy matches and context sets in `README.md`
 
 ---
 

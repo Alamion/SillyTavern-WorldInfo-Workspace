@@ -5,6 +5,8 @@ import { decisionNote, systemPrompt } from './prompts';
 import { resolveScope, selectionFolder } from './scope';
 import { expandTriggers } from './triggers';
 import { buildCatalog, folderCatalog } from './catalog';
+import { fuzzyMatches, rankEntries } from './bm25';
+import { truncateAtSentence } from './truncate';
 import type { ReadRequest } from './parser';
 import { getSummary } from '../tree/summary';
 import type {
@@ -136,7 +138,7 @@ function outlineRows(state: WorkspaceState, map: HandleMap): OutlineRow[] {
     return rows;
 }
 
-function itemBlock(node: TreeNode, handle: string): string {
+function itemBlock(node: TreeNode, handle: string, contentOverride?: string): string {
     if (node.kind === 'folder') {
         return `[${handle}] folder "${node.name}"`;
     }
@@ -158,7 +160,7 @@ function itemBlock(node: TreeNode, handle: string): string {
     if (fields.length > 0) {
         parts.push(`fields: ${fields.join(', ')}`);
     }
-    parts.push(`content:\n${node.native.content}`);
+    parts.push(`content:\n${contentOverride ?? node.native.content}`);
     return parts.join('\n');
 }
 
@@ -393,13 +395,14 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 : { reason: 'option', detail: 'activated in the current chat' }
         );
     }
+    const seedTexts: string[] = [];
     let triggered: EntryNode[];
     if (context.entryContents === 'all') {
         const seedIds = new Set(seeds.map((entry) => entry.id));
         triggered = candidates.filter((entry) => !seedIds.has(entry.id));
         triggered.forEach((entry) => why.set(entry.id, { reason: 'scope', detail: 'all entries of the structure' }));
     } else {
-        const seedTexts = [requestText, ...input.history.slice(-2).map((message) => message.text)];
+        seedTexts.push(requestText, ...input.history.slice(-2).map((message) => message.text));
         if (chat) {
             if (context.chatMessages > 0) {
                 seedTexts.push(...chat.messages.map((message) => message.text));
@@ -429,6 +432,14 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             }
         });
         triggered = layers.flatMap((layer) => layer.entries);
+        // Fuzzy supplement (spec 007 FR-010): word forms the keys miss, after the keys.
+        if (context.fuzzy) {
+            const taken = new Set([...seeds, ...triggered].map((entry) => entry.id));
+            for (const match of fuzzyMatches(candidates, seedTexts, { exclude: taken })) {
+                why.set(match.entry.id, { reason: 'fuzzy', detail: `words: ${match.terms.slice(0, 4).join(', ')}` });
+                triggered.push(match.entry);
+            }
+        }
     }
     // Catalog selection (spec 007 R4): Auto uses it only when the entries the mode
     // would send in full do not fit; On always; Off never.
@@ -446,6 +457,8 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     let seedsDropped = 0;
     let triggeredDropped = 0;
     let triggeredIncluded = 0;
+    // Only the first entry that does not fit is shortened (spec 007 R7).
+    let truncationUsed = false;
     const sendInFull = (entry: EntryNode, isSeed: boolean): void => {
         const handle = map.byNode.get(entry.id);
         if (handle === undefined) {
@@ -458,6 +471,32 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             if (useCatalog && !isSeed) {
                 // Listed in the catalog instead (below).
                 return;
+            }
+            const room = budgetTokens * (isSeed ? 0.9 : fullTextCap) - used;
+            if (!truncationUsed && room >= Math.max(50, cost * 0.25)) {
+                const overhead = cost - estimateTokens(entry.native.content);
+                const cut = truncateAtSentence(entry.native.content, Math.floor((room - overhead - 2) * 3.5));
+                if (cut !== null && cut.keptShare < 1) {
+                    truncationUsed = true;
+                    const shortened = itemBlock(entry, handle, `${cut.text} […]`);
+                    const shortCost = estimateTokens(shortened);
+                    used += shortCost;
+                    itemBlocks.push(shortened);
+                    sentInFull.add(entry.id);
+                    items.push({
+                        kind: 'entry',
+                        nodeId: entry.id,
+                        label: entry.name,
+                        ...origin,
+                        tokens: shortCost,
+                        state: 'truncated',
+                        keptShare: cut.keptShare,
+                    });
+                    if (!isSeed && context.entryContents !== 'all') {
+                        triggeredIncluded += 1;
+                    }
+                    return;
+                }
             }
             if (isSeed) {
                 seedsDropped += 1;
@@ -491,12 +530,14 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     if (useCatalog) {
         const triggeredIds = new Set(triggered.map((entry) => entry.id));
         const rest = candidates.filter((entry) => !sentInFull.has(entry.id));
+        // Narrowed catalogs keep the entries most related to the request (spec 007 R5).
+        const relevance = rankEntries(rest, seedTexts.length > 0 ? seedTexts : [requestText]);
         const catalog = buildCatalog({
             state,
             entries: rest,
             map,
             budgetTokens: Math.max(0, Math.floor(budgetTokens * 0.9 - used)),
-            rank: (entry) => (triggeredIds.has(entry.id) ? 1 : 0),
+            rank: (entry) => (triggeredIds.has(entry.id) ? 1000 : 0) + (relevance.get(entry.id) ?? 0),
         });
         catalogOnlyNodeIds = rest.map((entry) => entry.id);
         if (catalog.entryIds.length > 0 || catalog.folderIds.length > 0) {

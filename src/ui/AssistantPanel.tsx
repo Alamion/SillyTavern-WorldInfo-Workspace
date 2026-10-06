@@ -3,7 +3,7 @@ import { createComposerDraft } from '../adapters/composerDraft';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
 import { notifySuccess, notifyWarning } from '../adapters/logger';
 import { undoSummary } from '../core/assistant/undo';
-import { confirmDialog } from '../adapters/popups';
+import { confirmDialog, inputDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
 import type { AppliedBatchUndone, ContextSnapshot } from '../core/assistant/types';
 import { ContextPreview } from './assistant/ContextPreview';
@@ -131,9 +131,13 @@ export function AssistantPanel({
     // user types (spec 006 R5).
     const activeContext = snapshot.activeConversation?.context;
     const selectedList = useMemo(() => [...selectedIds], [selectedIds]);
+    const setName = snapshot.activeConversation?.contextSetName;
     const summary = useMemo(
-        () => (activeContext ? contextSummary(activeContext, state, selectedList) : 'Context'),
-        [activeContext, state, selectedList]
+        () =>
+            activeContext
+                ? `${setName !== undefined ? `${setName} · ` : ''}${contextSummary(activeContext, state, selectedList)}`
+                : 'Context',
+        [activeContext, state, selectedList, setName]
     );
 
     return (
@@ -263,6 +267,47 @@ export function AssistantPanel({
                     selectedIds={[...selectedIds]}
                     onChange={(patch) => void assistant.updateConversationContext(patch)}
                     onClose={() => setContextOpen(false)}
+                    sets={{
+                        apply: (set) => {
+                            void assistant.applyContextSet(set.id).then((applied) => {
+                                if (applied && applied.missing > 0) {
+                                    notifyWarning(
+                                        `Applied "${set.name}"; ${String(applied.missing)} folder(s) of the set no longer exist.`
+                                    );
+                                }
+                            });
+                        },
+                        saveAs: () => {
+                            void inputDialog('Name for this context set:', snapshot.activeConversation?.contextSetName ?? '').then(
+                                (name) => {
+                                    if (name !== null) {
+                                        void assistant.saveContextSet(name).then((result) => {
+                                            if (result.error !== undefined) {
+                                                notifyWarning(result.error);
+                                            }
+                                        });
+                                    }
+                                }
+                            );
+                        },
+                        rename: (set) => {
+                            void inputDialog('New name:', set.name).then((name) => {
+                                if (name !== null) {
+                                    const result = assistant.renameContextSet(set.id, name);
+                                    if (result.error !== undefined) {
+                                        notifyWarning(result.error);
+                                    }
+                                }
+                            });
+                        },
+                        remove: (set) => {
+                            void confirmDialog(`Delete the context set "${set.name}"?`).then((ok) => {
+                                if (ok) {
+                                    assistant.deleteContextSet(set.id);
+                                }
+                            });
+                        },
+                    }}
                     onPreview={() => {
                         const next = assistant.previewContext(createComposerDraft().load());
                         if (next) {

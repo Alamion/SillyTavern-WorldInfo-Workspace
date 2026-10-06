@@ -1174,3 +1174,35 @@ describe('read rounds (spec 007 protocol v2)', () => {
         expect(harness.llm.requests).toHaveLength(2);
     });
 });
+
+describe('context sets (spec 007 US3)', () => {
+    it('saves, applies to another conversation and forgets the name after a manual change', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        await harness.controller.createConversation();
+        await harness.controller.updateConversationContext({ fuzzy: true, chatMessages: 7 });
+        expect(await harness.controller.saveContextSet('Chatty')).toEqual({});
+        const set = harness.controller.getSnapshot().settings.contextSets[0];
+        expect(set).toMatchObject({ name: 'Chatty', context: { fuzzy: true, chatMessages: 7 } });
+
+        await harness.controller.createConversation();
+        await harness.controller.updateConversationContext({ fuzzy: false, chatMessages: 0 });
+        expect(await harness.controller.applyContextSet(set?.id ?? '')).toEqual({ missing: 0 });
+        let active = harness.controller.getSnapshot().activeConversation;
+        expect(active?.context).toMatchObject({ fuzzy: true, chatMessages: 7 });
+        expect(active?.contextSetName).toBe('Chatty');
+
+        await harness.controller.updateConversationContext({ persona: true });
+        active = harness.controller.getSnapshot().activeConversation;
+        expect(active?.contextSetName).toBeUndefined();
+    });
+
+    it('refuses to save sets while a recovery is pending', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        await harness.controller.createConversation();
+        harness.recovery.pending = true;
+        const result = await harness.controller.saveContextSet('Locked');
+        expect(result.error).toMatch(/recovery/);
+    });
+});

@@ -527,3 +527,35 @@ describe('catalog mode (spec 007 FR-008/FR-009)', () => {
         expect(catalogText(build({ state, selection: [NODE_IDS.taverns] }))).toContain('summary: When drinking.');
     });
 });
+
+describe('fuzzy matches and truncation (spec 007 FR-010, FR-012)', () => {
+    it('adds an entry whose key only matches another word form, after key-triggered ones', () => {
+        const built = build({
+            context: { ...BASE, fuzzy: true, scope: { kind: 'workspace' } },
+            selection: [],
+            request: 'Any good taverns near the harbor city?',
+        });
+        const item = built.snapshot.items?.find((entry) => entry.nodeId === NODE_IDS.taverns);
+        expect(item).toMatchObject({ reason: 'fuzzy', state: 'included' });
+        expect(item?.detail).toMatch(/taver/);
+        const order = (built.snapshot.items ?? []).filter((entry) => entry.kind === 'entry').map((entry) => entry.reason);
+        expect(order.indexOf('key')).toBeLessThan(order.indexOf('fuzzy'));
+    });
+
+    it('adds nothing with fuzzy matching off', () => {
+        const built = build({ context: { ...BASE, scope: { kind: 'workspace' } }, selection: [], request: 'Any good taverns?' });
+        expect(built.snapshot.items?.some((entry) => entry.reason === 'fuzzy')).toBe(false);
+    });
+
+    it('keeps the beginning of the last entry up to a sentence end when half of it fits', () => {
+        const state = aldermeerState();
+        const cities = (state.root.children[0] as FolderNode).children[0] as FolderNode;
+        (cities.children[1] as EntryNode).native.content = 'The tavern is old. '.repeat(1200);
+        const built = build({ state, selection: [NODE_IDS.taverns], contextTokens: 6000, responseTokens: 500 });
+        const item = built.snapshot.items?.find((entry) => entry.nodeId === NODE_IDS.taverns);
+        expect(item?.state).toBe('truncated');
+        expect(item?.keptShare).toBeGreaterThan(0.25);
+        expect(item?.keptShare).toBeLessThan(1);
+        expect(built.messages.at(-1)?.content).toMatch(/The tavern is old\. \[…\]/);
+    });
+});

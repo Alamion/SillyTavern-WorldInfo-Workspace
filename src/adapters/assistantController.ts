@@ -1,5 +1,6 @@
 import { applyDeletion, applyProposals, undoAppliedBatch } from './assistantApply';
 import { buildRequest, MAX_READ_ROUNDS, NO_MORE_READS, readRoundBlock } from '../core/assistant/context';
+import { applyContextSet, deleteContextSet, renameContextSet, saveContextSet } from '../core/assistant/contextSets';
 import { describeFailure, retryPolicy } from '../core/assistant/failures';
 import { parseReply } from '../core/assistant/parser';
 import { acceptAllSelection, applyOrder, canApplyAgain, withBlocked } from '../core/assistant/plan';
@@ -109,6 +110,14 @@ export interface AssistantController {
      * same code path without sending; null while busy.
      */
     previewContext(draft: string): ContextSnapshot | null;
+    /**
+     * Context sets (spec 007 FR-011): save the active conversation's context under a
+     * name, apply a saved set to it, rename or delete one. Errors are user-facing.
+     */
+    saveContextSet(name: string): Promise<{ error?: string }>;
+    applyContextSet(id: string): Promise<{ missing: number } | null>;
+    renameContextSet(id: string, name: string): { error?: string };
+    deleteContextSet(id: string): boolean;
     setSelection(nodeIds: readonly string[]): void;
     /**
      * Sends a request. An empty text answers the last message when it is the
@@ -1003,7 +1012,8 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 return;
             }
             const context: ContextSettings = { ...conversation.context, ...patch };
-            await putConversation({ ...conversation, context, updatedAt: deps.now() });
+            // A hand-made change means the conversation no longer follows a set.
+            await putConversation({ ...conversation, context, contextSetName: undefined, updatedAt: deps.now() });
             // The last choice is the start of the next conversation: no more resets to
             // "current folder, by keys" (owner request 2026-09-22).
             writeSettings({ defaultContext: structuredClone(context) });
@@ -1011,6 +1021,53 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         },
         setSelection(nodeIds) {
             selection = [...nodeIds];
+        },
+        async saveContextSet(name) {
+            await ensure();
+            const conversation = conversations.find((item) => item.id === activeConversationId);
+            if (!conversation) {
+                return { error: 'Open a conversation first.' };
+            }
+            const result = saveContextSet(settings().contextSets, name, conversation.context, deps.newId);
+            if ('error' in result) {
+                return { error: result.error };
+            }
+            if (!writeSettings({ contextSets: result.sets })) {
+                return { error: 'Context sets can be saved after the workspace recovery banner is resolved.' };
+            }
+            await putConversation({ ...conversation, contextSetName: name.trim(), updatedAt: deps.now() });
+            notify();
+            return {};
+        },
+        async applyContextSet(id) {
+            await ensure();
+            const conversation = conversations.find((item) => item.id === activeConversationId);
+            const set = settings().contextSets.find((item) => item.id === id);
+            if (!conversation || !set) {
+                return null;
+            }
+            const applied = applyContextSet(set, deps.store.getState());
+            await putConversation({
+                ...conversation,
+                context: applied.context,
+                contextSetName: set.name,
+                updatedAt: deps.now(),
+            });
+            writeSettings({ defaultContext: structuredClone(applied.context) });
+            notify();
+            return { missing: applied.missing };
+        },
+        renameContextSet(id, name) {
+            const result = renameContextSet(settings().contextSets, id, name);
+            if ('error' in result) {
+                return { error: result.error };
+            }
+            return writeSettings({ contextSets: result.sets })
+                ? {}
+                : { error: 'Context sets can be changed after the workspace recovery banner is resolved.' };
+        },
+        deleteContextSet(id) {
+            return writeSettings({ contextSets: deleteContextSet(settings().contextSets, id) });
         },
         previewContext(draft) {
             const trimmed = draft.trim();

@@ -156,6 +156,12 @@ the full text of the entries it needs (you see "Reading… round 1/3") and the r
 continues with them. *Large libraries* in the context menu switches this between Auto,
 always, and never.
 
+**Near matches and context sets.** *Also near matches* adds up to five entries that share
+words with your message even when no key matches exactly ("taverns" for a key
+"tavern"). An entry that only partly fits the context size keeps its beginning up to a
+sentence end. Choices you use often can be saved as a named *context set* and applied to
+any conversation in one click.
+
 **Preview context** (in the context menu) lists everything your next message would send:
 each entry with the reason it is there (selected, the key that matched, the entry that
 pulled it in through recursion…), its estimated size, and what was left out because it

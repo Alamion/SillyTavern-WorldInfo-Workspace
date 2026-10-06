@@ -1678,3 +1678,21 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     gap: $spacing-sm;
     flex-wrap: wrap;
 }
+
+// Context sets (spec 007 US3): apply button, summary, rename/delete.
+.wiw-context-set {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    min-width: 0;
+    padding: $spacing-xs;
+    border-radius: 6px;
+
+    > .wiw-context-hint {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
