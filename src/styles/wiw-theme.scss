@@ -1696,3 +1696,22 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         white-space: nowrap;
     }
 }
+
+// Memory Books entries (spec 007 US4).
+.wiw-badge-memory {
+    border-color: var(--SmartThemeQuoteColor);
+    color: var(--SmartThemeQuoteColor);
+}
+
+// A checkbox with its label as one clickable row (folder lore-picking exclusion).
+.wiw-checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-sm;
+    cursor: pointer;
+    font-size: 0.9em;
+
+    input {
+        accent-color: var(--SmartThemeQuoteColor);
+    }
+}

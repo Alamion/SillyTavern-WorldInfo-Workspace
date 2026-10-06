@@ -152,19 +152,19 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T042 [P] [US4] Memory Books detection tests: kinds (memory, tier N, side prompt/tracker, clip) from fields and title suffixes; numbered prefix rule accepting both `NNN - ` and `[NNN] - ` (research R14) in `tests/unit/interop-memory-books.test.ts`
-- [ ] T043 [P] [US4] Sync-engine scenario: a bound book with Memory Books entries — content edit keeps every `STMB_*`/`stmemorybooks` field byte-identical; tree reorder leaves native `displayIndex`/`order` unchanged; other entries still follow tree order — new scenario in `tests/integration/sync-engine.test.ts`
-- [ ] T044 [P] [US4] Doom's tracker extraction tests (present cast from `committedTrackerData`/`lastGeneratedData` `characterThoughts` given as array OR JSON string, absent `present` = present, `present === false` dropped, location from `infoBox.location.value` also as JSON string; only-`knownCharacters` → unavailable; malformed → unavailable) in `tests/unit/interop-dooms-tracker.test.ts`
+- [x] T042 [P] [US4] Memory Books detection tests: kinds (memory, tier N, side prompt/tracker, clip) from fields and title suffixes; numbered prefix rule accepting both `NNN - ` and `[NNN] - ` (research R14) in `tests/unit/interop-memory-books.test.ts`
+- [x] T043 [P] [US4] Sync-engine scenario: a bound book with Memory Books entries — content edit keeps every `STMB_*`/`stmemorybooks` field byte-identical; tree reorder leaves native `displayIndex`/`order` unchanged; other entries still follow tree order — new scenario in `tests/integration/sync-engine.test.ts`
+- [x] T044 [P] [US4] Doom's tracker extraction tests (present cast from `committedTrackerData`/`lastGeneratedData` `characterThoughts` given as array OR JSON string, absent `present` = present, `present === false` dropped, location from `infoBox.location.value` also as JSON string; only-`knownCharacters` → unavailable; malformed → unavailable) in `tests/unit/interop-dooms-tracker.test.ts`
 
 ### Implementation
 
-- [ ] T045 [P] [US4] Create `src/core/interop/memoryBooks.ts` and `src/core/interop/doomsTracker.ts` (pure)
-- [ ] T046 [US4] Memory Books order exception in `src/core/sync/flatten.ts`; update `AGENTS.md` "World Info sync" with the exception (contracts/native-sync-delta.md)
-- [ ] T047 [US4] Memory Books badges in `src/ui/StructureTree.tsx` and `src/ui/NodeHeader.tsx`; rename confirmation when a `[NNN]` prefix would be removed in the rename path (`src/ui/NodeHeader.tsx` / `src/adapters/popups.ts`)
-- [ ] T048 [US4] Create `src/adapters/interopSources.ts` (lazy detection; DeepLore `deepLoreEnhanced_matchText` with empty-result handling; Doom's tracker from fresh `chatMetadata`; Memory Books command availability via `SlashCommandParser.commands` and execution via `executeSlashCommandsWithOptions`)
-- [ ] T049 [US4] Interop sources in the request: "Scene cast" and "DeepLore matches" items (reason `interop`) in `src/core/assistant/context.ts` fed by the controller from `src/adapters/interopSources.ts`; scene cast as a ranking hint for catalogs
-- [ ] T050 [US4] Source toggles (only when detected) in `src/ui/assistant/ContextMenu.tsx`; "Create memory (Memory Books)" action in the bound book folder's header menu (`src/ui/ItemEditor.tsx`)
-- [ ] T051 [US4] Document interop (what each needs, what it does, AGPL note: data only) in `README.md`
+- [x] T045 [P] [US4] Create `src/core/interop/memoryBooks.ts` and `src/core/interop/doomsTracker.ts` (pure)
+- [x] T046 [US4] Memory Books order exception in `src/core/sync/flatten.ts`; update `AGENTS.md` "World Info sync" with the exception (contracts/native-sync-delta.md)
+- [x] T047 [US4] Memory Books badges in `src/ui/StructureTree.tsx` and `src/ui/NodeHeader.tsx`; rename confirmation when a `[NNN]` prefix would be removed in the rename path (`src/ui/NodeHeader.tsx` / `src/adapters/popups.ts`)
+- [x] T048 [US4] Create `src/adapters/interopSources.ts` (lazy detection; DeepLore `deepLoreEnhanced_matchText` with empty-result handling; Doom's tracker from fresh `chatMetadata`; Memory Books command availability via `SlashCommandParser.commands` and execution via `executeSlashCommandsWithOptions`)
+- [x] T049 [US4] Interop sources in the request: "Scene cast" and "DeepLore matches" items (reason `interop`) in `src/core/assistant/context.ts` fed by the controller from `src/adapters/interopSources.ts`; scene cast as a ranking hint for catalogs
+- [x] T050 [US4] Source toggles (only when detected) in `src/ui/assistant/ContextMenu.tsx`; "Create memory (Memory Books)" action in the bound book folder's header menu (`src/ui/ItemEditor.tsx`)
+- [x] T051 [US4] Document interop (what each needs, what it does, AGPL note: data only) in `README.md`
 
 ---
 

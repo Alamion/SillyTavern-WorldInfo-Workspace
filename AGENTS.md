@@ -294,6 +294,10 @@ contract: `specs/003-core-workspace-mvp/contracts/persistence-schema.md`.
 - Move-out removes an entry from the book at the next push via tombstones, move-in adds
   it (FR-018 amended 2026-09-14); deleted entities are disclosed in the delete
   confirmation and removed at the next sync (FR-021).
+- Memory Books entries (`stmemorybooks: true`, spec 007): every push keeps their stored
+  native `displayIndex` instead of the tree position (that extension numbers and orders
+  memories by it); all their `STMB_*` fields ride along in the cloned native entry. A
+  rename that drops a `NNN - ` / `[NNN] - ` prefix asks first.
 - Images and folders are workspace-only: they never export and never import (owner
   decision 2026-09-08; the former wiw-marker image encoding is retired). Sync state is
   PER BOOK (`sync.books[bookName] = { uid, hash, status }`) — nested WI roots give an

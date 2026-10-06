@@ -8,6 +8,7 @@ import { clampLayoutSize, LAYOUT_LIMITS } from '../../core/state/layout';
 import { useLayout } from '../layoutContext';
 import { useDraftField } from '../useDraftField';
 import { getSummary, isSummaryTooLong, SUMMARY_SOFT_LIMIT, withSummary } from '../../core/tree/summary';
+import { memoryBadge } from '../../core/interop/memoryBooks';
 import { NodeHeader } from '../NodeHeader';
 import { Splitter } from '../Splitter';
 import { CharacterFilterControl, MultiSelectControl } from './MultiSelect';
@@ -375,6 +376,16 @@ function ContentSection({
     );
 }
 
+function memoryHeaderBadge(native: NativeWorldInfoEntry): { label: string; title: string } | undefined {
+    const badge = memoryBadge(native);
+    return badge === null
+        ? undefined
+        : {
+              label: badge.label,
+              title: 'Memory Books entry: its own fields and order are kept when you edit it here.',
+          };
+}
+
 /**
  * Entry summary (spec 007 FR-004): when the entry matters, one or two sentences.
  * Stored in `extensions.wiw_summary`; longer than the soft limit is flagged only.
@@ -544,6 +555,7 @@ export function CardEditor({
                 icon="fa-book"
                 name={native.comment}
                 disabled={native.disable}
+                badge={memoryHeaderBadge(native)}
                 onCommitName={onCommitName}
                 onToggleDisable={onToggleDisable}
                 onDuplicate={onDuplicate}

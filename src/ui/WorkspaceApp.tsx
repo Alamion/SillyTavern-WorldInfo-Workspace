@@ -39,11 +39,13 @@ import {
     createChild,
     moveNode,
     renameNode,
+    setFolderPickExcluded,
     setExpanded,
     type CreateKind,
 } from '../core/tree/operations';
 import { validateNode } from '../core/tree/validation';
 import { resolveImageReference } from '../core/tree/imageLinks';
+import { isMemoryEntry, losesMemoryNumber } from '../core/interop/memoryBooks';
 import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { MarkdownControl } from './MarkdownControl';
@@ -388,13 +390,32 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         }
     };
 
+    // Memory Books numbers its memories by the "NNN - " title prefix (spec 007
+    // FR-015): dropping it asks once per typed name (the editor commits while typing).
+    const memoryRenameAnswers = useRef(new Map<string, { name: string; ok: boolean }>());
+    const confirmMemoryRename = async (id: string, nextName: string): Promise<boolean> => {
+        const node = index.get(id);
+        if (node?.kind !== 'entry' || !isMemoryEntry(node.native) || !losesMemoryNumber(node.name, nextName)) {
+            return true;
+        }
+        const known = memoryRenameAnswers.current.get(id);
+        if (known?.name === nextName) {
+            return known.ok;
+        }
+        const ok = await confirmDialog(
+            `"${node.name}" is a Memory Books memory. Memory Books numbers and sorts memories by the number at the start of the name; "${nextName}" drops it. Rename anyway?`
+        );
+        memoryRenameAnswers.current.set(id, { name: nextName, ok });
+        return ok;
+    };
+
     const handleRename = async (id: string): Promise<void> => {
         const node = index.get(id);
         if (!node) {
             return;
         }
         const nextName = await inputDialog('New name', node.name);
-        if (nextName === null) {
+        if (nextName === null || !(await confirmMemoryRename(id, nextName))) {
             return;
         }
         applyOperation((current) => renameNode(current, id, nextName));
@@ -592,7 +613,11 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         onCommitName: (nodeId: string, name: string) => {
             const node = index.get(nodeId);
             if (node?.kind === 'entry') {
-                commitEntryField(nodeId, 'comment', name);
+                void confirmMemoryRename(nodeId, name).then((ok) => {
+                    if (ok) {
+                        commitEntryField(nodeId, 'comment', name);
+                    }
+                });
                 return;
             }
             applyOperation((current) => renameNode(current, nodeId, name));
@@ -618,11 +643,41 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
             }
         },
         folderExtras: (folder: FolderNode) => (
-            <RootBookSettings
-                folder={folder}
-                onRenameBook={(nextName) => void sync.renameRootBook(folder.id, nextName)}
-                onResolveOrphan={(uid, mode) => void resolveOrphan(folder.book!.bookName, uid, mode)}
-            />
+            <>
+                <RootBookSettings
+                    folder={folder}
+                    onRenameBook={(nextName) => void sync.renameRootBook(folder.id, nextName)}
+                    onResolveOrphan={(uid, mode) => void resolveOrphan(folder.book!.bookName, uid, mode)}
+                />
+                <div className="wiw-editor-actions">
+                    <label className="wiw-checkbox-row" title="Main-chat lore picking never offers entries below this folder">
+                        <input
+                            type="checkbox"
+                            checked={folder.pickExcluded === true}
+                            onChange={(event) =>
+                                applyOperation((current) => setFolderPickExcluded(current, folder.id, event.target.checked))
+                            }
+                        />
+                        Exclude from lore picking
+                    </label>
+                    {folder.isWiRoot && services.assistant.interopAvailability().memoryBooks && (
+                        <button
+                            type="button"
+                            className="wiw-button"
+                            title="Runs Memory Books' own /creatememory for the scene marked in the current chat"
+                            onClick={() =>
+                                void services.assistant.createMemory().then((ok) => {
+                                    if (!ok) {
+                                        notifyError('Memory Books is not available.');
+                                    }
+                                })
+                            }
+                        >
+                            <i className="fa-solid fa-brain" /> Create memory (Memory Books)
+                        </button>
+                    )}
+                </div>
+            </>
         ),
     };
 

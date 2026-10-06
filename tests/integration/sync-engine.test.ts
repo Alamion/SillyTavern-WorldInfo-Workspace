@@ -8,7 +8,7 @@ import {
     createFolderNode,
     createImageNode,
 } from '../../src/core/state/schema';
-import { bulkSetDisable, commitEntryField } from '../../src/core/tree/operations';
+import { bulkSetDisable, commitEntryField, reorderChild } from '../../src/core/tree/operations';
 import { fingerprintEntry } from '../../src/core/sync/fingerprint';
 import { onSaveEvent } from '../../src/adapters/saveEvents';
 import { buildRig, type Rig } from '../support/fakeHost';
@@ -779,5 +779,71 @@ describe('moves across WI boundaries and reload stability', () => {
         expect(migrated._recovered).toEqual({ version: 1, root: {} });
         expect(isFreshRecovery(serialized, migrated)).toBe(false);
         expect(migrated.root.children).toHaveLength(1);
+    });
+});
+
+describe('Memory Books books (spec 007 FR-014/FR-015)', () => {
+    const MB_FIELDS = {
+        stmemorybooks: true,
+        STMB_start: 1,
+        STMB_end: 4,
+        STMB_chatId: 'Seraphina - 2026-10-07',
+        STMB_sp_plot_lastMsgId: 12,
+    };
+
+    function seedMemoryBook(rig: Rig): void {
+        const state = rig.store.getState();
+        const root = createFolderNode({ id: 'MB', parentId: state.root.id, name: 'Memories', now: NOW });
+        root.isWiRoot = true;
+        root.book = { bookName: 'Chat Book', orphans: [], tombstones: [] };
+        const entries: Record<string, NativeWorldInfoEntry> = {};
+        const names = ['001 - Arrival', '002 - Crossing', '003 - Temple'];
+        names.forEach((name, index) => {
+            const uid = index + 1;
+            const entry = createEntryNode({ id: `m${String(uid)}`, parentId: 'MB', name, now: NOW, nativeUid: uid });
+            Object.assign(entry.native, MB_FIELDS, { displayIndex: uid, order: uid, content: `Memory ${String(uid)}.` });
+            entry.sync = { books: { 'Chat Book': { uid, hash: fingerprintEntry(entry.native), status: 'in-sync' } } };
+            root.children.push(entry);
+            entries[String(uid)] = structuredClone(entry.native);
+        });
+        const plain = createEntryNode({ id: 'p1', parentId: 'MB', name: 'Seraphina', now: NOW, nativeUid: 9 });
+        plain.native.displayIndex = 3;
+        plain.sync = { books: { 'Chat Book': { uid: 9, hash: fingerprintEntry(plain.native), status: 'in-sync' } } };
+        root.children.push(plain);
+        entries['9'] = structuredClone(plain.native);
+        rig.store.update((draft) => {
+            draft.root.children.push(root);
+        });
+        rig.host.books.set('Chat Book', { entries });
+        void rig.host.updateWorldInfoList();
+    }
+
+    it('X1: editing a memory keeps every Memory Books field and its native order', async () => {
+        const rig = buildRig();
+        seedMemoryBook(rig);
+        const before = structuredClone(rig.host.books.get('Chat Book')!.entries['2']!);
+        rig.store.replace(commitEntryField(rig.store.getState(), 'm2', 'content', 'Edited in the workspace.'));
+        await rig.advanceTimers();
+        const after = rig.host.books.get('Chat Book')!.entries['2']! as unknown as Record<string, unknown>;
+        expect(after['content']).toBe('Edited in the workspace.');
+        for (const [key, value] of Object.entries(MB_FIELDS)) {
+            expect(after[key]).toEqual(value);
+        }
+        expect(after['displayIndex']).toBe(before.displayIndex);
+        expect(after['order']).toBe(before.order);
+        expect(after['comment']).toBe('002 - Crossing');
+    });
+
+    it('X2: reordering memories in the tree does not change their native order; other entries follow the tree', async () => {
+        const rig = buildRig();
+        seedMemoryBook(rig);
+        rig.store.replace(reorderChild(rig.store.getState(), 'MB', 3, 0)); // plain entry first
+        rig.store.replace(reorderChild(rig.store.getState(), 'MB', 3, 1)); // memory 3 before memory 1
+        // A same-folder reorder reaches the book with the next push of that book.
+        rig.engine.markBooksDirty(['Chat Book']);
+        await rig.advanceTimers();
+        const book = rig.host.books.get('Chat Book')!.entries;
+        expect([1, 2, 3].map((uid) => book[String(uid)]?.displayIndex)).toEqual([1, 2, 3]);
+        expect(book['9']?.displayIndex).toBe(0);
     });
 });

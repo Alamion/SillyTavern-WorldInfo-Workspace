@@ -308,15 +308,18 @@ export function AssistantPanel({
                             });
                         },
                     }}
+                    interop={assistant.interopAvailability()}
                     onPreview={() => {
-                        const next = assistant.previewContext(createComposerDraft().load());
-                        if (next) {
-                            setPreview({
-                                snapshot: next,
-                                title: 'Context preview',
-                                subtitle: 'What your next message would send, with the text in the message box now.',
-                            });
-                        }
+                        void assistant.prepareSources().then(() => {
+                            const next = assistant.previewContext(createComposerDraft().load());
+                            if (next) {
+                                setPreview({
+                                    snapshot: next,
+                                    title: 'Context preview',
+                                    subtitle: 'What your next message would send, with the text in the message box now.',
+                                });
+                            }
+                        });
                     }}
                 />
             )}

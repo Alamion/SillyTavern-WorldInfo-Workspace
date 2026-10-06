@@ -12,6 +12,7 @@ import {
 import type { FolderNode, TreeNode } from '../core/state/schema';
 import { VirtualList } from './VirtualList';
 import { getSummary } from '../core/tree/summary';
+import { memoryBadge } from '../core/interop/memoryBooks';
 
 export type TreeMenuAction =
     | 'rename'
@@ -297,6 +298,11 @@ function RowImpl({
                 >
                     {node.name}
                 </span>
+                {node.kind === 'entry' && memoryBadge(node.native) !== null && (
+                    <span className="wiw-badge wiw-badge-memory" title="Memory Books entry">
+                        {memoryBadge(node.native)?.label}
+                    </span>
+                )}
                 {node.kind === 'entry' && node.native.disable && (
                     <span className="wiw-badge wiw-badge-off" title="Disabled">
                         off

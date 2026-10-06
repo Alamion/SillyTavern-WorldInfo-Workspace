@@ -16,6 +16,7 @@ export function NodeHeader({
     onToggleDisable,
     onDuplicate,
     onDelete,
+    badge,
 }: {
     kind: 'folder' | 'entry' | 'image';
     icon: string;
@@ -25,6 +26,8 @@ export function NodeHeader({
     onToggleDisable?(): void;
     onDuplicate(): void;
     onDelete(): void;
+    /** Short label shown next to the name (e.g. a Memory Books kind, spec 007). */
+    badge?: { label: string; title: string };
 }): JSX.Element {
     // Renaming stays local and commits shortly after typing stops (spec 006 R3);
     // the caller keys this row by node id, so switching items flushes the draft.
@@ -57,6 +60,11 @@ export function NodeHeader({
                 onChange={(event) => nameDraft.onChange(event.target.value)}
                 onBlur={nameDraft.onBlur}
             />
+            {badge !== undefined && (
+                <span className="wiw-badge wiw-badge-memory" title={badge.title}>
+                    {badge.label}
+                </span>
+            )}
             <div className="wiw-editor-actions">
                 <button
                     type="button"

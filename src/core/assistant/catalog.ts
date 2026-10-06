@@ -1,4 +1,5 @@
-import { findNode, type EntryNode, type FolderNode, type WorkspaceState } from '../state/schema';
+import type { EntryNode, FolderNode, TreeNode, WorkspaceState } from '../state/schema';
+import { getNodeIndex } from '../state/nodeIndex';
 import { getSummary, SUMMARY_SOFT_LIMIT } from '../tree/summary';
 import type { HandleMap } from './handles';
 
@@ -19,13 +20,19 @@ function tokensOf(text: string): number {
 
 /** Folder path of a node, root excluded ("World / Region 0"). */
 export function folderPath(state: WorkspaceState, node: { parentId: string | null }): string {
+    // The cached index: findNode rebuilds one per call (O(n) per catalog line).
+    const index = getNodeIndex(state.root);
     const names: string[] = [];
-    let current = node.parentId !== null ? findNode(state, node.parentId) : undefined;
+    let current: TreeNode | undefined = node.parentId !== null ? index.get(node.parentId) : undefined;
     while (current && current.parentId !== null) {
         names.unshift(current.name);
-        current = findNode(state, current.parentId);
+        current = index.get(current.parentId);
     }
     return names.join(' / ');
+}
+
+function findNode(state: WorkspaceState, id: string): TreeNode | undefined {
+    return id === state.root.id ? state.root : getNodeIndex(state.root).get(id);
 }
 
 function description(entry: EntryNode): string {

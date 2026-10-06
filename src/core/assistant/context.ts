@@ -58,6 +58,11 @@ export interface BuildRequestInput {
         persona: PersonaView | null;
         activated: ActivatedEntryRef[];
     };
+    /** Spec 007 interop sources, already fetched (null = unavailable). */
+    sources?: {
+        scene: { present: string[]; location?: string } | null;
+        deeplore: { text: string; count: number } | null;
+    };
 }
 
 export interface BuiltRequest {
@@ -403,6 +408,10 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         triggered.forEach((entry) => why.set(entry.id, { reason: 'scope', detail: 'all entries of the structure' }));
     } else {
         seedTexts.push(requestText, ...input.history.slice(-2).map((message) => message.text));
+        // The scene cast points at the entries of the characters present (FR-017).
+        if (context.sources.scene && input.sources?.scene) {
+            seedTexts.push(input.sources.scene.present.join(', '));
+        }
         if (chat) {
             if (context.chatMessages > 0) {
                 seedTexts.push(...chat.messages.map((message) => message.text));
@@ -685,6 +694,46 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 }
             }
         }
+    }
+
+    // Other extensions (spec 007 US4): one item each, "unavailable" when enabled without data.
+    const sourceBlock = (label: string, body: string | null, detail: string | undefined): void => {
+        if (body === null) {
+            items.push({ kind: 'source', label, reason: 'interop', tokens: 0, state: 'omitted', omitReason: 'unavailable' });
+            return;
+        }
+        const cost = estimateTokens(body);
+        if (used + cost > budgetTokens) {
+            items.push({ kind: 'source', label, reason: 'interop', detail, tokens: cost, state: 'omitted', omitReason: 'budget' });
+            return;
+        }
+        used += cost;
+        optional.push(body);
+        items.push({ kind: 'source', label, reason: 'interop', detail, tokens: cost, state: 'included' });
+    };
+    if (context.sources.scene) {
+        const scene = input.sources?.scene ?? null;
+        sourceBlock(
+            'Current scene',
+            scene === null
+                ? null
+                : [
+                      "## Current scene (Doom's Enhancement Suite)",
+                      `Present: ${scene.present.join(', ')}`,
+                      ...(scene.location !== undefined ? [`Location: ${scene.location}`] : []),
+                  ].join('\n'),
+            scene === null ? undefined : `${String(scene.present.length)} present`
+        );
+    }
+    if (context.sources.deeplore) {
+        const matches = input.sources?.deeplore ?? null;
+        sourceBlock(
+            'DeepLore matches',
+            matches === null || matches.count === 0 || matches.text.trim() === ''
+                ? null
+                : `## DeepLore matches\n${matches.text}`,
+            matches === null ? undefined : `${String(matches.count)} ${matches.count === 1 ? 'entry' : 'entries'}`
+        );
     }
 
     const workspaceParts = [

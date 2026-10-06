@@ -95,3 +95,29 @@ export interface ChatContextPort {
     activatedEntries(): ActivatedEntryRef[];
     onChatChanged(listener: () => void): () => void;
 }
+
+/**
+ * Other lore extensions (spec 007 US4), detected lazily at the moment of use:
+ * every member answers "unavailable" (null / false) when the extension is absent
+ * or its data has an unexpected shape — never an error.
+ */
+export interface InteropPort {
+    /** Doom's Enhancement Suite: the tracked scene of the current chat. */
+    scene(): { present: string[]; location?: string } | null;
+    /** DeepLore: whether its public matcher exists. */
+    deepLoreAvailable(): boolean;
+    /** DeepLore keyword matches for the given texts; null when unavailable or failed. */
+    deepLoreMatches(texts: readonly string[]): Promise<{ text: string; count: number } | null>;
+    /** Memory Books: whether its commands are registered (it registers them late). */
+    memoryBooksAvailable(): boolean;
+    /** Runs Memory Books' own /creatememory; false when it is unavailable. */
+    createMemory(): Promise<boolean>;
+}
+
+export const NO_INTEROP: InteropPort = {
+    scene: () => null,
+    deepLoreAvailable: () => false,
+    deepLoreMatches: async () => null,
+    memoryBooksAvailable: () => false,
+    createMemory: async () => false,
+};

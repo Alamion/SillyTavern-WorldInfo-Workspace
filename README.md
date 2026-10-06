@@ -172,6 +172,24 @@ It needs the Connection Manager extension and at least one
 Free models are rate-limited often; the assistant retries by itself and tells you what
 happened.
 
+## Other lore extensions
+
+Nothing here is required; each part switches on only when the other extension is there.
+
+- **[Memory Books](https://github.com/aikohanasaki/SillyTavern-MemoryBooks)**: its memory
+  entries get a badge (Memory, Tier N, Side prompt, Clip). Editing them in the workspace
+  keeps every Memory Books field and their order — memories keep the order Memory Books
+  gave them however you arrange the tree — and renaming away the `001 - ` number asks
+  first. A World Info root folder offers *Create memory* (runs Memory Books' own command).
+- **[Doom's Enhancement Suite](https://github.com/DangerDaza/Dooms-Enhancement-Suite)**:
+  the assistant can include the tracked scene (who is present, where), and entries named
+  after present characters are pulled in.
+- **[DeepLore](https://github.com/pixelnull/sillytavern-DeepLore)**: the assistant can
+  include DeepLore's keyword matches for the recent chat as one block.
+
+Memory Books and Doom's Enhancement Suite are AGPL-licensed; this extension only reads
+their saved data and runs their public commands — no code is shared.
+
 ## For extension authors
 
 Other extensions can observe the workspace through documented, namespaced events — tree

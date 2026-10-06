@@ -1,3 +1,4 @@
+import { isMemoryEntry } from '../interop/memoryBooks';
 import type { NativeWorldInfoEntry, WorldInfoBook } from '../../global';
 import {
     findNode,
@@ -128,7 +129,12 @@ export function flattenRoot(input: FlattenInput): FlattenResult {
         const native = structuredClone(node.native);
         native.uid = uid;
         native.comment = node.name;
-        native.displayIndex = exported.length;
+        // Memory Books numbers and orders its memories by its own displayIndex: tree
+        // order is never written over it (spec 007 FR-015, native-sync-delta.md).
+        native.displayIndex =
+            isMemoryEntry(native) && typeof node.native.displayIndex === 'number'
+                ? node.native.displayIndex
+                : exported.length;
         entries[String(uid)] = native;
         exported.push({ nodeId: node.id, uid, hash: fingerprintEntry(native) });
     };

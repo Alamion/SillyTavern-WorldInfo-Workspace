@@ -215,6 +215,7 @@ export function ContextMenu({
     onClose,
     onPreview,
     sets,
+    interop,
 }: {
     snapshot: AssistantSnapshot;
     state: WorkspaceState;
@@ -223,6 +224,8 @@ export function ContextMenu({
     onClose: () => void;
     /** Opens the preview of the next request (spec 007 US1). */
     onPreview: () => void;
+    /** Other extensions usable right now (spec 007 US4). */
+    interop: { scene: boolean; deeplore: boolean; memoryBooks: boolean };
     /** Context sets (spec 007 US3). */
     sets: {
         apply: (set: ContextSet) => void;
@@ -437,6 +440,38 @@ export function ContextMenu({
                             onChange={(checked) => onChange({ activatedEntries: checked })}
                         />
                     </section>
+
+                    {(interop.scene || interop.deeplore || context.sources.scene || context.sources.deeplore) && (
+                        <section className="wiw-context-section">
+                            <h4>Other extensions</h4>
+                            {(interop.scene || context.sources.scene) && (
+                                <Option
+                                    type="checkbox"
+                                    checked={context.sources.scene}
+                                    title="Current scene (Doom's Enhancement Suite)"
+                                    hint={
+                                        interop.scene
+                                            ? 'Who is present and where; entries named after present characters are preferred.'
+                                            : 'No tracked scene in this chat yet.'
+                                    }
+                                    onChange={(checked) => onChange({ sources: { ...context.sources, scene: checked } })}
+                                />
+                            )}
+                            {(interop.deeplore || context.sources.deeplore) && (
+                                <Option
+                                    type="checkbox"
+                                    checked={context.sources.deeplore}
+                                    title="DeepLore matches"
+                                    hint={
+                                        interop.deeplore
+                                            ? "Entries DeepLore's keyword matching finds for the recent chat, as one block."
+                                            : 'DeepLore is not available right now.'
+                                    }
+                                    onChange={(checked) => onChange({ sources: { ...context.sources, deeplore: checked } })}
+                                />
+                            )}
+                        </section>
+                    )}
                 </div>
 
                 <div className="wiw-context-footer">

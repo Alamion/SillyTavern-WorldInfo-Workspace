@@ -21,6 +21,7 @@ import { createAssistantController, type AssistantController } from './assistant
 import { createLlmClient } from './llmClient';
 import { openConversationStore } from './conversationStore';
 import { createChatContext } from './chatContext';
+import { createInteropSources } from './interopSources';
 import { fsaAccess } from './fsaDisk';
 import { createImageStore } from './imageStore';
 import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
@@ -153,6 +154,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
         llm: createLlmClient(() => ctx),
         conversations: openConversationStore(),
         chat: createChatContext(),
+        interop: createInteropSources(),
         newId: () => ctx.uuidv4(),
         now: () => new Date().toISOString(),
         isRecoveryPending,

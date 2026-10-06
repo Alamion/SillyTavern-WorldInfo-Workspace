@@ -325,6 +325,24 @@ export function commitEntryField(
     return copied.state;
 }
 
+/** Leaves a folder's subtree out of main-chat lore picking (spec 007 FR-025; workspace-only). */
+export function setFolderPickExcluded(state: WorkspaceState, folderId: string, excluded: boolean): WorkspaceState {
+    const current = findNode(state, folderId);
+    if (current?.kind !== 'folder' || (current.pickExcluded === true) === excluded) {
+        return state;
+    }
+    const copied = withNodeCopied(state, folderId);
+    if (!copied || copied.node.kind !== 'folder') {
+        return state;
+    }
+    if (excluded) {
+        copied.node.pickExcluded = true;
+    } else {
+        delete copied.node.pickExcluded;
+    }
+    return copied.state;
+}
+
 /** Summary commit (spec 007 R1): `extensions.wiw_summary`, marks dirty like any field. */
 export function commitEntrySummary(state: WorkspaceState, entryId: string, summary: string): WorkspaceState {
     const current = findNode(state, entryId);

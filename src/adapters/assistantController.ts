@@ -15,7 +15,7 @@ import {
 import { forkedMessage, showVariant, variantIndex, withNewVariant } from '../core/assistant/variants';
 import type { SyncEngine } from './syncEngine';
 import type { ApplyOutcome } from './assistantApply';
-import type { ChatContextPort, ConversationStorePort, LlmPort, ProfileInfo } from '../core/assistant/ports';
+import { NO_INTEROP, type ChatContextPort, type ConversationStorePort, type InteropPort, type LlmPort, type ProfileInfo } from '../core/assistant/ports';
 import { CONTINUE_INSTRUCTION, systemPrompt } from '../core/assistant/prompts';
 import { canSaveAssistantSettings, setAssistantSettings } from '../core/assistant/settingsOps';
 import type {
@@ -83,6 +83,8 @@ export interface AssistantControllerDeps {
     now: () => string;
     /** Assistant settings cannot be saved while a data recovery is unresolved. */
     isRecoveryPending: () => boolean;
+    /** Other lore extensions (spec 007 US4); absent = none. */
+    interop?: InteropPort;
     emit?: (event: string, payload: unknown) => void;
 }
 
@@ -118,6 +120,12 @@ export interface AssistantController {
     applyContextSet(id: string): Promise<{ missing: number } | null>;
     renameContextSet(id: string, name: string): { error?: string };
     deleteContextSet(id: string): boolean;
+    /** Which other extensions can be used right now (probed at call time, spec 007 R14). */
+    interopAvailability(): { scene: boolean; deeplore: boolean; memoryBooks: boolean };
+    /** Runs Memory Books' own "create memory" command. */
+    createMemory(): Promise<boolean>;
+    /** Fetches async sources (DeepLore) for the active conversation, e.g. before a preview. */
+    prepareSources(): Promise<void>;
     setSelection(nodeIds: readonly string[]): void;
     /**
      * Sends a request. An empty text answers the last message when it is the
@@ -639,6 +647,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             createdAt: deps.now(),
         });
         notify();
+        await refreshDeepLore(conversation.context);
         const built = buildForConversation(conversation, trimmed, userSeq);
         await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
     };
@@ -667,11 +676,23 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             createdAt: deps.now(),
         });
         notify();
+        await refreshDeepLore(conversation.context);
         const built = buildForConversation(conversation, userMessage.text, userMessage.seq);
         await runRequest(conversation, assistantSeq, built.messages, built.snapshot);
     };
 
     /** Full request for a conversation turn (context builder, research R6). */
+    const interop = deps.interop ?? NO_INTEROP;
+    // DeepLore's matcher is async: fetched before a send, reused by previews.
+    let deepLoreCache: { text: string; count: number } | null = null;
+    const refreshDeepLore = async (context: ContextSettings): Promise<void> => {
+        if (!context.sources.deeplore) {
+            return;
+        }
+        const texts = deps.chat.chatMessages(Math.max(context.chatMessages, 6)).map((message) => message.text);
+        deepLoreCache = await interop.deepLoreMatches(texts);
+    };
+
     const buildForConversation = (
         conversation: Conversation,
         request: string,
@@ -697,6 +718,10 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 card: context.characterCard ? deps.chat.characterCard() : null,
                 persona: context.persona ? deps.chat.persona() : null,
                 activated: context.activatedEntries ? deps.chat.activatedEntries() : [],
+            },
+            sources: {
+                scene: context.sources.scene ? interop.scene() : null,
+                deeplore: context.sources.deeplore ? deepLoreCache : null,
             },
         });
         return { messages: built.messages, snapshot: built.snapshot };
@@ -888,6 +913,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                 createdAt: deps.now(),
             });
             notify();
+            await refreshDeepLore(touched.context);
             const built = buildForConversation(touched, request, userSeq);
             await runRequest(touched, assistantSeq, built.messages, {
                 ...built.snapshot,
@@ -1068,6 +1094,18 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         },
         deleteContextSet(id) {
             return writeSettings({ contextSets: deleteContextSet(settings().contextSets, id) });
+        },
+        interopAvailability() {
+            return {
+                scene: interop.scene() !== null,
+                deeplore: interop.deepLoreAvailable(),
+                memoryBooks: interop.memoryBooksAvailable(),
+            };
+        },
+        createMemory: () => interop.createMemory(),
+        async prepareSources() {
+            const active = conversations.find((item) => item.id === activeConversationId);
+            await refreshDeepLore(active?.context ?? repairContextSettings(settings().defaultContext));
         },
         previewContext(draft) {
             const trimmed = draft.trim();
@@ -1286,6 +1324,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
                     await runRequest(conversation, seq, previousContext.requestMessages, previousContext);
                     return;
                 }
+                await refreshDeepLore(conversation.context);
                 const built = buildForConversation(
                     conversation,
                     userMessage?.text ?? '',

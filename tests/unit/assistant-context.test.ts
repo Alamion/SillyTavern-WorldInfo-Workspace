@@ -290,7 +290,8 @@ describe('budget', () => {
             state,
             mode: 'propose',
             instructions: null,
-            context: { ...BASE, scope: { kind: 'workspace' }, entryContents: 'all' },
+            // Budget trimming without a catalog (the catalog path has its own perf budget).
+            context: { ...BASE, scope: { kind: 'workspace' }, entryContents: 'all', catalog: 'off' },
             selection: [],
             request: 'Reorganize the big folder',
             history: [],
@@ -557,5 +558,48 @@ describe('fuzzy matches and truncation (spec 007 FR-010, FR-012)', () => {
         expect(item?.keptShare).toBeGreaterThan(0.25);
         expect(item?.keptShare).toBeLessThan(1);
         expect(built.messages.at(-1)?.content).toMatch(/The tavern is old\. \[…\]/);
+    });
+});
+
+describe('interop sources (spec 007 FR-017/FR-018)', () => {
+    it('sends the scene cast and location, and lets the cast trigger entries by name', () => {
+        const built = build({
+            context: { ...BASE, scope: { kind: 'workspace' }, sources: { scene: true, deeplore: false } },
+            selection: [],
+            request: 'What happens next?',
+            sources: { scene: { present: ['Bristlemark'], location: 'Harbor' }, deeplore: null },
+        });
+        const text = built.messages.at(-1)?.content ?? '';
+        expect(text).toContain("## Current scene (Doom's Enhancement Suite)");
+        expect(text).toContain('Present: Bristlemark');
+        expect(text).toContain('Location: Harbor');
+        expect(built.snapshot.items?.find((item) => item.kind === 'source')).toMatchObject({ reason: 'interop', state: 'included' });
+        expect(built.snapshot.items?.find((item) => item.nodeId === NODE_IDS.bristlemark)?.state).toBe('included');
+    });
+
+    it('reports an enabled source without data as unavailable', () => {
+        const built = build({
+            context: { ...BASE, sources: { scene: true, deeplore: true } },
+            sources: { scene: null, deeplore: { text: '', count: 0 } },
+        });
+        const sources = (built.snapshot.items ?? []).filter((item) => item.kind === 'source');
+        expect(sources.map((item) => [item.label, item.state, item.omitReason])).toEqual([
+            ['Current scene', 'omitted', 'unavailable'],
+            ['DeepLore matches', 'omitted', 'unavailable'],
+        ]);
+    });
+
+    it('sends DeepLore matches as one item', () => {
+        const built = build({
+            context: { ...BASE, sources: { scene: false, deeplore: true } },
+            sources: { scene: null, deeplore: { text: '<Harbor>\nDocks.\n</Harbor>', count: 1 } },
+        });
+        expect(built.messages.at(-1)?.content).toContain('## DeepLore matches');
+        expect(built.snapshot.items?.find((item) => item.label === 'DeepLore matches')).toMatchObject({ state: 'included', detail: '1 entry' });
+    });
+
+    it('ignores sources that are switched off', () => {
+        const built = build({ sources: { scene: { present: ['X'] }, deeplore: { text: 'Y', count: 1 } } });
+        expect(built.snapshot.items?.some((item) => item.kind === 'source')).toBe(false);
     });
 });
