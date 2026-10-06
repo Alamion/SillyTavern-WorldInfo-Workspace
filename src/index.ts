@@ -6,8 +6,24 @@ import { mountWorkspaceSurface } from './ui/mount';
 import { flushDrafts } from './adapters/draftRegistry';
 import { createHookEmitter } from './adapters/hooks';
 import { WI_EVENTS } from './core/hooks/events';
+import { onPickRecorded } from './adapters/settingsStore';
+import { mountPickIndicator } from './adapters/pickIndicator';
+import type { GenerateInterceptor } from './global';
 
 const INIT_FLAG = '__worldInfoWorkspaceInitialized';
+
+let pickInterceptor: GenerateInterceptor | null = null;
+
+/**
+ * Main-chat lore picking (spec 007 US5): the manifest names this global as the
+ * generation interceptor. It is registered at load, before the services exist;
+ * until then (and whenever picking is off) it returns at once.
+ */
+(globalThis as Record<string, unknown>)['wiwPickInterceptor'] = (async (chat, contextSize, abort, type) => {
+    if (pickInterceptor !== null) {
+        await pickInterceptor(chat, contextSize, abort, type);
+    }
+}) satisfies GenerateInterceptor;
 
 function initSurface(services: WorkspaceStateServices): void {
     const shell = mountWorkspaceShell();
@@ -85,6 +101,8 @@ export function initWorkspace(): void {
     ctx.eventSource.on(ctx.eventTypes.APP_READY, () => {
         debugLog(`workspace v${'0.3.0'} ready`);
         const services = initWorkspaceState();
+        pickInterceptor = services.picking.interceptor;
+        mountPickIndicator(services.picking, onPickRecorded);
         initSurface(services);
     });
 }

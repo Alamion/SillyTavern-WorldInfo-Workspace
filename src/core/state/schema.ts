@@ -116,6 +116,11 @@ export interface WorkspaceSettings {
      */
     assistant?: AssistantSettings;
     /**
+     * Main-chat lore picking (spec 007, optional and additive); repaired field by
+     * field by `getPickingSettings` (core/picking/settings.ts).
+     */
+    picking?: unknown;
+    /**
      * Region sizes (2026-09-22). Optional and additive; repaired field by field by
      * `getLayoutSettings` (core/state/layout.ts).
      */

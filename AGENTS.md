@@ -409,6 +409,7 @@ Complete list, payload types in `src/core/hooks/events.ts`, consumer docs in
 | `wi-workspace:workspace-shown` / `-hidden` | The workspace surface becomes visible / stops being visible (drawer and mode switch) |
 | `wi-workspace:md-link-changed`, `wi-workspace:md-synced` | Markdown link state and sync reports (spec 004) |
 | `wi-workspace:assistant-applied`, `wi-workspace:assistant-undone` | Assistant batches (spec 005) |
+| `wi-workspace:pick-completed` | Main-chat lore picking finished for a generation (spec 007) |
 
 Rules: emitted through `adapters/hooks.ts` only, NEVER awaited (a slow subscriber must not
 block an edit) and wrapped in try/catch; payloads carry identity, never content; tree

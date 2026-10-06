@@ -45,4 +45,8 @@ describe('extension manifest', () => {
     it('declares the stylesheet field as a string', () => {
         expect(typeof field('css')).toBe('string');
     });
+
+    it('registers the lore-picking generation interceptor (spec 007)', () => {
+        expect(manifest.generate_interceptor).toBe('wiwPickInterceptor');
+    });
 });

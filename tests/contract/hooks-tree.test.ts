@@ -280,6 +280,8 @@ describe('documented surface matches the emitted surface (SC-010)', () => {
             'src/adapters/syncEngine.ts',
             'src/adapters/mdLink.ts',
             'src/adapters/assistantApply.ts',
+            'src/adapters/pickingController.ts',
+            'src/core/hooks/events.ts',
             'src/index.ts',
         ];
         const declared = new Set<string>(Object.values(WI_EVENTS));
@@ -307,5 +309,13 @@ describe('documented surface matches the emitted surface (SC-010)', () => {
         );
         const declared = new Set<string>(Object.values(WI_EVENTS));
         expect([...declared].sort()).toEqual([...documented].sort());
+    });
+
+    it('documents every declared event in docs/hooks.md (spec 007 T057)', async () => {
+        const fs = await import('node:fs/promises');
+        const doc = await fs.readFile(new URL('../../docs/hooks.md', import.meta.url), 'utf8');
+        for (const name of Object.values(WI_EVENTS)) {
+            expect(doc).toContain(`\`${name}\``);
+        }
     });
 });

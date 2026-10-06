@@ -167,6 +167,12 @@ interface AssistantUndonePayload {
 }
 ```
 
+## `wi-workspace:pick-completed` *(added by spec 007)*
+
+Main-chat lore picking finished for one generation (any outcome). Identity only:
+`{ chatId, source: 'prepared' | 'fresh' | 'fallback' | 'reused', picked: Array<{ book, uid }>,
+ignored: number, durationMs }`. Details: `specs/007-context-retrieval/contracts/hooks.md`.
+
 ---
 
 ## Contract testing (FR-012)

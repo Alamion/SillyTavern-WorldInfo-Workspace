@@ -303,3 +303,11 @@ bundled). Planning adds its own decisions (R-numbered) below this section.
   it wrote `<op type="read" ids="e12,e13">`, the round delivered both entries and the reply
   continued with details from them. Decision: catalog rules go into the system message
   whenever a catalog is sent.
+
+- **Live check of main-chat picking (2026-10-07, Seraphina chat, free router)**: the first
+  run failed cleanly ("spent the whole response length on thinking") with a 400-token
+  limit — the picking request now uses the assistant's response length. Second run: fresh
+  pick in 11.5 s, two memories picked with sensible reasons, both forced; the native engine
+  inserted one and cut the other by the World Info budget (25 % of a 4095-token context),
+  which the reply popup reports as "not inserted" — the native budget stays authoritative,
+  as designed.

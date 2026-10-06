@@ -23,6 +23,8 @@ export const WI_EVENTS = {
     mdSynced: 'wi-workspace:md-synced',
     assistantApplied: 'wi-workspace:assistant-applied',
     assistantUndone: 'wi-workspace:assistant-undone',
+    // Spec 007: main-chat lore picking.
+    pickCompleted: 'wi-workspace:pick-completed',
 } as const;
 
 export type WiEventName = (typeof WI_EVENTS)[keyof typeof WI_EVENTS];
@@ -91,4 +93,14 @@ export interface RootChangedPayload {
 
 export interface WorkspaceVisibilityPayload {
     mode: 'workspace' | 'native';
+}
+
+/** Spec 007: one generation's lore pick finished (any outcome). Identity only. */
+export interface PickCompletedPayload {
+    chatId: string;
+    source: 'prepared' | 'fresh' | 'fallback' | 'reused';
+    picked: Array<{ book: string; uid: number }>;
+    /** Names or handles the model returned that do not exist. */
+    ignored: number;
+    durationMs: number;
 }

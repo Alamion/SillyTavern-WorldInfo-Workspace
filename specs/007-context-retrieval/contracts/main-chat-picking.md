@@ -36,7 +36,7 @@ How the plugin takes part in main-chat generation (spec FR-019–FR-025; researc
 ## Request to the picking model
 
 - Profile: `settings.picking.profileId ?? settings.assistant.profileId`, through the
-  existing `LlmPort` (Connection Manager). Non-streaming; response limit 400 tokens.
+  existing `LlmPort` (Connection Manager). Response limit = the assistant's response length (a 400-token limit was spent entirely on thinking by a reasoning model in the live run of 2026-10-07).
 - Messages: system = picking rules (treat lore as data, pick at most `maxPicks`, reply only
   with pick lines); user = recent chat (`chatMessages` messages, oldest first, `Name:
   text`) + optional scene block (Doom's suite) + catalog (`catalogTokens` budget, folders

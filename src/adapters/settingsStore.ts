@@ -22,6 +22,8 @@ import { createLlmClient } from './llmClient';
 import { openConversationStore } from './conversationStore';
 import { createChatContext } from './chatContext';
 import { createInteropSources } from './interopSources';
+import { createPickingController, type PickingController } from './pickingController';
+import { getLiveAppContext } from './appApi';
 import { fsaAccess } from './fsaDisk';
 import { createImageStore } from './imageStore';
 import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
@@ -40,9 +42,18 @@ export interface WorkspaceStateServices {
     sync: SyncEngine;
     md: MdController;
     assistant: AssistantController;
+    /** Spec 007: main-chat lore picking (the generation interceptor). */
+    picking: PickingController;
 }
 
 let services: WorkspaceStateServices | null = null;
+const pickRecordedListeners = new Set<(messageId: number) => void>();
+
+/** The message icon (adapters/pickIndicator.ts) listens for newly recorded picks. */
+export function onPickRecorded(listener: (messageId: number) => void): () => void {
+    pickRecordedListeners.add(listener);
+    return () => pickRecordedListeners.delete(listener);
+}
 /**
  * True while a data recovery is unresolved and the empty fallback has NOT been
  * published: assistant settings must not be saved in that window, because any
@@ -146,12 +157,13 @@ export function initWorkspaceState(): WorkspaceStateServices {
         void md.link.init();
     }
 
+    const llm = createLlmClient(() => ctx);
     const assistant = createAssistantController({
         store,
         sync,
         confirm: confirmDialog,
         trackedIds: () => md.link.getStatus().trackedIds,
-        llm: createLlmClient(() => ctx),
+        llm,
         conversations: openConversationStore(),
         chat: createChatContext(),
         interop: createInteropSources(),
@@ -164,7 +176,19 @@ export function initWorkspaceState(): WorkspaceStateServices {
         notifyWarning(`Assistant conversations could not be loaded: ${String(error)}`);
     });
 
-    services = { store, worldInfo, activeBooks, sync, md, assistant };
+    const picking = createPickingController({
+        context: getLiveAppContext,
+        store,
+        llm,
+        emit,
+        notice: notifyWarning,
+        now: () => Date.now(),
+        onRecorded: (messageId) => pickRecordedListeners.forEach((listener) => listener(messageId)),
+        isRecoveryPending,
+    });
+    picking.start();
+
+    services = { store, worldInfo, activeBooks, sync, md, assistant, picking };
     return services;
 }
 

@@ -176,23 +176,23 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T052 [P] [US5] Pick-line parser tests (tolerant prose, unknown ids → ignored, duplicates, cap `maxPicks`) in `tests/unit/picking-parser.test.ts`
-- [ ] T053 [P] [US5] Decision tests: prepared used when new text has no unpicked mentions; fresh when it does; no prepared → fresh; continue → reused in `tests/unit/picking-decide.test.ts`
-- [ ] T054 [P] [US5] Forced-entry tests: full clone + `world` + `decorators: []`, leading `@@` lines stripped, disabled/excluded never produced, empty pick → no emit in `tests/unit/picking-forced.test.ts`
-- [ ] T055 [P] [US5] Picking request tests (system rules, recent chat, scene block, catalog within `catalogTokens`, folders as groups) in `tests/unit/picking-request.test.ts`
-- [ ] T056 [US5] Interceptor integration with a fake eventSource mirroring `world-info.js` forced-activation handling: off ⇒ 0 LLM calls and 0 emits; quiet/impersonate skipped; timeout ⇒ resolves within `timeoutSec + 1 s` and forces the prepared pick; chat change discards; result attached to `extra.wiw_pick` and the swipe; `inserted` filled from `WORLD_INFO_ACTIVATED`; `pick-completed` emitted in `tests/integration/picking.test.ts`
-- [ ] T057 [P] [US5] Contract tests: manifest has `generate_interceptor: "wiwPickInterceptor"` in `tests/manifest.test.ts`; `docs/hooks.md` ↔ `WI_EVENTS` includes `pick-completed` in `tests/contract/hooks.test.ts`
+- [x] T052 [P] [US5] Pick-line parser tests (tolerant prose, unknown ids → ignored, duplicates, cap `maxPicks`) in `tests/unit/picking-parser.test.ts`
+- [x] T053 [P] [US5] Decision tests: prepared used when new text has no unpicked mentions; fresh when it does; no prepared → fresh; continue → reused in `tests/unit/picking-decide.test.ts`
+- [x] T054 [P] [US5] Forced-entry tests: full clone + `world` + `decorators: []`, leading `@@` lines stripped, disabled/excluded never produced, empty pick → no emit in `tests/unit/picking-forced.test.ts`
+- [x] T055 [P] [US5] Picking request tests (system rules, recent chat, scene block, catalog within `catalogTokens`, folders as groups) in `tests/unit/picking-request.test.ts`
+- [x] T056 [US5] Interceptor integration with a fake eventSource mirroring `world-info.js` forced-activation handling: off ⇒ 0 LLM calls and 0 emits; quiet/impersonate skipped; timeout ⇒ resolves within `timeoutSec + 1 s` and forces the prepared pick; chat change discards; result attached to `extra.wiw_pick` and the swipe; `inserted` filled from `WORLD_INFO_ACTIVATED`; `pick-completed` emitted in `tests/integration/picking.test.ts`
+- [x] T057 [P] [US5] Contract tests: manifest has `generate_interceptor: "wiwPickInterceptor"` in `tests/manifest.test.ts`; `docs/hooks.md` ↔ `WI_EVENTS` includes `pick-completed` in `tests/contract/hooks.test.ts`
 
 ### Implementation
 
-- [ ] T058 [P] [US5] Create `src/core/picking/pickParser.ts`, `src/core/picking/decide.ts`, `src/core/picking/forced.ts`, `src/core/picking/request.ts` (reuse `catalog.ts`, `bm25.ts`, `triggers.ts`)
-- [ ] T059 [US5] `settings.picking` (data-model.md defaults and ranges) repair in `src/core/state/schema.ts` and bridge in `src/adapters/settingsStore.ts`; per-chat `chatMetadata.WorldInfoWorkspace.picking` read/write via `saveMetadataDebounced`
-- [ ] T060 [US5] Create `src/adapters/pickingController.ts`: active-entries cache from `WORLDINFO_ENTRIES_LOADED` with invalidation and dry `getWorldInfoPrompt` refresh; background preparation on `CHARACTER_MESSAGE_RENDERED`; `wiwPickInterceptor`; emit `WORLDINFO_FORCE_ACTIVATE`; record on `MESSAGE_RECEIVED`; `inserted` from `WORLD_INFO_ACTIVATED`; toast on fallback
-- [ ] T061 [US5] Register `globalThis.wiwPickInterceptor` in `src/index.ts` and add `"generate_interceptor": "wiwPickInterceptor"` to `manifest.json`
-- [ ] T062 [US5] Add `wi-workspace:pick-completed` to `src/core/hooks/events.ts` (`WI_EVENTS`) and emit it from `src/adapters/pickingController.ts` via `src/adapters/hooks.ts`; document it in `docs/hooks.md` and the AGENTS.md hook table
-- [ ] T063 [US5] Create `src/adapters/pickIndicator.ts` (icon in `#message_template .mes_buttons .extraMesButtons`, shown on messages with `extra.wiw_pick`, toggled on render/swipe/chat load; delegated click → app popup with details and "Pick fresh next time")
-- [ ] T064 [US5] Create `src/ui/PickingSettings.tsx` (global default, profile, timeout, chat messages, max picks, catalog size; per-chat toggle) reachable from the workspace header menu; folder "Exclude from lore picking" toggle in `src/ui/ItemEditor.tsx`
-- [ ] T065 [US5] Document lore picking (cost: extra model call per turn, prepared vs fresh, fallback, requirements) in `README.md`
+- [x] T058 [P] [US5] Create `src/core/picking/pickParser.ts`, `src/core/picking/decide.ts`, `src/core/picking/forced.ts`, `src/core/picking/request.ts` (reuse `catalog.ts`, `bm25.ts`, `triggers.ts`)
+- [x] T059 [US5] `settings.picking` (data-model.md defaults and ranges) repair in `src/core/state/schema.ts` and bridge in `src/adapters/settingsStore.ts`; per-chat `chatMetadata.WorldInfoWorkspace.picking` read/write via `saveMetadataDebounced`
+- [x] T060 [US5] Create `src/adapters/pickingController.ts`: active-entries cache from `WORLDINFO_ENTRIES_LOADED` with invalidation and dry `getWorldInfoPrompt` refresh; background preparation on `CHARACTER_MESSAGE_RENDERED`; `wiwPickInterceptor`; emit `WORLDINFO_FORCE_ACTIVATE`; record on `MESSAGE_RECEIVED`; `inserted` from `WORLD_INFO_ACTIVATED`; toast on fallback
+- [x] T061 [US5] Register `globalThis.wiwPickInterceptor` in `src/index.ts` and add `"generate_interceptor": "wiwPickInterceptor"` to `manifest.json`
+- [x] T062 [US5] Add `wi-workspace:pick-completed` to `src/core/hooks/events.ts` (`WI_EVENTS`) and emit it from `src/adapters/pickingController.ts` via `src/adapters/hooks.ts`; document it in `docs/hooks.md` and the AGENTS.md hook table
+- [x] T063 [US5] Create `src/adapters/pickIndicator.ts` (icon in `#message_template .mes_buttons .extraMesButtons`, shown on messages with `extra.wiw_pick`, toggled on render/swipe/chat load; delegated click → app popup with details and "Pick fresh next time")
+- [x] T064 [US5] Create `src/ui/PickingSettings.tsx` (global default, profile, timeout, chat messages, max picks, catalog size; per-chat toggle) reachable from the workspace header menu; folder "Exclude from lore picking" toggle in `src/ui/ItemEditor.tsx`
+- [x] T065 [US5] Document lore picking (cost: extra model call per turn, prepared vs fresh, fallback, requirements) in `README.md`
 
 ---
 

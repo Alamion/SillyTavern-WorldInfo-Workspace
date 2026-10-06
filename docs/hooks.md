@@ -170,6 +170,24 @@ interface AssistantUndonePayload {
 }
 ```
 
+## `wi-workspace:pick-completed`
+
+Fires once per main-chat generation in which lore picking ran (it is off unless the user
+turns it on), whatever the outcome. Entries are named by book and uid, never by content.
+
+```ts
+interface PickCompletedPayload {
+    chatId: string;
+    /** prepared = chosen in the background after the last reply; fresh = chosen for this
+     *  generation; fallback = the fresh pick failed or timed out; reused = continue. */
+    source: 'prepared' | 'fresh' | 'fallback' | 'reused';
+    picked: Array<{ book: string; uid: number }>;
+    /** Entries the picking model named that do not exist. */
+    ignored: number;
+    durationMs: number;
+}
+```
+
 ---
 
 ## Stability

@@ -172,6 +172,23 @@ It needs the Connection Manager extension and at least one
 Free models are rate-limited often; the assistant retries by itself and tells you what
 happened.
 
+## Lore picking in the main chat
+
+Off by default (the wand icon in the workspace header). When it is on, a model of your
+choice reads the recent chat and a catalog of the entries in your **active** lorebooks —
+names, folders and summaries — and picks the ones the next reply needs. They are activated
+through World Info itself, alongside the entries your keywords trigger, so position, depth,
+order and budget behave exactly as for keyword matches; nothing is injected around it.
+
+- It costs one extra request per reply. The pick for the next reply is prepared in the
+  background while you read and type, so most replies do not wait at all; only when your
+  message names an entry the prepared pick lacks does it pick again, waiting at most the
+  time you set (20 s by default) before going ahead with the earlier pick or keywords only.
+- The book icon on a reply shows what was picked, why, and whether World Info inserted it.
+- Summaries make picking much better: the model decides from them.
+- Folders can be left out with *Exclude from lore picking*; disabled entries never take part.
+- Quiet generations (other extensions' background requests) and impersonation are skipped.
+
 ## Other lore extensions
 
 Nothing here is required; each part switches on only when the other extension is there.

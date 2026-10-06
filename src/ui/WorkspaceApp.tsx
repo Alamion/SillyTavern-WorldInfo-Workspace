@@ -48,6 +48,7 @@ import { resolveImageReference } from '../core/tree/imageLinks';
 import { isMemoryEntry, losesMemoryNumber } from '../core/interop/memoryBooks';
 import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
+import { PickingSettings } from './PickingSettings';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
 import { LayoutContext, type LayoutContextValue } from './layoutContext';
@@ -71,6 +72,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     const [menu, setMenu] = useState<TreeMenuState | null>(null);
     const [movePickerFor, setMovePickerFor] = useState<{ ids: string[] } | null>(null);
     const [lorebooksOpen, setLorebooksOpen] = useState(false);
+    const [pickingOpen, setPickingOpen] = useState(false);
     const [reportsTick, setReportsTick] = useState(0);
     const [lastFailure, setLastFailure] = useState<{ message: string; bookName?: string } | null>(null);
     const [retrying, setRetrying] = useState(false);
@@ -711,6 +713,14 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     </button>
                     <button
                         type="button"
+                        className={`wiw-button wiw-icon-button${services.picking.status().enabled ? ' wiw-button-active' : ''}`}
+                        title="Lore picking: let a model choose the entries for main-chat replies"
+                        onClick={() => setPickingOpen(true)}
+                    >
+                        <i className="fa-solid fa-wand-magic-sparkles" />
+                    </button>
+                    <button
+                        type="button"
                         className="wiw-button wiw-icon-button"
                         title={(isMobile ? mobileSheet === 'assistant' : assistantOpen) ? 'Hide assistant' : 'Show assistant'}
                         onClick={() => {
@@ -877,6 +887,14 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                         excludeIds={new Set(movePickerFor.ids)}
                         onPick={handlePickMoveTarget}
                         onClose={() => setMovePickerFor(null)}
+                    />
+                )}
+                {pickingOpen && (
+                    <PickingSettings
+                        picking={services.picking}
+                        profiles={services.assistant.getSnapshot().profiles}
+                        assistantProfileName={services.assistant.getSnapshot().profile?.name ?? null}
+                        onClose={() => setPickingOpen(false)}
                     />
                 )}
                 {lorebooksOpen && (

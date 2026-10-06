@@ -1,5 +1,8 @@
 import type { NativeWorldInfoEntry } from '../../global';
 import type { EntryNode } from '../state/schema';
+
+/** What ranking needs from an entry: workspace nodes and native book entries both fit. */
+export type RankableEntry = Pick<EntryNode, 'id' | 'name' | 'native'>;
 import { getSummary } from '../tree/summary';
 
 /**
@@ -28,7 +31,7 @@ interface Doc {
 // Keyed by the native object (a new object per edit — structural sharing) and the name.
 const docCache = new WeakMap<NativeWorldInfoEntry, { name: string; doc: Doc }>();
 
-function docOf(entry: EntryNode): Doc {
+function docOf(entry: RankableEntry): Doc {
     const cached = docCache.get(entry.native);
     if (cached !== undefined && cached.name === entry.name) {
         return cached.doc;
@@ -48,13 +51,13 @@ function docOf(entry: EntryNode): Doc {
     return doc;
 }
 
-interface Scored {
-    entry: EntryNode;
+interface Scored<T extends RankableEntry> {
+    entry: T;
     score: number;
     terms: string[];
 }
 
-function scoreEntries(entries: readonly EntryNode[], queries: readonly string[]): Scored[] {
+function scoreEntries<T extends RankableEntry>(entries: readonly T[], queries: readonly string[]): Array<Scored<T>> {
     const queryTerms = [...new Set(queries.flatMap(tokenize))];
     if (queryTerms.length === 0 || entries.length === 0) {
         return entries.map((entry) => ({ entry, score: 0, terms: [] }));
@@ -90,7 +93,7 @@ function scoreEntries(entries: readonly EntryNode[], queries: readonly string[])
 }
 
 /** Relevance of every entry to the query texts (0 = no shared term). */
-export function rankEntries(entries: readonly EntryNode[], queries: readonly string[]): Map<string, number> {
+export function rankEntries(entries: readonly RankableEntry[], queries: readonly string[]): Map<string, number> {
     return new Map(scoreEntries(entries, queries).map((item) => [item.entry.id, item.score]));
 }
 
@@ -104,11 +107,11 @@ export interface FuzzyOptions {
 }
 
 /** Entries that share words with the query texts, best first (R5: cap 5, ≥ 0.5 of the best). */
-export function fuzzyMatches(
-    entries: readonly EntryNode[],
+export function fuzzyMatches<T extends RankableEntry>(
+    entries: readonly T[],
     queries: readonly string[],
     options: FuzzyOptions
-): Array<{ entry: EntryNode; score: number; terms: string[] }> {
+): Array<{ entry: T; score: number; terms: string[] }> {
     const scored = scoreEntries(entries, queries).filter((item) => item.score > 0);
     const best = Math.max(0, ...scored.map((item) => item.score));
     const threshold = (options.threshold ?? 0.5) * best;
