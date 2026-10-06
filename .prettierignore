@@ -4,3 +4,5 @@ pnpm-lock.yaml
 context/
 specs/
 .specify/
+AGENTS.md
+.github/ISSUE_TEMPLATE/report.yml

@@ -83,4 +83,56 @@ opening the previous separate plugins, over a week of real use.
 
 ## Results
 
-*(Filled during live validation, as in specs 003–005.)*
+### Quick live pass — 2026-10-06 (dev account, scale dataset of 2164 nodes / 1000-entry root, production build)
+
+Gates: typecheck, lint, `pnpm run test` (668 unit/integration + 11 perf), build — all green.
+Method: seeded dataset loaded into the account, Chromium via `playwright-cli`, longtask observer + CDP profiler.
+Account restored from backup afterwards. This was a fast pass, not the full H0–H26 sweep.
+
+| # | Result |
+|---|---|
+| H0 | PASS — `tests/perf` P-1…P-9 green (sequential run) |
+| H1 | PASS — collapse/expand of the 1000-entry folder: long tasks 106–136 ms, none above 200 ms |
+| H3 | PASS — 200 chars typed into an entry's content with native sync active: appended text identical, focus kept, no long tasks while typing |
+| H6 | **PARTIAL** — push of the 1000-entry book persisted correctly (1000 entries on disk), but long tasks of 470 ms and 191 ms occur around the push. Profile: host `fetch` 186 ms + GC 151 ms + `saveSettings` 70 ms dominate; plugin code is ~70 ms per function spread over several tasks. L-2 (< 200 ms) is not met on a 2 MB book |
+| H14 | PARTIAL — manual rename gave exactly one `tree-changed`; other routes covered by `hooks-engine` tests only |
+| H15 | PARTIAL — `book-pushed` `success` once with the right payload; failure outcomes covered by tests (scenario W) |
+| H17 | PASS (hidden transition seen live; shown after switching back) |
+| H18 | PASS — the push after an edit produced no extra `tree-changed` |
+| H19 | PASS — consumers that throw and one that busy-blocks 5 s: edit, push and events all completed, error only in the console |
+| H20 | PASS — documented-vs-emitted match is asserted by the test suite |
+| H22, H26 | PASS by reading — README states the Chromium/secure-page and Connection Manager requirements; constitution at 1.3.0 |
+| H2 | PASS — single select ~180 ms incl. automation overhead; 50 ctrl-click toggles, each task 51–77 ms |
+| H4 | PASS — drag of an entry across the 1000-entry folder moved it; long tasks 116 ms and one 209 ms at the drop (commit) |
+| H5 | PASS — tree search 58 ms, Lorebooks panel search no long task |
+| H6 | ACCEPTED by the owner as a host limitation (see the L-2 note in `contracts/performance-budgets.md`) |
+| H7 | PASS (shortened) — 90 s of continuous typing with background pushes: 1554 chars, text identical, focus kept, no long task > 200 ms, edit reached the native book. Markdown auto-push not part of this run |
+| H11 | PARTIAL — host stayed responsive after closing the workspace (longest task 73 ms); heap unchanged only because the large dataset had been deleted by then; hidden workspace keeps ~200 DOM nodes mounted |
+| H13 | PASS on a 200-entry book — save failure raised the banner and a `save-failed` event, Retry pushed the unsent text, `success` event, banner cleared, no false divergence. Not repeated on the 1000-entry book |
+| H16 | PASS — `designated`, `undesignated`, `imported`, `book-deleted` each fired once. `book-renamed` not exercised |
+| H14, H15 | ACCEPTED by the owner on the evidence above |
+| H8, H9, H10 | NOT RUN (H8 needs the folder picker, H10 a double-size dataset; H9 is covered by the integration suite) |
+| H12 | BLOCKED — the main API reports `no_connection` for the openrouter profile on the dev account (the profile switch worked, the Connect button did nothing); needs the owner to connect it |
+| H21 | PASS — owner: an outside tester followed the README; the problems they found were fixed in earlier sessions |
+| H24 | WAITING for a real candidate — the report template is now the GitHub issue form (`.github/ISSUE_TEMPLATE/report.yml`, blank issues disabled), so the first real report goes through it |
+| H25 | see the triage sample below |
+
+Harness note: a leftover `data-shot` attribute made a scripted click toggle a root off; the plugin behaved correctly ("Disable World Info root" shares the button).
+
+### H25 triage sample (rule: AGENTS.md "Maintenance changes" — no new user capability AND no delivered contract altered; doubt → spec)
+
+| # | Change | Route | Deciding rule |
+|---|---|---|---|
+| 1 | Fix a typo in the "Make World Info root" tooltip | maintenance | label fix, no contract |
+| 2 | Preview renders `==highlight==` wrongly inside a table cell | maintenance | preview rendering bug |
+| 3 | Drag a folder onto its own descendant shows no "not allowed" feedback | maintenance | drag-drop edge case |
+| 4 | Tree scrolling is slow at 5000 nodes | maintenance | perf fix, behaviour unchanged |
+| 5 | The failure banner stays after its book was deleted | maintenance | bug in banner clearing, no sync semantics changed |
+| 6 | Add `entryCount` to the `book-pushed` payload | **spec** (hooks) | new hook field |
+| 7 | Assistant retries rate limits three times (10/30/60 s) instead of two | **spec** (assistant protocol/behaviour) | changed retry behaviour |
+| 8 | Add a "Duplicate folder" bulk action | **spec** | new user capability |
+| 9 | Export `wi_group_weight` under another key name | **spec** (markdown convention) | convention key |
+| 10 | Persist `settings.layout.assistantCollapsed` | **spec** (persistence schema) | additive, but still the schema |
+| 11 | Raise the native push debounce from 1000 ms to 1500 ms | **spec** (native sync semantics) | AGENTS.md states 1000 ms as the contract |
+
+Result: 11/11 routed by the written rule alone; 5 maintenance, 6 spec. Owner confirmation of the routing: pending.

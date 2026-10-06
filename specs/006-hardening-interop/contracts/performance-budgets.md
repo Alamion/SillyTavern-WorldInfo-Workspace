@@ -56,7 +56,7 @@ These map to spec SC-001 and SC-002 and cannot be honestly asserted in jsdom.
 | # | Criterion | Budget | Method |
 |---|---|---|---|
 | L-1 | Routine interaction (expand/collapse, select, open entry, search books) | < 1 s to visible result | Manual timing + `performance.measure` |
-| L-2 | No task blocks input | no long task > 200 ms | `PerformanceObserver({ type: 'longtask' })` during the scripted session |
+| L-2 | No task blocks input | no long task > 200 ms (owner-accepted exception 2026-10-06: the push of a ~1000-entry / ~2 MB book may show tasks up to ~500 ms — the cost is the host's `fetch` body serialization, GC and `saveSettings`, not plugin code; the 200 ms limit stays for smaller books) | `PerformanceObserver({ type: 'longtask' })` during the scripted session |
 | L-3 | Typing fidelity | 0 dropped or re-ordered keystrokes | Type a known string at speed into a 1000-entry book's entry with sync + markdown auto-push running; compare committed text to the sent text exactly |
 | L-4 | Focus stability | 0 focus losses | `document.activeElement` sampled throughout the 5-minute scripted session |
 | L-5 | Large operation escapability | progress visible; cancel works or the operation is declared uninterruptible beforehand (FR-003) | Run a full scan/import on the large linked folder |

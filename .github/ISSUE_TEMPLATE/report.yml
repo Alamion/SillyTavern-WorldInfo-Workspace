@@ -1,0 +1,50 @@
+name: Report a problem
+description: Something does not work or behaves differently than expected.
+labels: [report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the project's standing report template (see "Maintenance changes" in AGENTS.md).
+        Every report is triaged into exactly one outcome: fix now, route to a spec, or defer to the backlog.
+  - type: textarea
+    id: did
+    attributes:
+      label: Did
+      description: What you did, in enough detail to reproduce it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What should have happened.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead. Screenshots and console errors help.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - tree
+        - editor
+        - sync
+        - markdown
+        - assistant
+        - lorebooks
+        - other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Extension version (manifest.json) and SillyTavern version.
+      placeholder: "0.4.12 / 1.13.x"

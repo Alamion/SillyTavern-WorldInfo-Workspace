@@ -1,0 +1,19 @@
+name: Request a feature
+description: A new capability or a change to documented behaviour.
+labels: [feature]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              New capabilities go through a spec, not the maintenance path. A short description of the need is enough.
+    - type: textarea
+      id: need
+      attributes:
+          label: What do you want to be able to do?
+      validations:
+          required: true
+    - type: textarea
+      id: context
+      attributes:
+          label: Context
+          description: Your workflow, related extensions, examples or links.

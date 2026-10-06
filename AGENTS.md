@@ -84,6 +84,9 @@ are maintenance. A new hook field, a new action, changed retry behaviour are not
 **Area:**      <tree | editor | sync | markdown | assistant | lorebooks | other>
 ```
 
+The same template is the GitHub issue form (`.github/ISSUE_TEMPLATE/report.yml`; blank issues are
+disabled, feature requests use `feature.yml`).
+
 **Triage** gives exactly one outcome: fix now, route to a spec (naming the contract it
 touches), or defer to `specs/006-hardening-interop/backlog.md`.
 
