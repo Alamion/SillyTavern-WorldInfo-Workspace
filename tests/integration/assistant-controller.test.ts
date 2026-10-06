@@ -1074,3 +1074,30 @@ describe('message editing and answering the last message (owner request 2026-09-
         expect(last(harness)?.text).toBe('answer');
     });
 });
+
+describe('context preview (spec 007 US1)', () => {
+    it('previews exactly the request the next send stores', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        harness.llm.reply('first').reply('second');
+        await harness.controller.createConversation();
+        await harness.controller.send('one');
+        harness.controller.setSelection([NODE_IDS.taverns]);
+        const preview = harness.controller.previewContext('Add an alehouse');
+        expect(preview).not.toBeNull();
+        await harness.controller.send('Add an alehouse');
+        const sent = harness.llm.requests[1];
+        expect(preview?.requestMessages).toEqual(sent?.messages);
+        const stored = harness.controller.getSnapshot().messages.at(-1)?.context;
+        expect(stored?.items).toEqual(preview?.items);
+        expect(stored?.items?.some((item) => item.nodeId === NODE_IDS.taverns && item.reason === 'selected')).toBe(true);
+    });
+
+    it('previews with the default context before any conversation exists', async () => {
+        const harness = createHarness();
+        await ready(harness);
+        const preview = harness.controller.previewContext('Hello');
+        expect(preview?.items?.[0]?.kind).toBe('request');
+        expect(harness.controller.getSnapshot().conversations).toHaveLength(0);
+    });
+});

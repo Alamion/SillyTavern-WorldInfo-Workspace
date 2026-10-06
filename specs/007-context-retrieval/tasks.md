@@ -79,14 +79,14 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T016 [P] [US1] Controller test: `previewContext(conversationId, draft)` returns the items the next `send` stores, byte-identical request text in `tests/integration/assistant-controller.test.ts`
+- [x] T016 [P] [US1] Controller test: `previewContext(conversationId, draft)` returns the items the next `send` stores, byte-identical request text in `tests/integration/assistant-controller.test.ts`
 
 ### Implementation
 
-- [ ] T017 [US1] Add `previewContext` (builds without sending) to `src/adapters/assistantController.ts` and expose it through `src/ui/assistant/useAssistant.ts`
-- [ ] T018 [US1] Create `src/ui/assistant/ContextPreview.tsx` (groups Included / Truncated / Left out; reason chip + detail; ≈tokens; totals vs budget) with styles in `src/styles/wiw-theme.scss`
-- [ ] T019 [US1] Add "Preview context" to `src/ui/assistant/ContextMenu.tsx` and a "Context" action on sent messages in `src/ui/assistant/ConversationView.tsx` (snapshot items; older messages without items show the old summary)
-- [ ] T020 [US1] Document the preview in `README.md` (assistant section)
+- [x] T017 [US1] Add `previewContext` (builds without sending) to `src/adapters/assistantController.ts` and expose it through `src/ui/assistant/useAssistant.ts`
+- [x] T018 [US1] Create `src/ui/assistant/ContextPreview.tsx` (groups Included / Truncated / Left out; reason chip + detail; ≈tokens; totals vs budget) with styles in `src/styles/wiw-theme.scss`
+- [x] T019 [US1] Add "Preview context" to `src/ui/assistant/ContextMenu.tsx` and a "Context" action on sent messages in `src/ui/assistant/ConversationView.tsx` (snapshot items; older messages without items show the old summary)
+- [x] T020 [US1] Document the preview in `README.md` (assistant section)
 
 **Checkpoint**: US1 independently usable (MVP).
 

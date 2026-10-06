@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createComposerDraft } from '../adapters/composerDraft';
 import type { WorkspaceStateServices } from '../adapters/settingsStore';
 import { notifySuccess, notifyWarning } from '../adapters/logger';
 import { undoSummary } from '../core/assistant/undo';
 import { confirmDialog } from '../adapters/popups';
 import type { WorkspaceState } from '../core/state/schema';
-import type { AppliedBatchUndone } from '../core/assistant/types';
+import type { AppliedBatchUndone, ContextSnapshot } from '../core/assistant/types';
+import { ContextPreview } from './assistant/ContextPreview';
 import { BatchBar } from './assistant/BatchBar';
 import { ConversationSwitcher } from './assistant/ConversationSwitcher';
 import { ConversationView, type MessageActions } from './assistant/ConversationView';
@@ -35,6 +37,9 @@ export function AssistantPanel({
     const snapshot = useAssistant(assistant);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [contextOpen, setContextOpen] = useState(false);
+    const [preview, setPreview] = useState<{ snapshot: ContextSnapshot; title: string; subtitle: string } | null>(
+        null
+    );
 
     useEffect(() => {
         assistant.setSelection([...selectedIds]);
@@ -63,6 +68,15 @@ export function AssistantPanel({
         onShowVariant: (seq, index) => void assistant.showVariant(seq, index),
         onNewVariant: (seq) => void assistant.regenerate(seq),
         onFork: (seq) => void assistant.forkConversation(seq),
+        onShowContext: (message) => {
+            if (message.context) {
+                setPreview({
+                    snapshot: message.context,
+                    title: 'Context of this reply',
+                    subtitle: 'What was sent to the model for this reply, as it was at that moment.',
+                });
+            }
+        },
         onEdit: (message, text) => {
             void assistant.editMessage(message.seq, text).then((edited) => {
                 if (edited === null) {
@@ -249,6 +263,25 @@ export function AssistantPanel({
                     selectedIds={[...selectedIds]}
                     onChange={(patch) => void assistant.updateConversationContext(patch)}
                     onClose={() => setContextOpen(false)}
+                    onPreview={() => {
+                        const next = assistant.previewContext(createComposerDraft().load());
+                        if (next) {
+                            setPreview({
+                                snapshot: next,
+                                title: 'Context preview',
+                                subtitle: 'What your next message would send, with the text in the message box now.',
+                            });
+                        }
+                    }}
+                />
+            )}
+            {preview && (
+                <ContextPreview
+                    snapshot={preview.snapshot}
+                    budgetTokens={Math.max(500, snapshot.settings.contextTokens - snapshot.settings.responseTokens)}
+                    title={preview.title}
+                    subtitle={preview.subtitle}
+                    onClose={() => setPreview(null)}
                 />
             )}
         </div>

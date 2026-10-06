@@ -1615,3 +1615,66 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     flex-wrap: wrap;
     flex: 0 0 auto;
 }
+
+// Context preview (spec 007 US1): one row per request item — icon, label, reason
+// chip, estimated cost; shortened and left-out rows are dimmed.
+.wiw-context-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+}
+
+.wiw-context-item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    min-width: 0;
+    font-size: 0.88rem;
+
+    > i {
+        flex: 0 0 1.1rem;
+        text-align: center;
+        opacity: 0.7;
+    }
+
+    .wiw-chip {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.wiw-context-item-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wiw-context-item-detail {
+    opacity: 0.75;
+}
+
+.wiw-context-item-cost {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.wiw-context-item-truncated,
+.wiw-context-item-omitted {
+    opacity: 0.7;
+}
+
+.wiw-context-footer-actions {
+    display: flex;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+}

@@ -24,6 +24,7 @@ import type {
     AssistantMode,
     AssistantSettings,
     ContextSettings,
+    ContextSnapshot,
     Conversation,
     LlmMessage,
     Message,
@@ -103,6 +104,11 @@ export interface AssistantController {
      * are locked by a pending recovery.
      */
     updateConversationContext(patch: Partial<ContextSettings>): Promise<void>;
+    /**
+     * The request the next send would make with `draft` (spec 007 US1), built by the
+     * same code path without sending; null while busy.
+     */
+    previewContext(draft: string): ContextSnapshot | null;
     setSelection(nodeIds: readonly string[]): void;
     /**
      * Sends a request. An empty text answers the last message when it is the
@@ -875,6 +881,23 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         },
         setSelection(nodeIds) {
             selection = [...nodeIds];
+        },
+        previewContext(draft) {
+            const trimmed = draft.trim();
+            const active = conversations.find((item) => item.id === activeConversationId);
+            const conversation: Conversation = active ?? {
+                id: '__preview__',
+                title: '',
+                createdAt: deps.now(),
+                updatedAt: deps.now(),
+                mode: 'propose',
+                context: repairContextSettings(settings().defaultContext),
+                nextSeq: 0,
+            };
+            const answered = trimmed === '' && active ? lastUserMessage() : undefined;
+            const request = answered?.text ?? trimmed;
+            const beforeSeq = answered?.seq ?? conversation.nextSeq;
+            return buildForConversation(conversation, request, beforeSeq).snapshot;
         },
         async send(text) {
             const trimmed = text.trim();

@@ -210,12 +210,15 @@ export function ContextMenu({
     selectedIds,
     onChange,
     onClose,
+    onPreview,
 }: {
     snapshot: AssistantSnapshot;
     state: WorkspaceState;
     selectedIds: readonly string[];
     onChange: (patch: Partial<ContextSettings>) => void;
     onClose: () => void;
+    /** Opens the preview of the next request (spec 007 US1). */
+    onPreview: () => void;
 }): JSX.Element | null {
     const context = snapshot.activeConversation?.context;
     const [chatCount, setChatCount] = useState(
@@ -372,9 +375,19 @@ export function ContextMenu({
                             ? 'Kept for this conversation; new conversations keep their start until the recovery banner is resolved.'
                             : 'New conversations start with these choices.'}
                     </span>
-                    <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
-                        Done
-                    </button>
+                    <span className="wiw-context-footer-actions">
+                        <button
+                            type="button"
+                            className="wiw-button"
+                            title="Everything the next message would send, with the reason and size of each part"
+                            onClick={onPreview}
+                        >
+                            <i className="fa-solid fa-layer-group" /> Preview context
+                        </button>
+                        <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
+                            Done
+                        </button>
+                    </span>
                 </div>
             </div>
         </div>

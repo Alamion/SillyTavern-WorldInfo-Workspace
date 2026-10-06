@@ -144,6 +144,11 @@ You choose what it sees — the selected items, the whole structure, the current
 character card — and that choice becomes the default for new conversations. Conversations
 live in your browser, per profile, never in your settings.
 
+**Preview context** (in the context menu) lists everything your next message would send:
+each entry with the reason it is there (selected, the key that matched, the entry that
+pulled it in through recursion…), its estimated size, and what was left out because it
+did not fit. The layers icon on a reply shows the same list for what was actually sent.
+
 It needs the Connection Manager extension and at least one
 [connection profile](https://docs.sillytavern.app/usage/core-concepts/connection-profiles/).
 Free models are rate-limited often; the assistant retries by itself and tells you what

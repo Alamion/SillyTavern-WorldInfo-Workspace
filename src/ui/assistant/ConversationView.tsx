@@ -22,6 +22,8 @@ export interface MessageActions {
     onDelete: (message: Message) => void;
     /** Saves an edited message text (owner request 2026-09-22). */
     onEdit: (message: Message, text: string) => void;
+    /** Shows what was sent for a reply (spec 007 FR-003). */
+    onShowContext: (message: Message) => void;
 }
 
 /** Row state that decides which message tools are usable. */
@@ -78,6 +80,16 @@ function MessageTools({
                         <i className="fa-solid fa-chevron-right" />
                     </button>
                 </span>
+            )}
+            {message.role === 'assistant' && message.context !== undefined && (
+                <button
+                    type="button"
+                    className="wiw-message-tool"
+                    title="What was sent for this reply"
+                    onClick={() => actions.onShowContext(message)}
+                >
+                    <i className="fa-solid fa-layer-group" />
+                </button>
             )}
             <button
                 type="button"
