@@ -244,3 +244,46 @@ describe('folder records', () => {
         expect(model.warnings).toHaveLength(1);
     });
 });
+
+describe('entry files — summary (spec 007 R2)', () => {
+    it('writes wi_summary and keeps it out of wi_extensions', () => {
+        const node = entry();
+        node.native.extensions = { wiw_summary: 'When the river floods.' };
+        const text = renderEntryFile(node, 'Aldermeer', yaml);
+        expect(text).toContain('wi_summary: When the river floods.');
+        expect(text).not.toContain('wi_extensions');
+        expect(roundTrip(node).extensions).toEqual({ wiw_summary: 'When the river floods.' });
+    });
+
+    it('keeps other extension data in wi_extensions next to wi_summary', () => {
+        const node = entry();
+        node.native.extensions = { wiw_summary: 'S', other: { a: 1 } };
+        const text = renderEntryFile(node, 'Aldermeer', yaml);
+        expect(text).toContain('wi_summary: S');
+        expect(text).toMatch(/wi_extensions:\n\s+other:/);
+        expect(roundTrip(node).extensions).toEqual({ other: { a: 1 }, wiw_summary: 'S' });
+    });
+
+    it('reads a hand-written wi_summary', () => {
+        const parsed = parseEntryFile('---\nwi_summary: Hand written\n---\n\nBody', 'Note', yaml);
+        expect(parsed.native.extensions).toEqual({ wiw_summary: 'Hand written' });
+        expect(parsed.warnings).toEqual([]);
+    });
+
+    it('prefers wi_summary over a conflicting wi_extensions value and warns', () => {
+        const text = '---\nwi_summary: Visible\nwi_extensions:\n  wiw_summary: Hidden\n---\n\nBody';
+        const parsed = parseEntryFile(text, 'Note', yaml);
+        expect(parsed.native.extensions).toEqual({ wiw_summary: 'Visible' });
+        expect(parsed.warnings.some((w) => w.includes('wi_summary'))).toBe(true);
+    });
+
+    it('leaves files without a summary unchanged', () => {
+        const node = entry();
+        node.native.content = 'Plain';
+        expect(renderEntryFile(node, 'Aldermeer', yaml)).toBe('Plain');
+    });
+
+    it('lists wi_summary in the field table', () => {
+        expect(FIELD_SPECS.some((spec) => spec.key === 'wi_summary')).toBe(true);
+    });
+});

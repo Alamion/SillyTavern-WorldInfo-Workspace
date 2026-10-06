@@ -7,6 +7,7 @@ import {
     RESPONSE_TOKENS_RANGE,
     type AssistantSettings,
     type ContextScope,
+    type ContextSet,
     type ContextSettings,
 } from '../assistant/types';
 import { fingerprintEntry } from '../sync/fingerprint';
@@ -85,6 +86,8 @@ export interface FolderNode extends NodeBase {
     kind: 'folder';
     expanded: boolean;
     isWiRoot: boolean;
+    /** Spec 007 FR-025: the subtree is left out of main-chat lore picking (workspace-only). */
+    pickExcluded?: boolean;
     book: BookBinding | null;
     children: TreeNode[];
 }
@@ -317,7 +320,7 @@ function repairScope(value: unknown): ContextScope {
     return DEFAULT_CONTEXT_SETTINGS.scope;
 }
 
-function repairContextSettings(value: unknown): ContextSettings {
+export function repairContextSettings(value: unknown): ContextSettings {
     const raw = isRecord(value) ? value : {};
     const bool = (key: keyof ContextSettings, fallbackValue: boolean): boolean =>
         typeof raw[key] === 'boolean' ? (raw[key] as boolean) : fallbackValue;
@@ -328,7 +331,15 @@ function repairContextSettings(value: unknown): ContextSettings {
         characterCard: bool('characterCard', DEFAULT_CONTEXT_SETTINGS.characterCard),
         persona: bool('persona', DEFAULT_CONTEXT_SETTINGS.persona),
         activatedEntries: bool('activatedEntries', DEFAULT_CONTEXT_SETTINGS.activatedEntries),
+        catalog: raw.catalog === 'on' || raw.catalog === 'off' ? raw.catalog : DEFAULT_CONTEXT_SETTINGS.catalog,
+        fuzzy: bool('fuzzy', DEFAULT_CONTEXT_SETTINGS.fuzzy),
+        sources: repairSources(raw.sources),
     };
+}
+
+function repairSources(value: unknown): ContextSettings['sources'] {
+    const raw = isRecord(value) ? value : {};
+    return { scene: raw.scene === true, deeplore: raw.deeplore === true };
 }
 
 /**
@@ -362,7 +373,35 @@ export function getAssistantSettings(state: WorkspaceState): AssistantSettings {
                 ? record.instructions
                 : null,
         defaultContext: repairContextSettings(record.defaultContext),
+        contextSets: repairContextSets(record.contextSets),
     };
+}
+
+/** Context sets (spec 007 R6): unique names (case-insensitive), 1–60 chars, at most 50. */
+export const MAX_CONTEXT_SETS = 50;
+
+export function repairContextSets(value: unknown): ContextSet[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const seen = new Set<string>();
+    const sets: ContextSet[] = [];
+    for (const item of value) {
+        if (!isRecord(item) || typeof item.id !== 'string' || typeof item.name !== 'string') {
+            continue;
+        }
+        const name = item.name.trim();
+        const key = name.toLowerCase();
+        if (name === '' || name.length > 60 || seen.has(key) || item.id === '') {
+            continue;
+        }
+        seen.add(key);
+        sets.push({ id: item.id, name, context: repairContextSettings(item.context) });
+        if (sets.length >= MAX_CONTEXT_SETS) {
+            break;
+        }
+    }
+    return sets;
 }
 
 export function createFolderNode(input: {

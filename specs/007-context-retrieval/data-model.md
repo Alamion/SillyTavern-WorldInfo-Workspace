@@ -17,7 +17,7 @@ No new node field: the native entry is already stored verbatim.
 
 | Where | Type | Rules |
 |---|---|---|
-| `FolderNode.pickExcluded` | `boolean?` | Absent/false = included; applies to the whole subtree; workspace-only (never exported to native or markdown records — folder records are spec 004's; added to `.wiw-folder.yaml` as `pick_excluded` only when true) |
+| `FolderNode.pickExcluded` | `boolean?` | Absent/false = included; applies to the whole subtree; workspace-only (never exported to native books or markdown folder records) |
 
 ### Assistant settings additions (`settings.assistant`)
 

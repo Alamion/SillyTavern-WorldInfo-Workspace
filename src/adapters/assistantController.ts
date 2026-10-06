@@ -31,7 +31,7 @@ import type {
     ProposalBatch,
     ProposedValues,
 } from '../core/assistant/types';
-import { findNode, getAssistantSettings, type WorkspaceState } from '../core/state/schema';
+import { findNode, getAssistantSettings, repairContextSettings, type WorkspaceState } from '../core/state/schema';
 import { fingerprintValues } from '../core/assistant/rules';
 import type { WorkspaceStore } from '../core/state/store';
 
@@ -801,7 +801,11 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             return snapshot;
         },
         async init() {
-            conversations = await deps.conversations.listConversations();
+            // Conversations stored before 0.5.0 lack the spec 007 context fields.
+            conversations = (await deps.conversations.listConversations()).map((item) => ({
+                ...item,
+                context: repairContextSettings(item.context),
+            }));
             messagesByConversation = new Map();
             for (const conversation of conversations) {
                 messagesByConversation.set(

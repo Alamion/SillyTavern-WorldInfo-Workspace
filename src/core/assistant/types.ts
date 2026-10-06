@@ -33,6 +33,15 @@ export type ContextScope =
  */
 export type EntryContents = 'triggered' | 'all';
 
+/** Catalog selection (spec 007 FR-009): Auto uses it only when full text overflows. */
+export type CatalogMode = 'auto' | 'on' | 'off';
+
+/** Optional context sources backed by other extensions (spec 007 FR-017/FR-018). */
+export interface InteropSourceSettings {
+    scene: boolean;
+    deeplore: boolean;
+}
+
 export interface ContextSettings {
     scope: ContextScope;
     entryContents: EntryContents;
@@ -41,6 +50,17 @@ export interface ContextSettings {
     characterCard: boolean;
     persona: boolean;
     activatedEntries: boolean;
+    /** Spec 007 additions (repaired with defaults on load). */
+    catalog: CatalogMode;
+    fuzzy: boolean;
+    sources: InteropSourceSettings;
+}
+
+/** Named, saved context choices (spec 007 FR-011, research R6). */
+export interface ContextSet {
+    id: string;
+    name: string;
+    context: ContextSettings;
 }
 
 export interface AssistantSettings {
@@ -50,6 +70,7 @@ export interface AssistantSettings {
     /** null = built-in default instructions. */
     instructions: string | null;
     defaultContext: ContextSettings;
+    contextSets: ContextSet[];
 }
 
 export const RESPONSE_TOKENS_RANGE = { min: 64, max: 32768 } as const;
@@ -64,6 +85,9 @@ export const DEFAULT_CONTEXT_SETTINGS: ContextSettings = {
     characterCard: false,
     persona: false,
     activatedEntries: false,
+    catalog: 'auto',
+    fuzzy: false,
+    sources: { scene: false, deeplore: false },
 };
 
 export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
@@ -72,6 +96,7 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
     contextTokens: 16000,
     instructions: null,
     defaultContext: DEFAULT_CONTEXT_SETTINGS,
+    contextSets: [],
 };
 
 export interface Conversation {
@@ -81,6 +106,8 @@ export interface Conversation {
     updatedAt: string;
     mode: AssistantMode;
     context: ContextSettings;
+    /** Name of the context set applied last (spec 007 FR-011). */
+    contextSetName?: string;
     /** Monotonic message sequence inside the conversation. */
     nextSeq: number;
 }
@@ -149,6 +176,46 @@ export interface LlmMessage {
     content: string;
 }
 
+/** Why an item is (or is not) in a request (spec 007 FR-002). */
+export type ContextReason =
+    | 'selected'
+    | 'scope'
+    | 'key'
+    | 'recursion'
+    | 'fuzzy'
+    | 'catalog-read'
+    | 'context-set'
+    | 'interop'
+    | 'option';
+
+export type ContextItemKind =
+    | 'request'
+    | 'entry'
+    | 'outline'
+    | 'catalog'
+    | 'chat'
+    | 'card'
+    | 'persona'
+    | 'activated'
+    | 'source'
+    | 'history';
+
+/** One part of a request's context (spec 007 research R3). */
+export interface ContextItem {
+    kind: ContextItemKind;
+    nodeId?: string;
+    label: string;
+    reason: ContextReason;
+    /** Matching key, `step 2 from "X"`, source name… */
+    detail?: string;
+    /** Estimated tokens (~3.5 chars/token, the same estimate the budget uses). */
+    tokens: number;
+    state: 'included' | 'truncated' | 'omitted';
+    /** 0–1, when truncated. */
+    keptShare?: number;
+    omitReason?: 'budget' | 'scope' | 'unavailable';
+}
+
 export interface ContextSnapshot {
     /** handle (`e12`) → node id (research R5). */
     handles: Record<string, string>;
@@ -159,6 +226,8 @@ export interface ContextSnapshot {
     estimatedTokens: number;
     /** Exact messages sent — "regenerate with the same context" re-sends these. */
     requestMessages: LlmMessage[];
+    /** Spec 007: typed items; absent on messages sent before 0.5.0. */
+    items?: ContextItem[];
 }
 
 export interface ProposedValues {

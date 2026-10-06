@@ -389,3 +389,76 @@ describe('optional chat sources (US6)', () => {
         );
     });
 });
+
+describe('context items (spec 007 FR-001/FR-002, research R3)', () => {
+    const items = (built: ReturnType<typeof buildRequest>) => built.snapshot.items ?? [];
+    const entryItem = (built: ReturnType<typeof buildRequest>, nodeId: string) =>
+        items(built).find((item) => item.kind === 'entry' && item.nodeId === nodeId);
+
+    it('marks a selected entry as selected and costs it', () => {
+        const built = build({ selection: [NODE_IDS.taverns], request: 'Polish this' });
+        const item = entryItem(built, NODE_IDS.taverns);
+        expect(item).toMatchObject({ reason: 'selected', state: 'included', label: 'Bristlemark Taverns' });
+        expect(item?.tokens).toBeGreaterThan(0);
+    });
+
+    it('names the matching key of a key-triggered entry', () => {
+        const built = build({ selection: [], request: 'Add an alehouse' });
+        expect(entryItem(built, NODE_IDS.taverns)).toMatchObject({ reason: 'key', detail: 'key "alehouse"' });
+    });
+
+    it('names the step and the source of a recursion', () => {
+        // Chain: request → taverns ("alehouse"), taverns content → Bristlemark ("harbor city").
+        const built = build({
+            state: (() => {
+                const s = aldermeerState();
+                const cities = (s.root.children[0] as FolderNode).children[0] as FolderNode;
+                const tav = cities.children[1] as EntryNode;
+                tav.native.content = 'Three taverns share the trade of the harbor city.';
+                return s;
+            })(),
+            selection: [],
+            request: 'Add an alehouse',
+        });
+        expect(entryItem(built, NODE_IDS.bristlemark)).toMatchObject({
+            reason: 'recursion',
+            detail: 'step 1 from "Bristlemark Taverns" (key "harbor city")',
+        });
+    });
+
+    it('lists entries that did not fit as omitted for budget', () => {
+        const state = aldermeerState();
+        const cities = (state.root.children[0] as FolderNode).children[0] as FolderNode;
+        (cities.children[1] as EntryNode).native.content = 'alehouse '.repeat(4000);
+        const built = build({ state, selection: [NODE_IDS.taverns], contextTokens: 2600, responseTokens: 500 });
+        expect(entryItem(built, NODE_IDS.taverns)).toMatchObject({ state: 'omitted', omitReason: 'budget' });
+    });
+
+    it('describes the outline, the request and optional sources', () => {
+        const built = build({
+            context: { ...BASE, chatMessages: 5, persona: true },
+            chat: {
+                messages: [{ name: 'Ann', text: 'Hello', isUser: true }],
+                card: null,
+                persona: { name: 'Ann', description: 'A traveller.' },
+                activated: [],
+            },
+        });
+        const kinds = items(built).map((item) => item.kind);
+        expect(kinds).toEqual(expect.arrayContaining(['request', 'outline', 'chat', 'persona']));
+        expect(items(built).find((item) => item.kind === 'chat')).toMatchObject({ detail: '1 message' });
+    });
+
+    it('marks every entry as in scope with the "all" contents mode', () => {
+        const built = build({ context: { ...BASE, entryContents: 'all', scope: { kind: 'workspace' } }, selection: [] });
+        expect(entryItem(built, NODE_IDS.bristlemark)).toMatchObject({ reason: 'scope' });
+    });
+
+    it('item costs add up to the request estimate', () => {
+        const built = build({ selection: [NODE_IDS.taverns], request: 'Add an alehouse' });
+        const sum = items(built)
+            .filter((item) => item.state !== 'omitted')
+            .reduce((total, item) => total + item.tokens, 0);
+        expect(sum).toBe(built.snapshot.estimatedTokens);
+    });
+});

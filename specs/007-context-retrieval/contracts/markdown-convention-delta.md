@@ -1,7 +1,7 @@
-# Contract — Markdown Convention: summary and pick exclusion (delta)
+# Contract — Markdown Convention: summary (delta)
 
-Base: `specs/004-markdown-folder-sync/contracts/markdown-convention.md`. Both additions
-are optional keys: files and folder records without them read and write exactly as
+Base: `specs/004-markdown-folder-sync/contracts/markdown-convention.md`. The addition
+is an optional key: files and folder records without them read and write exactly as
 before (minimal metadata rule — defaults are never written).
 
 ## Entry front matter
@@ -13,12 +13,13 @@ before (minimal metadata rule — defaults are never written).
 Import: `wi_summary` → `extensions.wiw_summary`. If `wi_extensions.wiw_summary` is also
 present and differs, `wi_summary` wins and the import report lists the item.
 
-## Folder record (`.wiw-folder.yaml`)
+## Folder record
 
-| Key | Workspace field | Type | Default |
-| --- | --- | --- | --- |
-| `pick_excluded` | `FolderNode.pickExcluded` | boolean | `false` (not written) |
+No change: `FolderNode.pickExcluded` is a workspace setting about main-chat picking, not
+lore content, and is NOT written to `.wiw-folder.yaml` (like `expanded`; decided during
+implementation 2026-10-07 — writing it would have pulled folder attributes into
+three-way reconcile for no lore value).
 
 ## Reference table
 
-`MappingReference` (UI) and the README convention table list both keys.
+`MappingReference` (UI) and the README convention table list `wi_summary`.

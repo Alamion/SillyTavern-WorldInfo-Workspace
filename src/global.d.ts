@@ -31,6 +31,41 @@ export interface SillyTavernEventTypes {
     CONNECTION_PROFILE_UPDATED: string;
     CONNECTION_PROFILE_DELETED: string;
     WORLD_INFO_ACTIVATED: string;
+    /** Spec 007 — main-chat picking (research R9/R10). */
+    WORLDINFO_FORCE_ACTIVATE: string;
+    WORLDINFO_ENTRIES_LOADED: string;
+    MESSAGE_RECEIVED: string;
+    CHARACTER_MESSAGE_RENDERED: string;
+    MESSAGE_SWIPED: string;
+    GENERATION_STOPPED: string;
+}
+
+/**
+ * `WORLDINFO_ENTRIES_LOADED` payload (world-info.js getSortedEntries): the app's own
+ * resolution of the active books; every entry carries its book in `world`.
+ */
+export type ActiveWorldInfoEntry = NativeWorldInfoEntry & { world: string; decorators?: string[] };
+export interface WorldInfoEntriesLoadedPayload {
+    globalLore: ActiveWorldInfoEntry[];
+    characterLore: ActiveWorldInfoEntry[];
+    chatLore: ActiveWorldInfoEntry[];
+    personaLore: ActiveWorldInfoEntry[];
+}
+
+/**
+ * Generation interceptor (manifest `generate_interceptor`, extensions.js
+ * runGenerationInterceptors): awaited per generation, never on dry runs.
+ */
+export type GenerateInterceptor = (
+    chat: SillyTavernChatMessage[],
+    contextSize: number,
+    abort: (immediately: boolean) => void,
+    type: string
+) => Promise<void>;
+
+/** Slash command registry (only presence checks are used). */
+export interface SlashCommandParserApi {
+    commands: Record<string, unknown>;
 }
 
 export interface NativeWorldInfoEntry {
@@ -207,6 +242,10 @@ export interface SillyTavernChatMessage {
     is_user: boolean;
     is_system?: boolean;
     mes: string;
+    /** Per-message extension data, saved with the chat (spec 007 R10). */
+    extra?: Record<string, unknown>;
+    swipe_id?: number;
+    swipe_info?: Array<{ extra?: Record<string, unknown> } | undefined>;
 }
 
 export interface CharacterCardFields {
@@ -265,6 +304,20 @@ export interface SillyTavernContext {
     /** Global API settings — only the streaming fallback of spec 005 R2 is read. */
     chatCompletionSettings?: Record<string, unknown>;
     textCompletionSettings?: Record<string, unknown>;
+    /** Spec 007 — picking, interop and per-reply records. */
+    getWorldInfoPrompt?(
+        chat: string[],
+        maxContext: number,
+        isDryRun: boolean
+    ): Promise<unknown>;
+    getCurrentChatId?(): string | undefined;
+    saveChat?(): Promise<void>;
+    saveMetadataDebounced?(): void;
+    SlashCommandParser?: SlashCommandParserApi;
+    executeSlashCommandsWithOptions?(
+        text: string,
+        options?: Record<string, unknown>
+    ): Promise<{ pipe?: unknown } | undefined>;
 }
 
 /**

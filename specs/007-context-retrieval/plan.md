@@ -170,7 +170,7 @@ src/
 │   │   ├── memoryBooks.ts    # detection, badge kind, prefix rule (new)
 │   │   └── doomsTracker.ts   # present cast / location extraction (new)
 │   ├── sync/flatten.ts       # Memory Books order exception (changed)
-│   ├── md/convention.ts      # wi_summary, pick_excluded (changed)
+│   ├── md/convention.ts      # wi_summary (changed)
 │   ├── hooks/events.ts       # + pick-completed (changed)
 │   └── state/schema.ts       # pickExcluded, settings.picking repair (changed)
 ├── adapters/

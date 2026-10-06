@@ -30,6 +30,8 @@ function typeLabel(spec: FieldSpec): string {
             return '{ exclude, names, tags }';
         case 'object':
             return 'object (verbatim)';
+        case 'summary':
+            return 'text';
         default:
             return spec.type;
     }

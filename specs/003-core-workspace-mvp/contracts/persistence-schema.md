@@ -107,6 +107,18 @@ ImageNode:
   bookName/uid/status pair; persisted legacy shapes are normalized on load
   (single-book state → one books entry).
 
+## Phase 6 additions (spec 007, additive)
+
+- Entry summary: `native.extensions.wiw_summary` (string; absent = none) — no shape
+  change, the native entry is stored verbatim.
+- Folder: optional `pickExcluded: true` (workspace-only; leaves the subtree out of
+  main-chat lore picking).
+- `settings.assistant`: `defaultContext.catalog` (`auto|on|off`), `defaultContext.fuzzy`,
+  `defaultContext.sources { scene, deeplore }`, `contextSets[]` (`{ id, name, context }`,
+  unique names, ≤ 50) — repaired field by field.
+- `settings.picking` (main-chat lore picking) — see
+  `specs/007-context-retrieval/data-model.md`.
+
 ## Size and lifecycle notes
 
 - Saved inside the app's whole-settings payload; no enforced size limit (research R1);

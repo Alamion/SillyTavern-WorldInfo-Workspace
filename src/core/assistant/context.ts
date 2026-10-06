@@ -12,6 +12,8 @@ import type {
 } from './ports';
 import type {
     AssistantMode,
+    ContextItem,
+    ContextReason,
     ContextSettings,
     ContextSnapshot,
     LlmMessage,
@@ -229,6 +231,16 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     const fallbackFolder = scope.folderIds.find((id) => id !== state.root.id);
     const locationText = locationBlock(state, map, input.selection, fallbackFolder);
     used += estimateTokens(locationText);
+    // Spec 007 research R3: every part of the request as a typed, costed item.
+    const items: ContextItem[] = [
+        {
+            kind: 'request',
+            label: 'Instructions, location and your request',
+            reason: 'option',
+            tokens: used,
+            state: 'included',
+        },
+    ];
 
     // Structure outline — collapsed by depth, then folders only, when it is too big.
     let outlineText = '';
@@ -262,17 +274,34 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             if (variant.omit) {
                 omitted.push(variant.omit);
             }
+            items.push({
+                kind: 'outline',
+                label: 'Workspace structure',
+                reason: 'scope',
+                detail: `${String(outlineItems)} items${variant.omit ? `, ${variant.omit.label}` : ''}`,
+                tokens: cost,
+                state: variant.omit ? 'truncated' : 'included',
+            });
             break;
         }
     }
     if (!outlineIncluded) {
         omitted.push({ what: 'outline-depth', label: 'structure omitted' });
+        items.push({
+            kind: 'outline',
+            label: 'Workspace structure',
+            reason: 'scope',
+            tokens: 0,
+            state: 'omitted',
+            omitReason: 'budget',
+        });
     }
 
     // History: most recent first, older turns are trimmed first.
     const historyMessages: LlmMessage[] = [];
     const historyCandidates = [...input.history].reverse();
     let historyDropped = 0;
+    let historyTokens = 0;
     for (const message of historyCandidates) {
         if (message.text.trim() === '') {
             continue;
@@ -285,6 +314,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             continue;
         }
         used += cost;
+        historyTokens += cost;
         // Decision notes follow the reply they are about (FR-033).
         if (note !== null) {
             historyMessages.unshift({ role: 'system', content: note });
@@ -293,6 +323,28 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     }
     if (historyDropped > 0) {
         omitted.push({ what: 'history', label: 'older conversation turns', count: historyDropped });
+    }
+    const historyTurns = historyMessages.filter((message) => message.role !== 'system').length;
+    if (historyTurns > 0) {
+        items.push({
+            kind: 'history',
+            label: 'Conversation so far',
+            reason: 'option',
+            detail: `${String(historyTurns)} ${historyTurns === 1 ? 'turn' : 'turns'}`,
+            tokens: historyTokens,
+            state: historyDropped > 0 ? 'truncated' : 'included',
+        });
+    }
+    if (historyDropped > 0) {
+        items.push({
+            kind: 'history',
+            label: 'Older conversation turns',
+            reason: 'option',
+            detail: `${String(historyDropped)} ${historyDropped === 1 ? 'turn' : 'turns'}`,
+            tokens: 0,
+            state: 'omitted',
+            omitReason: 'budget',
+        });
     }
 
     // Entries in full: the selection first, then key-triggered entries layer by
@@ -324,10 +376,21 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             .map((item) => item.node)
             .filter((node): node is EntryNode => node !== undefined && !selected.has(node.id)),
     ];
+    // Why each entry is a candidate for full text (FR-002).
+    const why = new Map<string, { reason: ContextReason; detail?: string }>();
+    for (const entry of seeds) {
+        why.set(
+            entry.id,
+            selected.has(entry.id)
+                ? { reason: 'selected' }
+                : { reason: 'option', detail: 'activated in the current chat' }
+        );
+    }
     let triggered: EntryNode[];
     if (context.entryContents === 'all') {
         const seedIds = new Set(seeds.map((entry) => entry.id));
         triggered = candidates.filter((entry) => !seedIds.has(entry.id));
+        triggered.forEach((entry) => why.set(entry.id, { reason: 'scope', detail: 'all entries of the structure' }));
     } else {
         const seedTexts = [requestText, ...input.history.slice(-2).map((message) => message.text)];
         if (chat) {
@@ -341,7 +404,24 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 seedTexts.push(chat.persona.description);
             }
         }
-        triggered = expandTriggers(candidates, seedTexts, seeds).flatMap((layer) => layer.entries);
+        const layers = expandTriggers(candidates, seedTexts, seeds, { explain: true });
+        const names = new Map(candidates.map((entry) => [entry.id, entry.name]));
+        layers.forEach((layer, step) => {
+            for (const entry of layer.entries) {
+                const origin = layer.origins?.get(entry.id);
+                const key = origin ? `key "${origin.trigger}"` : undefined;
+                if (step === 0 || origin?.sourceId == null) {
+                    why.set(entry.id, { reason: 'key', detail: key });
+                } else {
+                    const source = names.get(origin.sourceId) ?? 'an entry';
+                    why.set(entry.id, {
+                        reason: 'recursion',
+                        detail: `step ${String(step)} from "${source}"${key ? ` (${key})` : ''}`,
+                    });
+                }
+            }
+        });
+        triggered = layers.flatMap((layer) => layer.entries);
     }
     const itemBlocks: string[] = [];
     let seedsDropped = 0;
@@ -354,16 +434,27 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         }
         const block = itemBlock(entry, handle);
         const cost = estimateTokens(block);
+        const origin = why.get(entry.id) ?? { reason: 'scope' as const };
         if (used + cost > budgetTokens * 0.9) {
             if (isSeed) {
                 seedsDropped += 1;
             } else {
                 triggeredDropped += 1;
             }
+            items.push({
+                kind: 'entry',
+                nodeId: entry.id,
+                label: entry.name,
+                ...origin,
+                tokens: cost,
+                state: 'omitted',
+                omitReason: 'budget',
+            });
             return;
         }
         used += cost;
         itemBlocks.push(block);
+        items.push({ kind: 'entry', nodeId: entry.id, label: entry.name, ...origin, tokens: cost, state: 'included' });
         // With `all` nothing is chosen by keys: the notice must not claim it was.
         if (!isSeed && context.entryContents !== 'all') {
             triggeredIncluded += 1;
@@ -407,8 +498,10 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 used += cost;
                 optional.push(block);
                 cardIncluded = true;
+                items.push({ kind: 'card', label: 'Character card', reason: 'option', detail: chat.card.name, tokens: cost, state: 'included' });
             } else {
                 omitted.push({ what: 'chat', label: 'character card' });
+                items.push({ kind: 'card', label: 'Character card', reason: 'option', tokens: cost, state: 'omitted', omitReason: 'budget' });
             }
         }
         if (context.persona && chat.persona) {
@@ -418,8 +511,10 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                 used += cost;
                 optional.push(block);
                 personaIncluded = true;
+                items.push({ kind: 'persona', label: 'Persona description', reason: 'option', detail: chat.persona.name, tokens: cost, state: 'included' });
             } else {
                 omitted.push({ what: 'chat', label: 'persona description' });
+                items.push({ kind: 'persona', label: 'Persona description', reason: 'option', tokens: cost, state: 'omitted', omitReason: 'budget' });
             }
         }
         if (context.activatedEntries && activated.length > 0) {
@@ -440,6 +535,14 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                     used += cost;
                     optional.push(block);
                     activatedIncluded = handles.length;
+                    items.push({
+                        kind: 'activated',
+                        label: 'Entries activated in the chat',
+                        reason: 'option',
+                        detail: `${String(handles.length)} entries`,
+                        tokens: cost,
+                        state: 'included',
+                    });
                 }
             }
             if (unmatched > 0) {
@@ -459,6 +562,14 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                     used += cost;
                     optional.push(chatBlock(kept));
                     chatIncluded = kept.length;
+                    items.push({
+                        kind: 'chat',
+                        label: 'Current chat',
+                        reason: 'option',
+                        detail: `${String(kept.length)} ${kept.length === 1 ? 'message' : 'messages'}`,
+                        tokens: cost,
+                        state: dropped > 0 ? 'truncated' : 'included',
+                    });
                     break;
                 }
                 kept.shift();
@@ -466,6 +577,9 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             }
             if (dropped > 0) {
                 omitted.push({ what: 'chat', label: 'oldest chat messages', count: dropped });
+                if (chatIncluded === 0) {
+                    items.push({ kind: 'chat', label: 'Current chat', reason: 'option', tokens: 0, state: 'omitted', omitReason: 'budget' });
+                }
             }
         }
     }
@@ -522,6 +636,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         omitted,
         estimatedTokens: used,
         requestMessages: messages,
+        items,
     };
     return { messages, snapshot };
 }

@@ -1,4 +1,5 @@
 import type { NativeWorldInfoEntry } from '../../global';
+import { getSummary, SUMMARY_KEY, withSummary } from '../tree/summary';
 import { stableStringify } from '../sync/fingerprint';
 import {
     createDefaultNativeEntry,
@@ -19,7 +20,7 @@ import type { YamlCodec } from './ports';
 
 export const OWNED_PREFIX = 'wi_';
 
-type FieldType = 'boolean' | 'number' | 'string' | 'list' | 'nullable-number' | 'nullable-boolean' | 'number-or-boolean' | 'enum' | 'object' | 'filter';
+type FieldType = 'boolean' | 'number' | 'string' | 'list' | 'nullable-number' | 'nullable-boolean' | 'number-or-boolean' | 'enum' | 'object' | 'filter' | 'summary';
 
 export interface FieldSpec {
     key: string;
@@ -74,7 +75,8 @@ export const FIELD_SPECS: readonly FieldSpec[] = [
     { key: 'wi_triggers', field: 'triggers', type: 'list', description: 'Generation types that trigger the entry' },
     { key: 'wi_character_filter', field: 'characterFilter', type: 'filter', description: '{ exclude, names, tags }' },
     { key: 'wi_add_memo', field: 'addMemo', type: 'boolean', description: 'Show memo as title' },
-    { key: 'wi_extensions', field: 'extensions', type: 'object', description: 'Native extension data (verbatim)' },
+    { key: 'wi_extensions', field: 'extensions', type: 'object', description: 'Native extension data (verbatim, without the summary)' },
+    { key: 'wi_summary', field: 'extensions', type: 'summary', description: 'When the entry matters (extensions.wiw_summary, spec 007)' },
 ];
 
 /** Native fields never written: per-book state and fields carried by name/body. */
@@ -174,7 +176,19 @@ export function renderEntryFile(entry: EntryNode, fileStem: string, yaml: YamlCo
         owned[TITLE_KEY] = entry.name;
     }
     for (const spec of FIELD_SPECS) {
-        const value = native[spec.field];
+        if (spec.type === 'summary') {
+            const summary = getSummary(entry.native);
+            if (summary !== '') {
+                owned[spec.key] = summary;
+            }
+            continue;
+        }
+        let value = native[spec.field];
+        if (spec.type === 'object' && spec.field === 'extensions' && isPlainObject(value) && SUMMARY_KEY in value) {
+            const rest: Record<string, unknown> = { ...value };
+            delete rest[SUMMARY_KEY];
+            value = rest;
+        }
         if (value === undefined || sameValue(value, defaults[spec.field])) {
             continue;
         }
@@ -299,9 +313,17 @@ export function parseEntryFile(text: string, fileStem: string, yaml: YamlCodec):
         }
     }
     for (const spec of FIELD_SPECS) {
-        if (spec.key in owned) {
+        if (spec.type !== 'summary' && spec.key in owned) {
             target[spec.field] = parseField(spec, owned[spec.key]);
         }
+    }
+    const summaryValue = owned['wi_summary'];
+    if (typeof summaryValue === 'string' && summaryValue.trim() !== '') {
+        const stored = native.extensions?.[SUMMARY_KEY];
+        if (typeof stored === 'string' && stored.trim() !== '' && stored.trim() !== summaryValue.trim()) {
+            warnings.push('wi_summary and wi_extensions.wiw_summary differ; wi_summary was used.');
+        }
+        Object.assign(native, withSummary(native, summaryValue));
     }
     const titleValue = owned[TITLE_KEY];
     const title = typeof titleValue === 'string' && titleValue.trim() !== '' ? titleValue : fileStem;

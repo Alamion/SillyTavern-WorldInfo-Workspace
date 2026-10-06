@@ -13,6 +13,7 @@ import {
     withNodeDetached,
     withNodesCopied,
 } from '../state/sharing';
+import { withSummary } from './summary';
 
 /**
  * Pure tree mutations (US1, FR-002..FR-006, FR-011). Every function takes a state
@@ -320,6 +321,23 @@ export function commitEntryField(
     if (name === 'comment') {
         node.name = String(value ?? '');
     }
+    markEntryBooksDirty(node);
+    return copied.state;
+}
+
+/** Summary commit (spec 007 R1): `extensions.wiw_summary`, marks dirty like any field. */
+export function commitEntrySummary(state: WorkspaceState, entryId: string, summary: string): WorkspaceState {
+    const current = findNode(state, entryId);
+    if (!current || current.kind !== 'entry' || withSummary(current.native, summary) === current.native) {
+        return state;
+    }
+    const copied = withNodeCopied(state, entryId);
+    if (!copied || copied.node.kind !== 'entry') {
+        return state;
+    }
+    const node = copied.node;
+    node.native = withSummary(node.native, summary);
+    node.updatedAt = new Date().toISOString();
     markEntryBooksDirty(node);
     return copied.state;
 }

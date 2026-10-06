@@ -308,10 +308,64 @@ describe('assistant settings (spec 005 FR-035)', () => {
                 characterCard: true,
                 persona: true,
                 activatedEntries: true,
+                catalog: 'on',
+                fuzzy: true,
+                sources: { scene: true, deeplore: false },
             },
+            contextSets: [
+                {
+                    id: 's1',
+                    name: 'Factions',
+                    context: {
+                        scope: { kind: 'workspace' },
+                        entryContents: 'triggered',
+                        chatMessages: 0,
+                        characterCard: false,
+                        persona: false,
+                        activatedEntries: false,
+                        catalog: 'auto',
+                        fuzzy: false,
+                        sources: { scene: false, deeplore: false },
+                    },
+                },
+            ],
         };
         const state = migrate({ ...validPayload(), settings: { sortMode: 'custom', assistant } });
         expect(getAssistantSettings(state)).toEqual(assistant);
+    });
+
+    it('fills the spec 007 fields of a pre-0.5.0 block with defaults', () => {
+        const state = migrate({
+            ...validPayload(),
+            settings: { sortMode: 'custom', assistant: { profileId: 'p1', defaultContext: { entryContents: 'all' } } },
+        });
+        const settings = getAssistantSettings(state);
+        expect(settings.defaultContext).toMatchObject({
+            entryContents: 'all',
+            catalog: 'auto',
+            fuzzy: false,
+            sources: { scene: false, deeplore: false },
+        });
+        expect(settings.contextSets).toEqual([]);
+    });
+
+    it('drops invalid and duplicate context sets', () => {
+        const state = migrate({
+            ...validPayload(),
+            settings: {
+                sortMode: 'custom',
+                assistant: {
+                    contextSets: [
+                        { id: 'a', name: 'One', context: {} },
+                        { id: 'b', name: ' one ', context: {} },
+                        { id: 'c', name: '', context: {} },
+                        { name: 'No id' },
+                        'junk',
+                    ],
+                },
+            },
+        });
+        expect(getAssistantSettings(state).contextSets.map((set) => set.name)).toEqual(['One']);
     });
 
     it('repairs out-of-range and unknown values field by field', () => {

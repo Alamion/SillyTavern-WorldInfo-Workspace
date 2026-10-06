@@ -109,9 +109,14 @@ Defaults are those of `createDefaultNativeEntry` (`src/core/state/schema.ts`).
 | `wi_triggers` | `triggers` | list of generation types | `[]` |
 | `wi_character_filter` | `characterFilter` | `{ exclude: bool, names: [..], tags: [..] }` | empty, include |
 | `wi_add_memo` | `addMemo` | boolean | `true` |
-| `wi_extensions` | `extensions` | object (verbatim) | `{}` |
+| `wi_extensions` | `extensions` | object (verbatim, without the summary) | `{}` |
+| `wi_summary` | `extensions.wiw_summary` | text — when the entry matters (spec 007) | absent |
 | *(body)* | `content` | markdown text | `""` |
 | *(never written)* | `uid`, `displayIndex`, per-book sync | — | assigned per book by native sync |
+
+**Phase 6 addition (spec 007)**: `wi_summary` is hoisted out of `wi_extensions`; on
+import a differing `wi_extensions.wiw_summary` loses to `wi_summary` with a report
+warning. Details: `specs/007-context-retrieval/contracts/markdown-convention-delta.md`.
 
 Native fields not listed above that an entry carries (future app fields) are written
 under `wi_native` as an object and restored verbatim, so no native field is dropped.

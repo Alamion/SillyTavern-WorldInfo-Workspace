@@ -42,7 +42,7 @@ US3 Fuzzy/sets/truncation (P2) → US4 Interop (P2) → US5 Main-chat picking (P
 - [x] T002 Serve the vault to DeepLore: if a running Obsidian with the Local REST API plugin is not available, write `.live/obsidian-rest-mock.mjs` (Node, no dependencies) implementing the endpoints DeepLore calls (`context/sillytavern-DeepLore/src/vault/obsidian-api.js`: auth check, list files, read note, write note) over `.live/vault-dtf/`, and configure DeepLore on the `dev` account to use it; record port/key in `.live/README-fixtures.md`
 - [x] T003 Create Memory Books test data on the `dev` account: a chat with an existing character, a chat-bound lorebook, ≥ 3 memories created through Memory Books with a working free connection profile; record chat/book names in `.live/README-fixtures.md`
 - [x] T004 Create Doom's Enhancement Suite tracker data on the `dev` account: at least one tracked turn so `chatMetadata.dooms_tracker.committedTrackerData` (or `lastGeneratedData`) lists present characters; record the chat in `.live/README-fixtures.md` (if the tracker cannot run on the available API, write a recorded tracker payload into the chat metadata and note that it is synthetic)
-- [ ] T005 [P] Extend `src/global.d.ts`: events `WORLDINFO_FORCE_ACTIVATE`, `WORLDINFO_ENTRIES_LOADED` (payload `{ globalLore, characterLore, chatLore, personaLore }`), `WORLD_INFO_ACTIVATED`, `MESSAGE_RECEIVED`, `CHARACTER_MESSAGE_RENDERED`, `MESSAGE_SWIPED`, `WORLDINFO_SETTINGS_UPDATED`, `WORLDINFO_UPDATED`; `SlashCommandParser.commands`; chat message `extra` / `swipe_id` / `swipe_info[].extra`; `getWorldInfoPrompt`; interceptor signature type `GenerateInterceptor`
+- [x] T005 [P] Extend `src/global.d.ts`: events `WORLDINFO_FORCE_ACTIVATE`, `WORLDINFO_ENTRIES_LOADED` (payload `{ globalLore, characterLore, chatLore, personaLore }`), `WORLD_INFO_ACTIVATED`, `MESSAGE_RECEIVED`, `CHARACTER_MESSAGE_RENDERED`, `MESSAGE_SWIPED`, `WORLDINFO_SETTINGS_UPDATED`, `WORLDINFO_UPDATED`; `SlashCommandParser.commands`; chat message `extra` / `swipe_id` / `swipe_info[].extra`; `getWorldInfoPrompt`; interceptor signature type `GenerateInterceptor`
 
 ---
 
@@ -53,19 +53,19 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T006 [P] Unit tests for summary accessors (`getSummary`, `setSummary` — blank removes the key, trims, >300 flagged) and fingerprint inclusion in `tests/unit/entry-summary.test.ts`
-- [ ] T007 [P] Unit tests for `wi_summary` export/import incl. hoisting out of `wi_extensions`, omitting empty `wi_extensions`, conflict (both present) reported, files without the key unchanged, and folder `pick_excluded` record key in `tests/unit/md-convention.test.ts`
-- [ ] T008 [P] Integration summary round-trip matrix (R13) on FakeHost + memory disk: editor set → reload; push → native entry has `extensions.wiw_summary`; native edit of another field → summary kept; native edit of the summary → pulled; markdown export → import; export → edit file → pull; character-book conversion helper round trip in `tests/integration/summary-roundtrip.test.ts`
-- [ ] T009 [P] Unit tests for `ContextItem` production in `buildRequest`: one item per sent part with kind/reason/detail/tokens/state; omitted items with `omitReason`; items equal what the request text contains in `tests/unit/assistant-context.test.ts`
+- [x] T006 [P] Unit tests for summary accessors (`getSummary`, `setSummary` — blank removes the key, trims, >300 flagged) and fingerprint inclusion in `tests/unit/entry-summary.test.ts`
+- [x] T007 [P] Unit tests for `wi_summary` export/import incl. hoisting out of `wi_extensions`, omitting empty `wi_extensions`, conflict (both present) reported, files without the key unchanged, in `tests/unit/md-convention.test.ts` (folder `pickExcluded` stays workspace-only — not in markdown, decided 2026-10-07)
+- [x] T008 [P] Integration summary round-trip matrix (R13) on FakeHost + memory disk: editor set → reload; push → native entry has `extensions.wiw_summary`; native edit of another field → summary kept; native edit of the summary → pulled; markdown export → import; export → edit file → pull; character-book conversion helper round trip in `tests/integration/summary-roundtrip.test.ts`
+- [x] T009 [P] Unit tests for `ContextItem` production in `buildRequest`: one item per sent part with kind/reason/detail/tokens/state; omitted items with `omitReason`; items equal what the request text contains in `tests/unit/assistant-context.test.ts`
 
 ### Implementation
 
-- [ ] T010 Add summary accessors and the 300-char soft limit in `src/core/tree/summary.ts` (pure; reads/writes `node.native.extensions.wiw_summary`)
-- [ ] T011 Add `wi_summary` and folder `pick_excluded` to the field table and the export/import mapping in `src/core/md/convention.ts` (and `src/core/md/reference.ts` sample); update `specs/004-markdown-folder-sync/contracts/markdown-convention.md` with a "Phase 6 additions" section pointing to `specs/007-context-retrieval/contracts/markdown-convention-delta.md`
-- [ ] T012 Add `pickExcluded?: boolean` to `FolderNode` and its load repair in `src/core/state/schema.ts`; document both additions in `specs/003-core-workspace-mvp/contracts/persistence-schema.md`
-- [ ] T013 Add `ContextItem` and the new `ContextSettings` fields (`catalog`, `fuzzy`, `sources`) with defaults and repair in `src/core/assistant/types.ts` and the settings/conversation repair paths (`src/core/assistant/settingsOps.ts`, `src/adapters/conversationStore.ts`)
-- [ ] T014 Produce `items` in `buildRequest` and store them in `ContextSnapshot.items` in `src/core/assistant/context.ts` (reasons: selected, scope, key with matching key, recursion with step/source from `src/core/assistant/triggers.ts`, option, history)
-- [ ] T015 Make T008 pass end to end: ensure `src/core/sync/fingerprint.ts` covers `extensions` and `src/core/sync/import.ts` keeps `extensions.wiw_summary` on clean-side pulls
+- [x] T010 Add summary accessors and the 300-char soft limit in `src/core/tree/summary.ts` (pure; reads/writes `node.native.extensions.wiw_summary`)
+- [x] T011 Add `wi_summary` to the field table and the export/import mapping in `src/core/md/convention.ts` (and `src/core/md/reference.ts` sample); update `specs/004-markdown-folder-sync/contracts/markdown-convention.md` with a "Phase 6 additions" section pointing to `specs/007-context-retrieval/contracts/markdown-convention-delta.md`
+- [x] T012 Add `pickExcluded?: boolean` to `FolderNode` and its load repair in `src/core/state/schema.ts`; document both additions in `specs/003-core-workspace-mvp/contracts/persistence-schema.md`
+- [x] T013 Add `ContextItem` and the new `ContextSettings` fields (`catalog`, `fuzzy`, `sources`) with defaults and repair in `src/core/assistant/types.ts` and the settings/conversation repair paths (`src/core/assistant/settingsOps.ts`, `src/adapters/conversationStore.ts`)
+- [x] T014 Produce `items` in `buildRequest` and store them in `ContextSnapshot.items` in `src/core/assistant/context.ts` (reasons: selected, scope, key with matching key, recursion with step/source from `src/core/assistant/triggers.ts`, option, history)
+- [x] T015 Make T008 pass end to end: ensure `src/core/sync/fingerprint.ts` covers `extensions` and `src/core/sync/import.ts` keeps `extensions.wiw_summary` on clean-side pulls
 
 **Checkpoint**: summaries persist everywhere; every request carries typed items.
 
