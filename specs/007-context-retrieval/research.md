@@ -288,3 +288,11 @@ bundled). Planning adds its own decisions (R-numbered) below this section.
   unavailable" (known characters are not the present cast and are not used).
 - DeepLore wraps `console.*` (its diagnostics); our logs still appear, attributed to its
   wrapper — irrelevant for behaviour.
+
+- **Fixtures created (2026-10-07, `.live/README-fixtures.md`)**: Memory Books names memory
+  entries `NNN - title` on this account (title format without brackets) — the prefix rule
+  must accept `NNN - ` and `[NNN] - `. Doom's suite stores `characterThoughts` and
+  `infoBox` as JSON STRINGS inside `lastGeneratedData` / `committedTrackerData` (parse
+  when a string), characters carry no `present` key (absent = present), location is
+  `infoBox.location.value`. DeepLore runs against a local stand-in for the Obsidian Local
+  REST API (`.live/obsidian-rest-mock.mjs`) over a copied vault.
