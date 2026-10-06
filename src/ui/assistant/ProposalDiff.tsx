@@ -1,3 +1,4 @@
+import { getSummary } from '../../core/tree/summary';
 import { FIELD_SPECS, OWNED_PREFIX } from '../../core/md/convention';
 import type { EntryNode, TreeNode } from '../../core/state/schema';
 import type { OperationProposal, ProposedValues } from '../../core/assistant/types';
@@ -48,6 +49,13 @@ export function ProposalDiff({
             label: 'secondary keys',
             before: entry?.native.keysecondary.join(', ') ?? '',
             after: values.secondaryKeys.join(', '),
+        });
+    }
+    if (values.summary !== undefined) {
+        rows.push({
+            label: 'summary',
+            before: entry !== undefined ? getSummary(entry.native) : '',
+            after: values.summary === '' ? '(removed)' : values.summary,
         });
     }
     for (const [field, value] of Object.entries(values.fields ?? {})) {

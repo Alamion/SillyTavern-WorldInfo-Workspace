@@ -20,6 +20,13 @@ export function displayText(message: Message): string {
  * from the 2026-09-15 live run, where it said "0 chars" for 23 s).
  */
 export function statusText(message: Message, now: number = Date.now()): string | null {
+    if (message.reading !== undefined && (message.status === 'received' || message.status === 'receiving')) {
+        // Protocol v2 read round (spec 007): the model asked for entries from the catalog.
+        const what = message.reading.count === 1 ? '1 item' : `${String(message.reading.count)} items`;
+        return message.reading.count === 0
+            ? 'Finishing the reply without further reads…'
+            : `Reading ${what} from the workspace… (round ${String(message.reading.round)}/3)`;
+    }
     if (message.status === 'pending') {
         const started = message.startedAt !== undefined ? Date.parse(message.startedAt) : now;
         const seconds = Math.max(0, Math.round((now - started) / 1000));

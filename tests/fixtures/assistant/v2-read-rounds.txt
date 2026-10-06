@@ -1,0 +1,4 @@
+The seal question needs two entries I only see in the catalog.
+
+<op type="read" ids="e12, e13"></op>
+<op type="open" ids="f7"></op>

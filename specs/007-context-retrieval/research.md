@@ -296,3 +296,10 @@ bundled). Planning adds its own decisions (R-numbered) below this section.
   when a string), characters carry no `present` key (absent = present), location is
   `infoBox.location.value`. DeepLore runs against a local stand-in for the Obsidian Local
   REST API (`.live/obsidian-rest-mock.mjs`) over a copied vault.
+
+- **Live check of read rounds (2026-10-07, free router)**: with the read/open rules only in
+  the catalog header (user turn) the model announced "Let me read those two." and wrote no
+  block; with the rules also in the system message (`CATALOG_PROTOCOL_TEXT`, all modes)
+  it wrote `<op type="read" ids="e12,e13">`, the round delivered both entries and the reply
+  continued with details from them. Decision: catalog rules go into the system message
+  whenever a catalog is sent.

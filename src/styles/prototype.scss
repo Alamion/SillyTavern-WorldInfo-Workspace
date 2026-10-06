@@ -891,3 +891,24 @@ body.wiw-active #WorldInfo > .wiw-root {
 }
 
 
+
+// Entry summary (spec 007): one line that grows with its text, counter in the label.
+.wiw-summary-input {
+    width: 100%;
+    min-height: 1.9em;
+    padding: 0.2rem 0.35rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    font: inherit;
+    font-size: 0.9em;
+    resize: vertical;
+    field-sizing: content;
+}
+
+.wiw-summary-count {
+    margin-left: auto;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}

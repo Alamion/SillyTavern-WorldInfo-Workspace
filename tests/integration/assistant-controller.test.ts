@@ -1101,3 +1101,76 @@ describe('context preview (spec 007 US1)', () => {
         expect(harness.controller.getSnapshot().conversations).toHaveLength(0);
     });
 });
+
+describe('read rounds (spec 007 protocol v2)', () => {
+    async function catalogConversation(harness: Harness): Promise<void> {
+        await ready(harness);
+        await harness.controller.createConversation();
+        await harness.controller.updateConversationContext({ catalog: 'on', scope: { kind: 'workspace' } });
+        harness.controller.setSelection([]);
+    }
+
+    it('delivers requested entries and appends the continuation to the same reply', async () => {
+        const harness = createHarness();
+        await catalogConversation(harness);
+        harness.llm
+            .reply('Let me look.\n<op type="read" ids="e1"></op>')
+            .reply('Bristlemark sits on the Lira.\n<op type="edit_entry" id="e1"><content>New text.</content></op>');
+        await harness.controller.send('Where is the capital?');
+        expect(harness.llm.requests).toHaveLength(2);
+        const followUp = harness.llm.requests[1]?.messages ?? [];
+        expect(followUp.at(-2)).toMatchObject({ role: 'assistant' });
+        expect(followUp.at(-1)?.content).toContain('<workspace-read round="1">');
+        expect(followUp.at(-1)?.content).toContain('[e1] Bristlemark');
+        const reply = harness.controller.getSnapshot().messages.at(-1);
+        expect(reply?.text).toContain('Let me look.');
+        expect(reply?.text).toContain('Bristlemark sits on the Lira.');
+        expect(reply?.context?.catalogOnlyNodeIds).not.toContain(NODE_IDS.bristlemark);
+        expect(reply?.context?.items?.some((item) => item.reason === 'catalog-read' && item.nodeId === NODE_IDS.bristlemark)).toBe(true);
+        // The entry was read, so the edit is reviewable.
+        expect(reply?.batch?.proposals[0]).toMatchObject({ op: 'edit_entry', decision: 'pending' });
+        expect(reply?.reading).toBeUndefined();
+    });
+
+    it('rejects an edit of an entry that was never read', async () => {
+        const harness = createHarness();
+        await catalogConversation(harness);
+        harness.llm.reply('<op type="edit_entry" id="e1"><content>Blind edit.</content></op>');
+        await harness.controller.send('Rewrite the capital');
+        const reply = harness.controller.getSnapshot().messages.at(-1);
+        expect(reply?.batch?.proposals[0]?.decision).toBe('invalid');
+    });
+
+    it('stops after three rounds with a "no more reads" turn', async () => {
+        const harness = createHarness();
+        await catalogConversation(harness);
+        harness.llm.always({ text: 'More.\n<op type="read" ids="e2"></op>' });
+        await harness.controller.send('Read everything');
+        // 1 request + 3 read rounds + 1 final "no more reads" turn.
+        expect(harness.llm.requests).toHaveLength(5);
+        expect(harness.llm.requests[4]?.messages.at(-1)?.content).toBe(
+            'No more reads are available; answer with what you have.'
+        );
+    });
+
+    it('reports unknown handles as not found', async () => {
+        const harness = createHarness();
+        await catalogConversation(harness);
+        harness.llm.reply('<op type="read" ids="e99"></op>').reply('Nothing there.');
+        await harness.controller.send('Read e99');
+        expect(harness.llm.requests[1]?.messages.at(-1)?.content).toContain('not found: e99');
+    });
+
+    it('Stop during a read round keeps what arrived and applies nothing', async () => {
+        const harness = createHarness();
+        await catalogConversation(harness);
+        harness.llm.reply('First part.\n<op type="read" ids="e1"></op>').hang();
+        const sending = harness.controller.send('Read the capital');
+        await vi.waitFor(() => expect(harness.llm.requests).toHaveLength(2));
+        harness.controller.stop();
+        await sending;
+        const reply = harness.controller.getSnapshot().messages.at(-1);
+        expect(reply?.text).toContain('First part.');
+        expect(harness.llm.requests).toHaveLength(2);
+    });
+});

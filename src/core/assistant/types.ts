@@ -228,6 +228,12 @@ export interface ContextSnapshot {
     requestMessages: LlmMessage[];
     /** Spec 007: typed items; absent on messages sent before 0.5.0. */
     items?: ContextItem[];
+    /**
+     * Entries the model saw only as catalog lines (spec 007 R4): their full text was
+     * not sent, so changes other than the summary need a read first. Read rounds
+     * remove the entries they deliver.
+     */
+    catalogOnlyNodeIds?: string[];
 }
 
 export interface ProposedValues {
@@ -236,6 +242,8 @@ export interface ProposedValues {
     secondaryKeys?: string[];
     content?: string;
     fields?: Partial<NativeWorldInfoEntry>;
+    /** Spec 007: entry summary; '' clears it. */
+    summary?: string;
 }
 
 export type Decision =
@@ -378,4 +386,6 @@ export interface Message {
     retryAt?: string;
     /** Number of automatic retries already spent. */
     retryAttempt?: number;
+    /** Spec 007: a read round in progress (protocol v2), for the status line. */
+    reading?: { round: number; count: number };
 }

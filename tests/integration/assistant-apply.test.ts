@@ -464,3 +464,33 @@ describe('structure operations, deletions and undo (US2)', () => {
         });
     });
 });
+
+describe('summary proposals (spec 007 R13)', () => {
+    it('applies a summary to the native book and undo restores the previous extensions', async () => {
+        const rig = buildRig();
+        seedRoot(rig);
+        rig.store.updateNode('e-bristle', (node) => {
+            if (node.kind === 'entry') {
+                node.native.extensions = { other: 1 };
+            }
+        });
+        await rig.advanceTimers();
+        const events: Array<{ event: string; payload: unknown }> = [];
+        const batch = batchFrom(
+            rig,
+            '<op type="edit_entry" id="e1"><summary>When the harbor matters.</summary></op>'
+        );
+        const result = applyProposals(deps(rig, events), { conversationId: 'c1' }, batch, [batch.proposals[0]?.id ?? '']);
+        expect(result.outcomes[0]?.status).toBe('applied');
+        await rig.advanceTimers();
+        expect(rig.host.books.get('Book')?.entries['5']?.extensions).toEqual({
+            other: 1,
+            wiw_summary: 'When the harbor matters.',
+        });
+
+        const undone = undoAppliedBatch(deps(rig, events), { conversationId: 'c1' }, result.batch);
+        expect(undone.reverted).toEqual(['e-bristle']);
+        await rig.advanceTimers();
+        expect(rig.host.books.get('Book')?.entries['5']?.extensions).toEqual({ other: 1 });
+    });
+});

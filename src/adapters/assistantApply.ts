@@ -1,5 +1,7 @@
 import { findNode, type EntryNode, type WorkspaceState } from '../core/state/schema';
 import { deleteSubtree as deleteSubtreeById } from '../core/tree/operations';
+import { withSummary } from '../core/tree/summary';
+import type { NativeWorldInfoEntry } from '../global';
 import type { WorkspaceStore } from '../core/state/store';
 import {
     commitEntryField,
@@ -78,7 +80,12 @@ function indexInParent(state: WorkspaceState, nodeId: string): number {
     return Math.max(0, parent.children.findIndex((child) => child.id === nodeId));
 }
 
-function fieldEntries(values: ProposedValues): Array<[string, unknown]> {
+/**
+ * Native field writes for proposed values. A summary becomes the entry's updated
+ * `extensions` object (spec 007 R1), so the existing restore-fields undo puts the
+ * previous object back unchanged.
+ */
+function fieldEntries(values: ProposedValues, native?: NativeWorldInfoEntry): Array<[string, unknown]> {
     const fields: Array<[string, unknown]> = [];
     if (values.keys !== undefined) {
         fields.push(['key', values.keys]);
@@ -91,6 +98,9 @@ function fieldEntries(values: ProposedValues): Array<[string, unknown]> {
     }
     for (const [field, value] of Object.entries(values.fields ?? {})) {
         fields.push([field, value]);
+    }
+    if (values.summary !== undefined && native !== undefined) {
+        fields.push(['extensions', withSummary(native, values.summary).extensions ?? {}]);
     }
     return fields;
 }
@@ -175,7 +185,7 @@ export function applyProposals(
                 break;
             }
             if (proposal.op === 'create_entry') {
-                for (const [field, value] of fieldEntries(values)) {
+                for (const [field, value] of fieldEntries(values, entryOf(deps.store.getState(), id)?.native)) {
                     applyTreeChange(deps, (current) => commitEntryField(current, id, field, value), {
                         books: Object.keys(entryOf(deps.store.getState(), id)?.sync.books ?? {}),
                     });
@@ -200,7 +210,8 @@ export function applyProposals(
             }
             const previousName = before.name;
             const previousNative: Record<string, unknown> = {};
-            for (const [field] of fieldEntries(values)) {
+            const writes = fieldEntries(values, before.native);
+            for (const [field] of writes) {
                 previousNative[field] = (before.native as unknown as Record<string, unknown>)[field];
             }
             const books = Object.keys(before.sync.books);
@@ -209,7 +220,7 @@ export function applyProposals(
                     books,
                 });
             }
-            for (const [field, value] of fieldEntries(values)) {
+            for (const [field, value] of writes) {
                 applyTreeChange(deps, (current) => commitEntryField(current, before.id, field, value), { books });
             }
             appliedNodeId = before.id;

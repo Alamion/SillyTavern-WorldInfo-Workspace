@@ -462,3 +462,68 @@ describe('context items (spec 007 FR-001/FR-002, research R3)', () => {
         expect(sum).toBe(built.snapshot.estimatedTokens);
     });
 });
+
+describe('catalog mode (spec 007 FR-008/FR-009)', () => {
+    function bigState(): WorkspaceState {
+        const state = aldermeerState();
+        const cities = (state.root.children[0] as FolderNode).children[0] as FolderNode;
+        for (let i = 0; i < 60; i++) {
+            const entry = createEntryNode({ id: `big-${String(i)}`, parentId: cities.id, name: `District ${String(i)}`, now: '2026-10-07T00:00:00.000Z', nativeUid: 100 + i });
+            entry.native.key = ['district'];
+            entry.native.content = `District ${String(i)} lies along the canal. `.repeat(40);
+            cities.children.push(entry);
+        }
+        return state;
+    }
+    const catalogText = (built: ReturnType<typeof buildRequest>) => built.messages.at(-1)?.content ?? '';
+
+    it('Auto leaves a library that fits exactly as before (no catalog)', () => {
+        const auto = build({ context: { ...BASE, catalog: 'auto' } });
+        const off = build({ context: { ...BASE, catalog: 'off' } });
+        expect(auto.messages).toEqual(off.messages);
+        expect(catalogText(auto)).not.toContain('## Catalog');
+        expect(auto.snapshot.catalogOnlyNodeIds ?? []).toEqual([]);
+    });
+
+    it('Auto switches to the catalog when the triggered text overflows', () => {
+        const built = build({
+            state: bigState(),
+            context: { ...BASE, catalog: 'auto', scope: { kind: 'workspace' } },
+            selection: [],
+            request: 'Which district has the oldest canal?',
+            contextTokens: 6000,
+            responseTokens: 1000,
+        });
+        expect(catalogText(built)).toContain('## Catalog');
+        expect(built.snapshot.catalogOnlyNodeIds?.length).toBeGreaterThan(0);
+        const catalogItem = built.snapshot.items?.find((item) => item.kind === 'catalog');
+        expect(catalogItem).toMatchObject({ state: 'included' });
+        expect(catalogItem?.detail).toMatch(/entries/);
+    });
+
+    it('Off never uses the catalog, even when entries are left out', () => {
+        const built = build({
+            state: bigState(),
+            context: { ...BASE, catalog: 'off', scope: { kind: 'workspace' } },
+            selection: [],
+            request: 'Which district has the oldest canal?',
+            contextTokens: 6000,
+            responseTokens: 1000,
+        });
+        expect(catalogText(built)).not.toContain('## Catalog');
+    });
+
+    it('On uses the catalog for a small library too, keeping selected entries in full', () => {
+        const built = build({ context: { ...BASE, catalog: 'on', scope: { kind: 'workspace' } }, selection: [NODE_IDS.taverns] });
+        expect(catalogText(built)).toContain('## Catalog');
+        expect(built.snapshot.catalogOnlyNodeIds).not.toContain(NODE_IDS.taverns);
+        expect(built.snapshot.items?.find((item) => item.nodeId === NODE_IDS.taverns)?.state).toBe('included');
+    });
+
+    it('sends the summary line with entries in full', () => {
+        const state = aldermeerState();
+        const cities = (state.root.children[0] as FolderNode).children[0] as FolderNode;
+        (cities.children[1] as EntryNode).native.extensions = { wiw_summary: 'When drinking.' };
+        expect(catalogText(build({ state, selection: [NODE_IDS.taverns] }))).toContain('summary: When drinking.');
+    });
+});

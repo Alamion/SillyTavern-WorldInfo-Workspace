@@ -19,6 +19,7 @@ export function ProposalEditor({
     const [keys, setKeys] = useState((initial.keys ?? []).join(', '));
     const [secondaryKeys, setSecondaryKeys] = useState((initial.secondaryKeys ?? []).join(', '));
     const [content, setContent] = useState(initial.content ?? '');
+    const [summary, setSummary] = useState(initial.summary ?? '');
 
     const save = (): void => {
         const values: ProposedValues = { ...initial };
@@ -39,6 +40,9 @@ export function ProposalEditor({
         }
         if (initial.content !== undefined || content !== '') {
             values.content = content;
+        }
+        if (initial.summary !== undefined || summary.trim() !== '') {
+            values.summary = summary.trim();
         }
         onSave(values);
         onClose();
@@ -65,6 +69,10 @@ export function ProposalEditor({
                         value={secondaryKeys}
                         onChange={(event) => setSecondaryKeys(event.target.value)}
                     />
+                </label>
+                <label>
+                    Summary (when the entry matters)
+                    <input value={summary} onChange={(event) => setSummary(event.target.value)} />
                 </label>
                 <label>
                     Content

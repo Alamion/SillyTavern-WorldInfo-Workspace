@@ -1,4 +1,4 @@
-import { DISCUSS_PROTOCOL_TEXT, PROPOSE_PROTOCOL_TEXT } from './protocol';
+import { CATALOG_PROTOCOL_TEXT, DISCUSS_PROTOCOL_TEXT, PROPOSE_PROTOCOL_TEXT } from './protocol';
 import type { AssistantMode, OperationProposal, ProposalBatch } from './types';
 
 /**
@@ -16,10 +16,14 @@ export const DEFAULT_INSTRUCTIONS = [
     'Answer in the language the user writes in.',
 ].join('\n');
 
-export function systemPrompt(mode: AssistantMode, instructions: string | null): string {
+export function systemPrompt(
+    mode: AssistantMode,
+    instructions: string | null,
+    options: { catalog?: boolean } = {}
+): string {
     const head = instructions ?? DEFAULT_INSTRUCTIONS;
     const protocol = mode === 'propose' ? PROPOSE_PROTOCOL_TEXT : DISCUSS_PROTOCOL_TEXT;
-    return `${head}\n\n${protocol}`;
+    return options.catalog === true ? `${head}\n\n${protocol}\n\n${CATALOG_PROTOCOL_TEXT}` : `${head}\n\n${protocol}`;
 }
 
 

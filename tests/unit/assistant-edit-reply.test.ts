@@ -110,6 +110,7 @@ describe('continuing a cut-off reply (live run 2026-09-22)', () => {
     it('joins a block on its own line and prose with one space', () => {
         expect(appendContinuation(BLOCK('A'), `  ${BLOCK('B')}`)).toBe(`${BLOCK('A')}\n${BLOCK('B')}`);
         expect(appendContinuation('The harbor is', 'loud at dawn.')).toBe('The harbor is loud at dawn.');
+        expect(appendContinuation('Reading.\n<op type="read" ids="e1"></op>', 'It says X.')).toBe('Reading.\n<op type="read" ids="e1"></op>\n\nIt says X.');
         expect(appendContinuation('The harbor is ', 'loud.')).toBe('The harbor is loud.');
         expect(appendContinuation('The harbor', ', at dawn')).toBe('The harbor, at dawn');
     });

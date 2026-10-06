@@ -1,5 +1,6 @@
 import { diffLines, diffSequences } from '../diff/lineDiff';
 import { findNode, type EntryNode, type TreeNode, type WorkspaceState } from '../state/schema';
+import { getSummary } from '../tree/summary';
 import type { OperationProposal, ProposedValues } from './types';
 
 /**
@@ -121,6 +122,9 @@ export function fingerprintValues(node: TreeNode, values: ProposedValues): strin
         }
         if (values.secondaryKeys !== undefined) {
             parts.push(node.native.keysecondary.join(SEPARATOR));
+        }
+        if (values.summary !== undefined) {
+            parts.push(`summary=${getSummary(node.native)}`);
         }
         if (values.fields !== undefined) {
             for (const field of Object.keys(values.fields)) {

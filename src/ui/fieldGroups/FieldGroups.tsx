@@ -7,6 +7,7 @@ import { renderMarkdown, type ImageResolver } from '../../core/preview';
 import { clampLayoutSize, LAYOUT_LIMITS } from '../../core/state/layout';
 import { useLayout } from '../layoutContext';
 import { useDraftField } from '../useDraftField';
+import { getSummary, isSummaryTooLong, SUMMARY_SOFT_LIMIT, withSummary } from '../../core/tree/summary';
 import { NodeHeader } from '../NodeHeader';
 import { Splitter } from '../Splitter';
 import { CharacterFilterControl, MultiSelectControl } from './MultiSelect';
@@ -374,6 +375,45 @@ function ContentSection({
     );
 }
 
+/**
+ * Entry summary (spec 007 FR-004): when the entry matters, one or two sentences.
+ * Stored in `extensions.wiw_summary`; longer than the soft limit is flagged only.
+ */
+function SummaryField({
+    native,
+    onCommitField,
+}: {
+    native: NativeWorldInfoEntry;
+    onCommitField: CommitField;
+}): JSX.Element {
+    const draft = useDraftField(getSummary(native), (next) =>
+        onCommitField('extensions', withSummary(native, next).extensions ?? {})
+    );
+    const length = draft.value.trim().length;
+    const tooLong = isSummaryTooLong(draft.value.trim());
+    return (
+        <div className="wiw-field wiw-summary-field">
+            <span className="wiw-field-label">
+                Summary
+                <InfoIcon info="When this entry matters, in one or two sentences. The assistant and lore picking read it instead of the whole entry to decide whether it is relevant." />
+                <span className={`wiw-summary-count${tooLong ? ' wiw-field-error' : ''}`}>
+                    {String(length)}/{String(SUMMARY_SOFT_LIMIT)}
+                </span>
+            </span>
+            <textarea
+                className="wiw-summary-input"
+                rows={1}
+                value={draft.value}
+                placeholder="e.g. Relevant when the harbor, trade or the council come up."
+                spellCheck={false}
+                onChange={(event) => draft.onChange(event.target.value)}
+                onBlur={draft.onBlur}
+            />
+            {tooLong && <span className="wiw-field-error">Longer than {String(SUMMARY_SOFT_LIMIT)} characters: catalogs show it shortened.</span>}
+        </div>
+    );
+}
+
 export function CardEditor({
     entry,
     banner,
@@ -512,6 +552,9 @@ export function CardEditor({
             {banner}
             <p className="wiw-membership-line">{membershipLine}</p>
             <div className="wiw-field-grid">
+                <div style={{ gridColumn: 'span 12' }}>
+                    <SummaryField key={entry.id} native={native} onCommitField={set} />
+                </div>
                 <FieldControl
                     meta={fieldMeta('key')}
                     span={4}

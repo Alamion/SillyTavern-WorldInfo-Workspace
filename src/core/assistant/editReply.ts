@@ -102,6 +102,7 @@ export function editMessage(message: Message, text: string, state: WorkspaceStat
         snapshot: {
             handles: message.context?.handles ?? {},
             scopeNodeIds: message.context?.scopeNodeIds ?? [],
+            catalogOnlyNodeIds: message.context?.catalogOnlyNodeIds,
         },
         newProposalId: newId,
     });
@@ -172,6 +173,10 @@ export function appendContinuation(base: string, continuation: string): string {
     }
     if (/^<op\b/i.test(rest)) {
         return `${base.trimEnd()}\n${rest}`;
+    }
+    // After a read block (protocol v2) the answer starts a new paragraph.
+    if (/<\/op>\s*$/i.test(base)) {
+        return `${base.trimEnd()}\n\n${rest}`;
     }
     // Providers trim the leading space of a continuation that ends mid-sentence.
     return /\s$/.test(base) || /^[,.;:!?)]/.test(rest) ? base + rest : `${base} ${rest}`;

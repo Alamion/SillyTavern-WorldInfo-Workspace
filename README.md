@@ -144,6 +144,18 @@ You choose what it sees — the selected items, the whole structure, the current
 character card — and that choice becomes the default for new conversations. Conversations
 live in your browser, per profile, never in your settings.
 
+**Summaries.** Each entry has a short *Summary* field under its title: one or two
+sentences saying when the entry matters. It is stored inside the native entry (so it
+travels with the book, with markdown as `wi_summary`, and with character cards), and the
+assistant can write summaries for you — ask it to summarize a folder and review the
+proposals as usual.
+
+**Large libraries.** When the entries you chose do not fit the context size, the
+assistant gets a *catalog* instead: every entry by name, folder and summary. It asks for
+the full text of the entries it needs (you see "Reading… round 1/3") and the reply
+continues with them. *Large libraries* in the context menu switches this between Auto,
+always, and never.
+
 **Preview context** (in the context menu) lists everything your next message would send:
 each entry with the reason it is there (selected, the key that matched, the entry that
 pulled it in through recursion…), its estimated size, and what was left out because it

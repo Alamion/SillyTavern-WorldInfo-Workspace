@@ -4,6 +4,9 @@ import { buildHandleMap, type HandleMap } from './handles';
 import { decisionNote, systemPrompt } from './prompts';
 import { resolveScope, selectionFolder } from './scope';
 import { expandTriggers } from './triggers';
+import { buildCatalog, folderCatalog } from './catalog';
+import type { ReadRequest } from './parser';
+import { getSummary } from '../tree/summary';
 import type {
     ActivatedEntryRef,
     CharacterCardView,
@@ -147,6 +150,10 @@ function itemBlock(node: TreeNode, handle: string): string {
     if (node.native.keysecondary.length > 0) {
         parts.push(`secondary keys: ${node.native.keysecondary.join(', ')}`);
     }
+    const summary = getSummary(node.native);
+    if (summary !== '') {
+        parts.push(`summary: ${summary}`);
+    }
     const fields = fieldLines(node);
     if (fields.length > 0) {
         parts.push(`fields: ${fields.join(', ')}`);
@@ -223,7 +230,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     }
 
     const budgetTokens = Math.max(500, input.contextTokens - input.responseTokens);
-    const systemText = systemPrompt(input.mode, input.instructions);
+    let systemText = systemPrompt(input.mode, input.instructions);
     const requestText = input.request;
     let used = estimateTokens(systemText) + estimateTokens(requestText);
 
@@ -423,7 +430,19 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         });
         triggered = layers.flatMap((layer) => layer.entries);
     }
+    // Catalog selection (spec 007 R4): Auto uses it only when the entries the mode
+    // would send in full do not fit; On always; Off never.
+    const fullCost = [...seeds, ...triggered].reduce((total, entry) => {
+        const handle = map.byNode.get(entry.id);
+        return handle === undefined ? total : total + estimateTokens(itemBlock(entry, handle));
+    }, 0);
+    const useCatalog =
+        candidates.length > seeds.length &&
+        (context.catalog === 'on' || (context.catalog === 'auto' && used + fullCost > budgetTokens * 0.9));
+    // With a catalog, full text stops early to leave it room.
+    const fullTextCap = useCatalog ? 0.6 : 0.9;
     const itemBlocks: string[] = [];
+    const sentInFull = new Set<string>();
     let seedsDropped = 0;
     let triggeredDropped = 0;
     let triggeredIncluded = 0;
@@ -435,7 +454,11 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         const block = itemBlock(entry, handle);
         const cost = estimateTokens(block);
         const origin = why.get(entry.id) ?? { reason: 'scope' as const };
-        if (used + cost > budgetTokens * 0.9) {
+        if (used + cost > budgetTokens * (isSeed ? 0.9 : fullTextCap)) {
+            if (useCatalog && !isSeed) {
+                // Listed in the catalog instead (below).
+                return;
+            }
             if (isSeed) {
                 seedsDropped += 1;
             } else {
@@ -454,6 +477,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         }
         used += cost;
         itemBlocks.push(block);
+        sentInFull.add(entry.id);
         items.push({ kind: 'entry', nodeId: entry.id, label: entry.name, ...origin, tokens: cost, state: 'included' });
         // With `all` nothing is chosen by keys: the notice must not claim it was.
         if (!isSeed && context.entryContents !== 'all') {
@@ -462,6 +486,44 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     };
     seeds.forEach((entry) => sendInFull(entry, true));
     triggered.forEach((entry) => sendInFull(entry, false));
+    let catalogText = '';
+    let catalogOnlyNodeIds: string[] = [];
+    if (useCatalog) {
+        const triggeredIds = new Set(triggered.map((entry) => entry.id));
+        const rest = candidates.filter((entry) => !sentInFull.has(entry.id));
+        const catalog = buildCatalog({
+            state,
+            entries: rest,
+            map,
+            budgetTokens: Math.max(0, Math.floor(budgetTokens * 0.9 - used)),
+            rank: (entry) => (triggeredIds.has(entry.id) ? 1 : 0),
+        });
+        catalogOnlyNodeIds = rest.map((entry) => entry.id);
+        if (catalog.entryIds.length > 0 || catalog.folderIds.length > 0) {
+            catalogText = catalog.text;
+            used += catalog.tokens;
+            // The read/open rules go into the system message too (see CATALOG_PROTOCOL_TEXT).
+            const withCatalog = systemPrompt(input.mode, input.instructions, { catalog: true });
+            const extra = estimateTokens(withCatalog) - estimateTokens(systemText);
+            used += extra;
+            systemText = withCatalog;
+            const request = items[0];
+            if (request) {
+                request.tokens += extra;
+            }
+            items.push({
+                kind: 'catalog',
+                label: 'Catalog',
+                reason: 'scope',
+                detail: `${String(catalog.entryIds.length)} entries${catalog.folderIds.length > 0 ? `, ${String(catalog.folderIds.length)} folders to open` : ''}${context.catalog === 'auto' ? ' · used because the full text does not fit' : ''}`,
+                tokens: catalog.tokens,
+                state: catalog.omitted > 0 ? 'truncated' : 'included',
+            });
+        }
+        if (catalog.omitted > 0) {
+            omitted.push({ what: 'item', label: 'entries left out of the catalog', count: catalog.omitted });
+        }
+    }
     if (seedsDropped > 0) {
         omitted.push({ what: 'item', label: 'selected entries sent without content', count: seedsDropped });
     }
@@ -594,6 +656,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
                   ...itemBlocks,
               ].join('\n\n')
             : '',
+        catalogText,
         ...optional,
     ].filter((part) => part !== '');
 
@@ -637,8 +700,80 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         estimatedTokens: used,
         requestMessages: messages,
         items,
+        catalogOnlyNodeIds,
     };
     return { messages, snapshot };
+}
+
+/** Read rounds per reply (spec 007 R4). */
+export const MAX_READ_ROUNDS = 3;
+
+export const NO_MORE_READS = 'No more reads are available; answer with what you have.';
+
+export interface ReadRound {
+    /** The user turn that delivers the requested text. */
+    text: string;
+    /** Entries whose full text was delivered (no longer catalog-only). */
+    deliveredIds: string[];
+    items: ContextItem[];
+    notFound: string[];
+    count: number;
+}
+
+/**
+ * The `<workspace-read>` turn for a reply's read/open requests (protocol v2):
+ * full text for `read` handles, the folder catalog for `open` handles, and the
+ * handles that resolve to nothing. Handles come from the reply's snapshot.
+ */
+export function readRoundBlock(
+    state: WorkspaceState,
+    snapshot: Pick<ContextSnapshot, 'handles'>,
+    requests: readonly ReadRequest[],
+    round: number,
+    budgetTokens: number
+): ReadRound {
+    const byNode = new Map(Object.entries(snapshot.handles).map(([handle, nodeId]) => [nodeId, handle]));
+    const map = { handles: snapshot.handles, byNode };
+    const parts: string[] = [];
+    const deliveredIds: string[] = [];
+    const items: ContextItem[] = [];
+    const notFound: string[] = [];
+    let used = 0;
+    const seen = new Set<string>();
+    for (const request of requests) {
+        for (const handle of request.ids) {
+            if (seen.has(`${request.kind}:${handle}`)) {
+                continue;
+            }
+            seen.add(`${request.kind}:${handle}`);
+            const nodeId = snapshot.handles[handle];
+            const node = nodeId !== undefined ? findNode(state, nodeId) : undefined;
+            if (request.kind === 'read' && node?.kind === 'entry') {
+                const block = itemBlock(node, handle);
+                const cost = estimateTokens(block);
+                if (used + cost > budgetTokens) {
+                    items.push({ kind: 'entry', nodeId: node.id, label: node.name, reason: 'catalog-read', tokens: cost, state: 'omitted', omitReason: 'budget', detail: `round ${String(round)}` });
+                    continue;
+                }
+                used += cost;
+                parts.push(block);
+                deliveredIds.push(node.id);
+                items.push({ kind: 'entry', nodeId: node.id, label: node.name, reason: 'catalog-read', detail: `round ${String(round)}`, tokens: cost, state: 'included' });
+            } else if (request.kind === 'open' && node?.kind === 'folder') {
+                const catalog = folderCatalog(state, node, map, Math.max(0, budgetTokens - used));
+                used += catalog.tokens;
+                parts.push(catalog.text);
+                items.push({ kind: 'catalog', nodeId: node.id, label: `Folder ${node.name}`, reason: 'catalog-read', detail: `round ${String(round)} · ${String(catalog.entryIds.length)} entries`, tokens: catalog.tokens, state: catalog.omitted > 0 ? 'truncated' : 'included' });
+            } else {
+                notFound.push(handle);
+            }
+        }
+    }
+    if (notFound.length > 0) {
+        parts.push(`not found: ${notFound.join(', ')}`);
+    }
+    const text = [`<workspace-read round="${String(round)}">`, parts.join('\n\n'), '</workspace-read>', 'Continue your reply.'].join('\n');
+    return { text, deliveredIds, items, notFound, count: deliveredIds.length + items.filter((item) => item.kind === 'catalog').length };
 }
 
 /** Tree path of a node, for proposal summaries (FR-007). */

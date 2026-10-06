@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AssistantSnapshot } from '../../adapters/assistantController';
 import { resolveScope } from '../../core/assistant/scope';
-import type { ContextSettings, ContextScope, EntryContents } from '../../core/assistant/types';
+import type { CatalogMode, ContextSettings, ContextScope, EntryContents } from '../../core/assistant/types';
 import type { FolderNode, TreeNode, WorkspaceState } from '../../core/state/schema';
 
 /**
@@ -90,6 +90,9 @@ export function contextSummary(
         scopeName(context, state, selection),
         context.entryContents === 'all' ? 'all contents' : 'by keys',
     ];
+    if (context.catalog !== 'auto') {
+        parts.push(context.catalog === 'on' ? 'catalog' : 'no catalog');
+    }
     if (context.chatMessages > 0) {
         parts.push(`chat ${String(context.chatMessages)}`);
     }
@@ -322,6 +325,30 @@ export function ContextMenu({
                             hint="For small structures. Whatever does not fit the context size is left out."
                             onChange={() => setContents('all')}
                         />
+                    </section>
+
+                    <section className="wiw-context-section">
+                        <h4>Large libraries</h4>
+                        <p className="wiw-context-hint">
+                            A catalog lists entries by name, folder and summary; the model asks for the full
+                            text of the ones it needs (it may take a few extra seconds).
+                        </p>
+                        {(
+                            [
+                                ['auto', 'Auto (recommended)', 'Only when the entry contents above do not fit the context size.'],
+                                ['on', 'Always use the catalog', 'Selected entries are still sent in full.'],
+                                ['off', 'Never', 'Entries that do not fit are left out, as before.'],
+                            ] as Array<[CatalogMode, string, string]>
+                        ).map(([mode, title, hint]) => (
+                            <Option
+                                key={mode}
+                                type="radio"
+                                checked={context.catalog === mode}
+                                title={title}
+                                hint={hint}
+                                onChange={() => onChange({ catalog: mode })}
+                            />
+                        ))}
                     </section>
 
                     <section className="wiw-context-section">

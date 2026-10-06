@@ -268,3 +268,51 @@ describe('owner report 2026-09-15 (regressions)', () => {
         expect(proposals[1]?.dependsOn).toEqual([proposals[0]?.id]);
     });
 });
+
+describe('summaries and catalog reads (spec 007)', () => {
+    it('turns a summary-only edit into a valid proposal', () => {
+        const { proposals } = proposalsOf('<op type="edit_entry" id="e1"><summary>When the harbor matters.</summary></op>');
+        expect(proposals[0]).toMatchObject({ op: 'edit_entry', decision: 'pending', destructive: false });
+        expect(proposals[0]?.values.summary).toBe('When the harbor matters.');
+    });
+
+    it('drops a summary edit that changes nothing', () => {
+        const state = aldermeerState();
+        const cities = (state.root.children[0] as import('../../src/core/state/schema').FolderNode)
+            .children[0] as import('../../src/core/state/schema').FolderNode;
+        const entry = cities.children[0] as import('../../src/core/state/schema').EntryNode;
+        entry.native.extensions = { wiw_summary: 'Same.' };
+        const { proposals } = proposalsOf('<op type="edit_entry" id="e1"><summary>Same.</summary></op>', { state });
+        expect(proposals[0]?.decision).toBe('invalid');
+    });
+
+    it('rejects edits of catalog-only entries the model has not read', () => {
+        const state = aldermeerState();
+        const map = buildHandleMap(state);
+        const scope = [...resolveScope(state, { kind: 'workspace' }, []).nodeIds];
+        const proposals = toProposals(
+            parseReply('<op type="edit_entry" id="e1"><content>New.</content></op>', { final: true }).blocks,
+            {
+                state,
+                snapshot: { handles: map.handles, scopeNodeIds: scope, catalogOnlyNodeIds: [NODE_IDS.bristlemark] },
+                newProposalId: () => 'p1',
+            }
+        );
+        expect(proposals[0]).toMatchObject({ decision: 'invalid', invalidReason: 'read the entry first (it was only listed in the catalog)' });
+    });
+
+    it('allows a summary-only edit of a catalog-only entry (the summary was shown)', () => {
+        const state = aldermeerState();
+        const map = buildHandleMap(state);
+        const scope = [...resolveScope(state, { kind: 'workspace' }, []).nodeIds];
+        const proposals = toProposals(
+            parseReply('<op type="edit_entry" id="e1"><summary>Better.</summary></op>', { final: true }).blocks,
+            {
+                state,
+                snapshot: { handles: map.handles, scopeNodeIds: scope, catalogOnlyNodeIds: [NODE_IDS.bristlemark] },
+                newProposalId: () => 'p1',
+            }
+        );
+        expect(proposals[0]?.decision).toBe('pending');
+    });
+});

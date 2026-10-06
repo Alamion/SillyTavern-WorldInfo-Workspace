@@ -1,5 +1,6 @@
 import { createDefaultNativeEntry, findNode, type TreeNode, type WorkspaceState } from '../state/schema';
 import { validateName, validateNode } from '../tree/validation';
+import { getSummary } from '../tree/summary';
 import { pathOf } from './context';
 import type { ParsedBlock } from './parser';
 import { findDuplicate, fingerprintValues, isDestructiveEdit } from './rules';
@@ -20,7 +21,7 @@ import type {
 
 export interface ValidateInput {
     state: WorkspaceState;
-    snapshot: Pick<ContextSnapshot, 'handles' | 'scopeNodeIds'>;
+    snapshot: Pick<ContextSnapshot, 'handles' | 'scopeNodeIds' | 'catalogOnlyNodeIds'>;
     newProposalId: () => string;
 }
 
@@ -53,6 +54,9 @@ function valuesOf(block: ParsedBlock): ProposedValues {
     }
     if (block.tags.fields !== undefined) {
         values.fields = block.tags.fields;
+    }
+    if (block.tags.summary !== undefined) {
+        values.summary = block.tags.summary;
     }
     return values;
 }
@@ -281,11 +285,23 @@ export function toProposals(
                 }
             }
         }
+        // Protocol v2 (spec 007 R4): an entry listed only in the catalog was never shown
+        // in full — anything but its summary must be read before it is changed.
+        if (
+            invalidReason === undefined &&
+            targetId !== undefined &&
+            (block.type === 'edit_entry' || block.type === 'delete') &&
+            input.snapshot.catalogOnlyNodeIds?.includes(targetId) === true &&
+            !(block.type === 'edit_entry' && Object.keys(values).every((key) => key === 'summary'))
+        ) {
+            invalidReason = 'read the entry first (it was only listed in the catalog)';
+        }
         if (invalidReason === undefined && block.type === 'edit_entry' && targetId !== undefined) {
             const node = findNode(state, targetId);
             if (node?.kind === 'entry') {
                 const unchanged =
                     (values.content === undefined || values.content === node.native.content) &&
+                    (values.summary === undefined || values.summary.trim() === getSummary(node.native)) &&
                     (values.title === undefined || values.title === node.name) &&
                     (values.keys === undefined ||
                         values.keys.join('\u0000') === node.native.key.join('\u0000')) &&

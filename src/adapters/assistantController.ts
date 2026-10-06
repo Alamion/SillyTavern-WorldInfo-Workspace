@@ -1,5 +1,5 @@
 import { applyDeletion, applyProposals, undoAppliedBatch } from './assistantApply';
-import { buildRequest } from '../core/assistant/context';
+import { buildRequest, MAX_READ_ROUNDS, NO_MORE_READS, readRoundBlock } from '../core/assistant/context';
 import { describeFailure, retryPolicy } from '../core/assistant/failures';
 import { parseReply } from '../core/assistant/parser';
 import { acceptAllSelection, applyOrder, canApplyAgain, withBlocked } from '../core/assistant/plan';
@@ -396,6 +396,135 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
         }
         await deps.conversations.flush(conversation.id);
         notify();
+        const finished = messagesOf(conversation.id).find((item) => item.seq === assistantSeq);
+        if (finished?.status === 'received') {
+            await fulfilReads(conversation, assistantSeq, finished.text);
+        }
+    };
+
+    /**
+     * One continuation of a reply (Continue, read rounds): the original request, the
+     * reply so far as an assistant turn, then `userTurn`; what arrives is appended to
+     * the SAME reply (no prefill — routed models ignore it, live run 2026-09-22).
+     */
+    const runContinuation = async (
+        conversation: Conversation,
+        message: Message,
+        base: string,
+        userTurn: string
+    ): Promise<{ failure: AssistantFailure | null; received: string }> => {
+        const current = settings();
+        const availability = deps.llm.availability();
+        if (availability.state !== 'ready') {
+            return { failure: describeFailure('connection-manager-disabled'), received: '' };
+        }
+        const profile = availability.profiles.find((item) => item.id === current.profileId);
+        if (!profile) {
+            return { failure: describeFailure('profile'), received: '' };
+        }
+        const requestMessages: LlmMessage[] = [
+            ...requestMessagesFor(conversation, message.seq),
+            { role: 'assistant', content: base },
+            { role: 'user', content: userTurn },
+        ];
+        busy = true;
+        abortController = new AbortController();
+        activeRequest = { conversationId: conversation.id, seq: message.seq };
+        notify();
+        let failure: AssistantFailure | null = null;
+        let received = '';
+        let done = false;
+        try {
+            await deps.llm.run(
+                {
+                    profileId: profile.id,
+                    messages: requestMessages,
+                    maxTokens: current.responseTokens,
+                    signal: abortController.signal,
+                },
+                (event) => {
+                    if (event.type === 'progress') {
+                        received = event.text;
+                        const text = appendContinuation(base, received);
+                        void putMessage({
+                            ...message,
+                            status: 'receiving',
+                            text,
+                            prose: parseReply(text, {}).prose,
+                        });
+                        notify();
+                    } else if (event.type === 'done') {
+                        received = event.text;
+                        done = true;
+                    } else if (event.type === 'failed') {
+                        failure = event.failure;
+                    }
+                }
+            );
+        } finally {
+            busy = false;
+            abortController = null;
+            activeRequest = null;
+        }
+        // A stopped continuation keeps what arrived, as a stopped reply does.
+        const stopped = (failure as AssistantFailure | null)?.kind === 'aborted';
+        if ((!done && !stopped) || received.trim() === '') {
+            await putMessage({ ...message, reading: undefined });
+            notify();
+            return { failure: failure ?? describeFailure('empty'), received: '' };
+        }
+        const edited = editMessage(message, appendContinuation(base, received), deps.store.getState());
+        await putMessage({ ...edited.message, status: 'received', reading: undefined });
+        await deps.conversations.flush(conversation.id);
+        notify();
+        return { failure: stopped ? (failure as AssistantFailure | null) : null, received };
+    };
+
+    /**
+     * Read rounds (spec 007 R4, protocol v2): while the newest part of a reply asks
+     * for entries (`read`) or folders (`open`), deliver them and let the reply go on —
+     * at most MAX_READ_ROUNDS rounds, then one "no more reads" turn. Stop ends it.
+     */
+    const fulfilReads = async (conversation: Conversation, seq: number, latestPart: string): Promise<void> => {
+        let pending = parseReply(latestPart, { final: true }).requests;
+        let round = 0;
+        while (pending.length > 0) {
+            const message = messageAt(seq);
+            if (!message?.context || message.status !== 'received') {
+                return;
+            }
+            const limitReached = round >= MAX_READ_ROUNDS;
+            let userTurn = NO_MORE_READS;
+            let context = message.context;
+            let count = 0;
+            if (!limitReached) {
+                round += 1;
+                const current = settings();
+                const block = readRoundBlock(
+                    deps.store.getState(),
+                    message.context,
+                    pending,
+                    round,
+                    Math.max(500, Math.floor((current.contextTokens - current.responseTokens) * 0.5))
+                );
+                userTurn = block.text;
+                count = block.count;
+                const delivered = new Set(block.deliveredIds);
+                context = {
+                    ...message.context,
+                    items: [...(message.context.items ?? []), ...block.items],
+                    catalogOnlyNodeIds: (message.context.catalogOnlyNodeIds ?? []).filter((id) => !delivered.has(id)),
+                };
+            }
+            const reading = { ...message, context, reading: { round: limitReached ? MAX_READ_ROUNDS : round, count } };
+            await putMessage(reading);
+            notify();
+            const result = await runContinuation(conversation, reading, reading.text, userTurn);
+            if (result.failure !== null || limitReached) {
+                return;
+            }
+            pending = parseReply(result.received, { final: true }).requests;
+        }
     };
 
     const failMessage = async (
@@ -581,6 +710,7 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             snapshot: {
                 handles: message.context?.handles ?? {},
                 scopeNodeIds: message.context?.scopeNodeIds ?? [],
+                catalogOnlyNodeIds: message.context?.catalogOnlyNodeIds,
             },
             newProposalId: () => `${String(message.seq)}-${String((counter += 1))}`,
         });
@@ -1064,73 +1194,12 @@ export function createAssistantController(deps: AssistantControllerDeps): Assist
             if (!conversation || message?.role !== 'assistant' || busy) {
                 return null;
             }
-            const current = settings();
-            const availability = deps.llm.availability();
-            if (availability.state !== 'ready') {
-                return describeFailure('connection-manager-disabled');
-            }
-            const profile = availability.profiles.find((item) => item.id === current.profileId);
-            if (!profile) {
-                return describeFailure('profile');
-            }
-            // The original request, the reply so far, then the instruction: a trailing
-            // assistant prefill is ignored by many routed models (live run 2026-09-22).
             const base = continuationBase(message);
-            const requestMessages: LlmMessage[] = [
-                ...requestMessagesFor(conversation, seq),
-                { role: 'assistant', content: base },
-                { role: 'user', content: CONTINUE_INSTRUCTION },
-            ];
-            busy = true;
-            abortController = new AbortController();
-            activeRequest = { conversationId: conversation.id, seq };
-            notify();
-            let failure: AssistantFailure | null = null;
-            let received = '';
-            let done = false;
-            try {
-                await deps.llm.run(
-                    {
-                        profileId: profile.id,
-                        messages: requestMessages,
-                        maxTokens: current.responseTokens,
-                        signal: abortController.signal,
-                    },
-                    (event) => {
-                        if (event.type === 'progress') {
-                            received = event.text;
-                            const text = appendContinuation(base, received);
-                            void putMessage({
-                                ...message,
-                                status: 'receiving',
-                                text,
-                                prose: parseReply(text, {}).prose,
-                            });
-                            notify();
-                        } else if (event.type === 'done') {
-                            received = event.text;
-                            done = true;
-                        } else if (event.type === 'failed') {
-                            failure = event.failure;
-                        }
-                    }
-                );
-            } finally {
-                busy = false;
-                abortController = null;
-                activeRequest = null;
+            const result = await runContinuation(conversation, message, base, CONTINUE_INSTRUCTION);
+            if (result.failure !== null) {
+                return result.failure;
             }
-            // A stopped continuation keeps what arrived, as a stopped reply does.
-            const stopped = (failure as AssistantFailure | null)?.kind === 'aborted';
-            if ((!done && !stopped) || received.trim() === '') {
-                await putMessage(message);
-                notify();
-                return failure ?? describeFailure('empty');
-            }
-            const edited = editMessage(message, appendContinuation(base, received), deps.store.getState());
-            await putMessage({ ...edited.message, status: 'received' });
-            await deps.conversations.flush(conversation.id);
-            notify();
+            await fulfilReads(conversation, seq, result.received);
             return null;
         },
         async regenerate(seq, options = {}) {

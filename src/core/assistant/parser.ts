@@ -22,8 +22,16 @@ export interface ParsedBlock {
         secondaryKeys?: string[];
         content?: string;
         fields?: Partial<NativeWorldInfoEntry>;
+        /** Spec 007: `extensions.wiw_summary`; '' clears it. */
+        summary?: string;
     };
     raw: string;
+}
+
+/** Protocol v2 (spec 007 R4): the model asks for full text of entries / a folder's catalog. */
+export interface ReadRequest {
+    kind: 'read' | 'open';
+    ids: string[];
 }
 
 export interface ParsedReply {
@@ -34,6 +42,8 @@ export interface ParsedReply {
     reasoning: string;
     /** `[[handle]]` references found in the prose. */
     references: string[];
+    /** `read` / `open` blocks, in order (protocol v2). */
+    requests: ReadRequest[];
 }
 
 const OPERATION_TYPES: ReadonlySet<string> = new Set<OperationType>([
@@ -45,7 +55,8 @@ const OPERATION_TYPES: ReadonlySet<string> = new Set<OperationType>([
     'delete',
 ]);
 
-const VALUE_TAGS = ['title', 'keys', 'secondary_keys', 'content', 'fields'] as const;
+const VALUE_TAGS = ['title', 'keys', 'secondary_keys', 'content', 'fields', 'summary'] as const;
+const REQUEST_TYPES: ReadonlySet<string> = new Set(['read', 'open']);
 const EXCERPT_LIMIT = 200;
 
 /** Scalar field rows of the markdown convention, keyed without the `wi_` prefix. */
@@ -232,6 +243,14 @@ function trimContent(value: string): string {
     return value.replace(/^\n/, '').replace(/\n$/, '');
 }
 
+function buildRequest(type: 'read' | 'open', head: string, raw: string): ReadRequest | UnparsedBlock {
+    const ids = [...new Set((parseAttributes(head)['ids'] ?? '').split(/[\s,]+/).filter((id) => id !== ''))];
+    if (ids.length === 0) {
+        return { kind: 'malformed-block', excerpt: excerpt(raw), reason: `${type} needs ids` };
+    }
+    return { kind: type, ids };
+}
+
 function buildBlock(
     typeRaw: string,
     head: string,
@@ -272,6 +291,8 @@ function buildBlock(
             tags.secondaryKeys = splitList(value);
         } else if (tag === 'content') {
             tags.content = trimContent(value);
+        } else if (tag === 'summary') {
+            tags.summary = value.trim();
         } else {
             const parsed = parseFields(value);
             if ('error' in parsed) {
@@ -304,6 +325,7 @@ export function parseReply(text: string, options: { final?: boolean } = {}): Par
     const { text: withoutReasoning, reasoning } = extractReasoning(text);
     const blocks: ParsedBlock[] = [];
     const unparsed: UnparsedBlock[] = [];
+    const requests: ReadRequest[] = [];
     const proseParts: string[] = [];
     let cursor = 0;
     const openPattern = /<op\b/gi;
@@ -333,6 +355,17 @@ export function parseReply(text: string, options: { final?: boolean } = {}): Par
         const body = withoutReasoning.slice(headEnd + 1, closeAt);
         const raw = withoutReasoning.slice(open.index, closeAt + '</op>'.length);
         const typeMatch = /type\s*=\s*["']?([\w-]+)/i.exec(head);
+        const typeName = (typeMatch?.[1] ?? '').toLowerCase();
+        if (REQUEST_TYPES.has(typeName)) {
+            const request = buildRequest(typeName as ReadRequest['kind'], head, raw);
+            if ('ids' in request) {
+                requests.push(request);
+            } else {
+                unparsed.push(request);
+            }
+            cursor = closeAt + '</op>'.length;
+            continue;
+        }
         const built = buildBlock(typeMatch?.[1] ?? '', head, body, raw);
         if ('kind' in built) {
             unparsed.push(built);
@@ -367,5 +400,5 @@ export function parseReply(text: string, options: { final?: boolean } = {}): Par
         }
     }
     const references = [...prose.matchAll(/\[\[([A-Za-z0-9_-]+)\]\]/g)].map((match) => match[1] ?? '');
-    return { prose, blocks, unparsed, reasoning, references };
+    return { prose, blocks, unparsed, reasoning, references, requests };
 }

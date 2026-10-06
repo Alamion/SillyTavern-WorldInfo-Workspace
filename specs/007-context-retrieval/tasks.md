@@ -101,22 +101,22 @@ and US5. **No user story starts before this phase is complete.**
 
 ### Tests (write first, must fail)
 
-- [ ] T021 [P] [US2] Unit tests for catalog lines and folder narrowing (fits → entry catalog; too big → folder lines + top-ranked entries; excluded/disabled left out; summary vs quoted excerpt; ≈tokens) in `tests/unit/assistant-catalog.test.ts`
-- [ ] T022 [P] [US2] Parser tests for v2: `read`/`open` blocks (ids lists, unknown handles), `summary` tag in create/edit, empty summary clears, waiting state, streaming chunk boundaries in `tests/unit/assistant-protocol.test.ts` with new fixtures `tests/fixtures/assistant/v2-read-rounds.txt`, `v2-round-limit.txt`, `v2-summary-edit.txt`
-- [ ] T023 [P] [US2] Validation tests: catalog-mode edit of an unread entry → "read the entry first"; summary-only edit valid; no-op summary dropped in `tests/unit/assistant-validate.test.ts`
-- [ ] T024 [P] [US2] Context tests for Auto/On/Off: Auto uses the catalog only when full text overflows; Off/fit = request identical to the pre-phase snapshot in `tests/unit/assistant-context.test.ts`
-- [ ] T025 [US2] Controller tests for read rounds with `FakeLlm`: fulfil reads, continuation appended to the same reply, max 3 rounds then "No more reads", Stop mid-round, items gain `catalog-read` in `tests/integration/assistant-controller.test.ts`
+- [x] T021 [P] [US2] Unit tests for catalog lines and folder narrowing (fits → entry catalog; too big → folder lines + top-ranked entries; excluded/disabled left out; summary vs quoted excerpt; ≈tokens) in `tests/unit/assistant-catalog.test.ts`
+- [x] T022 [P] [US2] Parser tests for v2: `read`/`open` blocks (ids lists, unknown handles), `summary` tag in create/edit, empty summary clears, waiting state, streaming chunk boundaries in `tests/unit/assistant-protocol.test.ts` with new fixtures `tests/fixtures/assistant/v2-read-rounds.txt`, `v2-round-limit.txt`, `v2-summary-edit.txt`
+- [x] T023 [P] [US2] Validation tests: catalog-mode edit of an unread entry → "read the entry first"; summary-only edit valid; no-op summary dropped in `tests/unit/assistant-validate.test.ts`
+- [x] T024 [P] [US2] Context tests for Auto/On/Off: Auto uses the catalog only when full text overflows; Off/fit = request identical to the pre-phase snapshot in `tests/unit/assistant-context.test.ts`
+- [x] T025 [US2] Controller tests for read rounds with `FakeLlm`: fulfil reads, continuation appended to the same reply, max 3 rounds then "No more reads", Stop mid-round, items gain `catalog-read` in `tests/integration/assistant-controller.test.ts`
 
 ### Implementation
 
-- [ ] T026 [P] [US2] Summary field (counter, warning >300) in the Essentials group of `src/ui/fieldGroups/FieldGroups.tsx`; tree tooltip with the summary in `src/ui/StructureTree.tsx`
-- [ ] T027 [P] [US2] Create `src/core/assistant/catalog.ts` (catalog lines, folder narrowing, excerpt quoting, ranking hook for R5)
-- [ ] T028 [US2] Extend `src/core/assistant/parser.ts` with `read`/`open` blocks and the `summary` tag; `src/core/assistant/protocol.ts` and `src/core/assistant/prompts.ts` with the v2 model-facing text; bump the protocol doc: copy the delta into `specs/005-ai-lore-assistant/contracts/assistant-protocol.md` as "v2"
-- [ ] T029 [US2] Extend `src/core/assistant/validate.ts` (read-before-edit rule, summary values) and `src/adapters/assistantApply.ts` (apply/undo summary edits through tree ops)
-- [ ] T030 [US2] Catalog mode in `src/core/assistant/context.ts` (Auto/On/Off, catalog section, handles for catalog lines, `<workspace-read>` block builder)
-- [ ] T031 [US2] Read rounds in `src/adapters/assistantController.ts` (reuse the Continue path, visible status "Reading N entries… (round k/3)", stoppable, max 3) and the status line in `src/ui/assistant/ConversationView.tsx`
-- [ ] T032 [US2] Catalog Auto/On/Off control in `src/ui/assistant/ContextMenu.tsx`
-- [ ] T033 [US2] Document summaries, catalog mode and `wi_summary` in `README.md` and `src/ui/MappingReference.tsx`
+- [x] T026 [P] [US2] Summary field (counter, warning >300) in the Essentials group of `src/ui/fieldGroups/FieldGroups.tsx`; tree tooltip with the summary in `src/ui/StructureTree.tsx`
+- [x] T027 [P] [US2] Create `src/core/assistant/catalog.ts` (catalog lines, folder narrowing, excerpt quoting, ranking hook for R5)
+- [x] T028 [US2] Extend `src/core/assistant/parser.ts` with `read`/`open` blocks and the `summary` tag; `src/core/assistant/protocol.ts` and `src/core/assistant/prompts.ts` with the v2 model-facing text; bump the protocol doc: copy the delta into `specs/005-ai-lore-assistant/contracts/assistant-protocol.md` as "v2"
+- [x] T029 [US2] Extend `src/core/assistant/validate.ts` (read-before-edit rule, summary values) and `src/adapters/assistantApply.ts` (apply/undo summary edits through tree ops)
+- [x] T030 [US2] Catalog mode in `src/core/assistant/context.ts` (Auto/On/Off, catalog section, handles for catalog lines, `<workspace-read>` block builder)
+- [x] T031 [US2] Read rounds in `src/adapters/assistantController.ts` (reuse the Continue path, visible status "Reading N entries… (round k/3)", stoppable, max 3) and the status line in `src/ui/assistant/ConversationView.tsx`
+- [x] T032 [US2] Catalog Auto/On/Off control in `src/ui/assistant/ContextMenu.tsx`
+- [x] T033 [US2] Document summaries, catalog mode and `wi_summary` in `README.md` and `src/ui/MappingReference.tsx`
 
 **Checkpoint**: large libraries usable; summaries editable by hand and by the assistant.
 

@@ -100,6 +100,11 @@ export function ProposalCard({
                     <span className="wiw-badge wiw-badge-danger">{proposal.failedReason}</span>
                 )}
             </div>
+            {values.summary !== undefined && (
+                <div className="wiw-proposal-path" title="Summary">
+                    <i className="fa-solid fa-tag" /> {values.summary === '' ? '(summary removed)' : values.summary}
+                </div>
+            )}
             {(proposal.op === 'create_entry' || proposal.op === 'create_folder') && (
                 <>
                     {fieldSummary(proposal) !== '' && (

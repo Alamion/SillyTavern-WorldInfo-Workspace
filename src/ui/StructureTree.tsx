@@ -11,6 +11,7 @@ import {
 } from '../core/tree/browse';
 import type { FolderNode, TreeNode } from '../core/state/schema';
 import { VirtualList } from './VirtualList';
+import { getSummary } from '../core/tree/summary';
 
 export type TreeMenuAction =
     | 'rename'
@@ -278,6 +279,7 @@ function RowImpl({
                     className="wiw-tree-name"
                     role="button"
                     tabIndex={0}
+                    title={node.kind === 'entry' ? getSummary(node.native) || undefined : undefined}
                     onClick={(event) => {
                         if (event.shiftKey) {
                             onSelect(node.id, 'range');

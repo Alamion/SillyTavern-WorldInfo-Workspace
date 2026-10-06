@@ -1,0 +1,8 @@
+Here are summaries for the two city entries.
+
+<op type="edit_entry" id="e1"><summary>Capital; relevant for trade, the harbor and the council.</summary></op>
+<op type="edit_entry" id="e2">
+<summary>
+Taverns of Bristlemark; relevant when characters drink, rest or gather rumours.
+</summary>
+</op>

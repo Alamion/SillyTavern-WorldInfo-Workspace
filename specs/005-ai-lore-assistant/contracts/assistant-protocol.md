@@ -1,4 +1,4 @@
-# Contract — Assistant Operation Protocol v1
+# Contract — Assistant Operation Protocol (v1, extended to v2 by spec 007)
 
 The text protocol between the plugin and the model (research R3). The default system
 instructions embed the "Model-facing description" section verbatim; the parser in
@@ -122,3 +122,23 @@ invalid; a ref used as `parent` must be a folder creation.
 `tests/fixtures/assistant/` stores real replies: `probe-2026-09-15-router.txt` (five
 blocks, prose interleaved), plus hand-made cases: truncated block, fenced blocks, think
 tags, unknown field, broken attribute quoting, chunk boundaries inside tags.
+
+## v2 (spec 007, 2026-10-07)
+
+Additive to v1; details in `specs/007-context-retrieval/contracts/assistant-protocol-v2.md`.
+
+- `summary` tag in `create_entry` / `edit_entry` (entry summary, `extensions.wiw_summary`;
+  empty clears it). Entries sent in full carry a `summary:` line.
+- Catalog section (catalog mode Auto/On/Off): entries listed by handle, folder path, name,
+  ≈tokens and summary or quoted excerpt; narrowed folders are listed as
+  `(folder, N entries …) — not listed, open to see`. When a catalog is sent, the system
+  message also carries the read/open rules (`CATALOG_PROTOCOL_TEXT`; live run 2026-10-07:
+  with the rules only in the user turn a free model wrote "Let me read those two." and no
+  block).
+- `<op type="read" ids="…"></op>` and `<op type="open" ids="…"></op>` are requests, not
+  operations: the plugin answers with a `<workspace-read round="n">` user turn and the
+  continuation is appended to the same reply; at most 3 rounds, then one
+  "No more reads are available; answer with what you have." turn.
+- Validation: an entry listed only in the catalog cannot be edited (except its summary)
+  or deleted before it was read — "read the entry first (it was only listed in the
+  catalog)".

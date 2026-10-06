@@ -259,3 +259,47 @@ describe('echoed request context (live run 2026-09-22, Text Completion)', () => 
         expect(parsed.prose).toBe('Sure.');
     });
 });
+
+describe('protocol v2 (spec 007): read/open requests and the summary tag', () => {
+    it('collects read and open requests without turning them into operations', () => {
+        const parsed = parseReply(fixture('v2-read-rounds.txt'), { final: true });
+        expect(parsed.blocks).toHaveLength(0);
+        expect(parsed.unparsed).toHaveLength(0);
+        expect(parsed.requests).toEqual([
+            { kind: 'read', ids: ['e12', 'e13'] },
+            { kind: 'open', ids: ['f7'] },
+        ]);
+        expect(parsed.prose).toBe('The seal question needs two entries I only see in the catalog.');
+    });
+
+    it('splits ids on commas and whitespace and drops duplicates', () => {
+        const parsed = parseReply('<op type="read" ids="e1 e2,e2 ,  e3"></op>', { final: true });
+        expect(parsed.requests).toEqual([{ kind: 'read', ids: ['e1', 'e2', 'e3'] }]);
+    });
+
+    it('reports a read without ids as malformed', () => {
+        const parsed = parseReply('<op type="read"></op>', { final: true });
+        expect(parsed.requests).toEqual([]);
+        expect(parsed.unparsed[0]?.reason).toBe('read needs ids');
+    });
+
+    it('reads the summary tag of edits (trimmed)', () => {
+        const parsed = parseReply(fixture('v2-summary-edit.txt'), { final: true });
+        expect(parsed.blocks.map((block) => block.tags.summary)).toEqual([
+            'Capital; relevant for trade, the harbor and the council.',
+            'Taverns of Bristlemark; relevant when characters drink, rest or gather rumours.',
+        ]);
+    });
+
+    it('accepts an empty summary tag as a clear', () => {
+        const parsed = parseReply('<op type="edit_entry" id="e1"><summary></summary></op>', { final: true });
+        expect(parsed.blocks[0]?.tags.summary).toBe('');
+    });
+
+    it('never exposes a read request split across stream chunks', () => {
+        const text = fixture('v2-round-limit.txt');
+        const cut = text.indexOf('</op>') - 3;
+        expect(parseReply(text.slice(0, cut)).requests).toEqual([]);
+        expect(parseReply(text, { final: true }).requests).toEqual([{ kind: 'read', ids: ['e40'] }]);
+    });
+});
