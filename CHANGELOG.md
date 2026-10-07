@@ -3,6 +3,30 @@
 User-visible changes, newest first. Internal-only work (refactors, tests, tooling) is not
 listed here — see the git history for that.
 
+## 0.5.0 — 2026-10-07
+
+### Added
+
+- **Context preview**: see everything the assistant's next message would send — each
+  entry with the reason it is there (selected, the matching key, the recursion chain…) and
+  its estimated size, plus what was left out. The layers icon on a reply shows what was
+  sent for it.
+- **Entry summaries**: a short "when does this matter" field on every entry, stored in the
+  native entry (travels with the book, with markdown as `wi_summary`, and with character
+  cards). The assistant can write summaries for a whole folder.
+- **Large libraries**: when the chosen entries do not fit, the assistant gets a catalog
+  (names, folders, summaries) and reads the entries it needs before answering.
+- **Near matches** (other word forms of keys), **sentence-boundary truncation** of the
+  last entry that does not fit, and **named context sets**.
+- **Lore picking in the main chat** (off by default): a model picks the entries of your
+  active lorebooks the next reply needs; they are activated through World Info itself.
+  Picks are prepared in the background, so most replies do not wait; the book icon on a
+  reply shows what was picked and whether it was inserted.
+- **Other lore extensions** (all optional): Memory Books entries get badges and keep their
+  own fields and order when edited here; Doom's Enhancement Suite scene and DeepLore
+  matches can be added to the assistant's context.
+- Hook `wi-workspace:pick-completed` for extension authors.
+
 ## 0.4.12 — 2026-09-25
 
 ### Added

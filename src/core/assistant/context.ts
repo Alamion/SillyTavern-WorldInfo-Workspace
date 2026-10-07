@@ -452,9 +452,19 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     }
     // Catalog selection (spec 007 R4): Auto uses it only when the entries the mode
     // would send in full do not fit; On always; Off never.
+    // Each entry's block is built once per request (cost estimate and sending).
+    const blocks = new Map<string, string>();
+    const blockOf = (entry: EntryNode, handle: string): string => {
+        let block = blocks.get(entry.id);
+        if (block === undefined) {
+            block = itemBlock(entry, handle);
+            blocks.set(entry.id, block);
+        }
+        return block;
+    };
     const fullCost = [...seeds, ...triggered].reduce((total, entry) => {
         const handle = map.byNode.get(entry.id);
-        return handle === undefined ? total : total + estimateTokens(itemBlock(entry, handle));
+        return handle === undefined ? total : total + estimateTokens(blockOf(entry, handle));
     }, 0);
     const useCatalog =
         candidates.length > seeds.length &&
@@ -473,7 +483,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
         if (handle === undefined) {
             return;
         }
-        const block = itemBlock(entry, handle);
+        const block = blockOf(entry, handle);
         const cost = estimateTokens(block);
         const origin = why.get(entry.id) ?? { reason: 'scope' as const };
         if (used + cost > budgetTokens * (isSeed ? 0.9 : fullTextCap)) {
@@ -699,7 +709,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     // Other extensions (spec 007 US4): one item each, "unavailable" when enabled without data.
     const sourceBlock = (label: string, body: string | null, detail: string | undefined): void => {
         if (body === null) {
-            items.push({ kind: 'source', label, reason: 'interop', tokens: 0, state: 'omitted', omitReason: 'unavailable' });
+            items.push({ kind: 'source', label, reason: 'interop', detail, tokens: 0, state: 'omitted', omitReason: 'unavailable' });
             return;
         }
         const cost = estimateTokens(body);
@@ -732,7 +742,11 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
             matches === null || matches.count === 0 || matches.text.trim() === ''
                 ? null
                 : `## DeepLore matches\n${matches.text}`,
-            matches === null ? undefined : `${String(matches.count)} ${matches.count === 1 ? 'entry' : 'entries'}`
+            matches === null
+                ? undefined
+                : matches.count === 0
+                  ? 'no matches for the recent chat'
+                  : `${String(matches.count)} ${matches.count === 1 ? 'entry' : 'entries'}`
         );
     }
 

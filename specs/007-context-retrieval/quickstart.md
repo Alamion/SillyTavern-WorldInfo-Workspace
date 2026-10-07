@@ -92,4 +92,46 @@ noted), the summary matrix C4–C12 passes completely, and the four gates are gr
 
 ## Results
 
-*(Filled during live validation.)*
+### Live pass — 2026-10-07 (dev account, free OpenRouter router, fixtures in `.live/README-fixtures.md`)
+
+Gates: typecheck, lint, 796 tests + 13 perf budgets (incl. P-10/P-11, run uncontended), build — green.
+
+| # | Result |
+|---|---|
+| C0 | PASS — preview lists request, structure, key/recursion entries with the chain ("step 3 from Lamp Night (key Bristlemark)"), catalog, ≈tokens vs budget |
+| C1 | PASS — the layers icon on a reply shows that reply's snapshot |
+| C2, C3 | Automated (`assistant-context` truncation/budget tests; preview = sent request in `assistant-controller`); not repeated live |
+| C4 | PASS — summary typed in the editor; counter, tree tooltip |
+| C5 | PASS — pushed into the book file as `extensions.wiw_summary`, nothing else changed |
+| C6 | PASS — native edit of the content pulled; summary kept on both sides; no banner |
+| C7 | PASS — native edit of the summary pulled into the field |
+| C8–C10 | Automated only (summary matrix S6–S8: markdown export/import, on-disk edit, character-card round trip) |
+| C11 | PASS — 303/300 shown with the warning; saved unshortened |
+| C12 | PASS — the assistant proposed summaries for the 3 entries of a folder; 2 accepted reached the book, 1 denied did not; "Undo all" removed both |
+| C13 | Automated (Auto + library that fits = byte-identical request) |
+| C14 | PASS after a fix — first run: the model wrote "Let me read those two." without a block (rules only in the user turn); with the rules in the system message it wrote `<op type="read" ids="e12,e13">`, round 1 delivered both, the reply continued with details from them |
+| C15–C18 | Automated (`assistant-controller` read rounds: open, unread edit rejected, 3-round limit, Stop) |
+| C19, C40 | NOT RUN — the 10-question / 10-turn rates need the owner's real library and time; left to the week of use |
+| C20 | Automated (fuzzy tests); option visible and saved in a set live |
+| C21 | PASS — set saved from the menu, chip shows its name, applied in a new conversation with all choices |
+| C22, C23 | Automated (`assistant-context-sets`, controller sets) |
+| C24 | PASS — the Memory Books chat book imported as a root; three entries badged "Memory" |
+| C25 | PASS — content edit pushed; all `STMB_*`/`stmemorybooks` fields, `displayIndex`, `order`, title unchanged (missing native defaults filled, as every import does) |
+| C26 | PASS — tree order 1,3,2; native `displayIndex` stays 1,2,3 after the next push |
+| C27 | PASS — renaming away "003 - " asks; Cancel keeps the name |
+| C28 | PASS — the button runs Memory Books' `/creatememory` (it refused an overlapping scene by its own rules) |
+| C29 | PASS — "Current scene" item, 1 present, ≈30 tokens |
+| C30 | PASS after a fix — 2 DeepLore matches (≈1037 tokens) for a vault-related message; an empty result now reads "no matches for the recent chat" instead of a bare "unavailable" |
+| C31 | Automated (`NO_INTEROP`, lazy probes); not run live (would disable the owner's extensions) |
+| C32 | PASS — picking off: 1 generate request (the reply), no pick event, no record |
+| C33 | PASS after a fix — fresh pick 11.5 s, two memories with reasons, both forced; one inserted, one cut by the native WI budget (25 % of 4095) and shown "not inserted"; a 400-token response limit had been spent on thinking — now the assistant's response length |
+| C34 | PASS — next neutral turn used the prepared pick (0 ms wait, 12 s whole turn) |
+| C35 | Automated (`picking` integration: named entry outside the prepared pick → fresh) |
+| C36 | PASS — fresh pick exceeded 20 s on the free router: reply went ahead with keywords only, record "fallback / timed out" |
+| C37, C38 | Automated (quiet/impersonate skipped; continue re-forces the stored pick) |
+| C39 | Automated (excluded folder never offered) |
+
+Fixes made during the pass (each with a test): catalog rules in the system message;
+picking response length; read-round continuation on a new paragraph; DeepLore
+"no matches" label; catalog lines use the cached node index (P-10).
+

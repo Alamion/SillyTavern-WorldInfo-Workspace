@@ -200,11 +200,11 @@ and US5. **No user story starts before this phase is complete.**
 
 - [x] T066 Perf check: preview build for the 1000-entry scale dataset < 150 ms and interceptor overhead with picking off < 1 ms, added to `tests/perf/scale.bench.test.ts`
 - [x] T067 Update `AGENTS.md` (current increment, structure: `core/picking`, `core/interop`, new adapters; settings `picking`, `contextSets`; protocol v2) and `specs/001-workspace-plugin-roadmap/spec.md` delivery note
-- [ ] T068 Run live scenarios C0–C23 on the `dev` account and record results in `specs/007-context-retrieval/quickstart.md`
-- [ ] T069 Run live scenarios C24–C31 on the Phase 1 fixtures and record results in `specs/007-context-retrieval/quickstart.md`
-- [ ] T070 Run live scenarios C32–C40 with the free profile and record results in `specs/007-context-retrieval/quickstart.md`
-- [ ] T071 Fix every defect found in T068–T070; each live sync discrepancy becomes a scenario in `tests/integration/sync-engine.test.ts`
-- [ ] T072 Run all four gates; bump `manifest.json` to 0.5.0; add the `CHANGELOG.md` entry (Added: preview, summaries, catalog, fuzzy, sets, interop, lore picking); build and commit `dist/index.js`
+- [x] T068 Run live scenarios C0–C23 on the `dev` account and record results in `specs/007-context-retrieval/quickstart.md`
+- [x] T069 Run live scenarios C24–C31 on the Phase 1 fixtures and record results in `specs/007-context-retrieval/quickstart.md`
+- [x] T070 Run live scenarios C32–C40 with the free profile and record results in `specs/007-context-retrieval/quickstart.md`
+- [x] T071 Fix every defect found in T068–T070; each live sync discrepancy becomes a scenario in `tests/integration/sync-engine.test.ts`
+- [x] T072 Run all four gates; bump `manifest.json` to 0.5.0; add the `CHANGELOG.md` entry (Added: preview, summaries, catalog, fuzzy, sets, interop, lore picking); build and commit `dist/index.js`
 
 ---
 

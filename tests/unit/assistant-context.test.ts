@@ -583,9 +583,9 @@ describe('interop sources (spec 007 FR-017/FR-018)', () => {
             sources: { scene: null, deeplore: { text: '', count: 0 } },
         });
         const sources = (built.snapshot.items ?? []).filter((item) => item.kind === 'source');
-        expect(sources.map((item) => [item.label, item.state, item.omitReason])).toEqual([
-            ['Current scene', 'omitted', 'unavailable'],
-            ['DeepLore matches', 'omitted', 'unavailable'],
+        expect(sources.map((item) => [item.label, item.state, item.omitReason, item.detail])).toEqual([
+            ['Current scene', 'omitted', 'unavailable', undefined],
+            ['DeepLore matches', 'omitted', 'unavailable', 'no matches for the recent chat'],
         ]);
     });
 

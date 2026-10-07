@@ -6,7 +6,7 @@
     "js": "dist/index.js",
     "css": "",
     "author": "Alamion",
-    "version": "0.4.12",
+    "version": "0.5.0",
     "auto_update": true,
     "generate_interceptor": "wiwPickInterceptor"
 }
