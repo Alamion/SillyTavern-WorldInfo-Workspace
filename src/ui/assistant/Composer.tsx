@@ -34,6 +34,7 @@ export function Composer({
     onStop,
     onModeChange,
     onOpenContext,
+    onPreviewContext,
 }: {
     mode: AssistantMode;
     busy: boolean;
@@ -45,6 +46,8 @@ export function Composer({
     onStop: () => void;
     onModeChange: (mode: AssistantMode) => void;
     onOpenContext: () => void;
+    /** Shows what the next message would send (spec 007 US1). */
+    onPreviewContext: () => void;
 }): JSX.Element {
     const [text, setTextState] = useState(() => draft.load());
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,9 +89,19 @@ export function Composer({
                 >
                     Discuss
                 </button>
-                <button type="button" className="wiw-button" onClick={onOpenContext}>
-                    <i className="fa-solid fa-sliders" /> {contextSummary}
-                </button>
+                <span className="wiw-context-controls">
+                    <button type="button" className="wiw-button wiw-context-chip" title={contextSummary} onClick={onOpenContext}>
+                        <i className="fa-solid fa-sliders" /> <span>{contextSummary}</span>
+                    </button>
+                    <button
+                        type="button"
+                        className="wiw-button wiw-icon-button"
+                        title="Preview context: what your next message would send, with the reason and size of each part"
+                        onClick={onPreviewContext}
+                    >
+                        <i className="fa-solid fa-layer-group" />
+                    </button>
+                </span>
             </div>
             <textarea
                 ref={textareaRef}

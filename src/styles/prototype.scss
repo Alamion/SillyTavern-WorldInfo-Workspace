@@ -815,6 +815,15 @@ body.wiw-active #WorldInfo > .wiw-root {
     flex: 0 0 auto;
 }
 
+// Folder editor: root book settings, folder options and actions as separate,
+// evenly spaced blocks.
+.wiw-editor-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
 .wiw-strategy {
     display: inline-flex;
     gap: 0.25rem;

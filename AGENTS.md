@@ -220,6 +220,8 @@ src/
 │   ├── NodeHeader.tsx       # Unified item header (icon, enable, name, duplicate/delete)
 │   ├── Sheet.tsx            # Mobile bottom sheet (reaches the drawer top, snap animation)
 │   ├── VirtualList.tsx      # Fixed-row windowing (inactive below 200 rows)
+│   ├── formControls.tsx     # Shared panel pieces: MenuPanel, FormSection, OptionRow,
+│   │                        #   FormField, NumberField (see "Style system")
 │   ├── useDraftField.ts     # Local text draft + debounced commit; flushes on blur,
 │   │                        #   unmount, generation start and workspace close
 │   ├── Splitter.tsx         # usePointerResize + <Splitter>: DOM writes while dragging,
@@ -478,6 +480,21 @@ All component styling lives in `src/styles/wiw-theme.scss` (shared primitives: b
 overlays/panels, rows, banners, menus, bulk bar, badges) composed through
 `prototype.scss` (layout). Theme variables only (`--SmartTheme*`); when a surface needs
 something new, extend the shared system — never add one-off styles.
+
+**Form controls and menus (2026-10-08)** — the lore picking panel shipped with white
+fields and a centered checkbox because its controls were themed only inside the
+assistant and its labels inherited a column layout. Rules:
+
+- Inputs, selects and textareas are themed for the WHOLE workspace (`.wiw-root :where(…)`
+  at the top of `wiw-theme.scss`, zero specificity, so component rules still win). Never
+  scope base control styling to one region again.
+- Panels and menus build from `src/ui/formControls.tsx`: `MenuPanel` (overlay, title +
+  close, scrolling body, footer hint + actions), `FormSection` (uppercase heading + hint),
+  `OptionRow` (checkbox/radio + title + hint as one clickable row — never a bare
+  `<label><input type=checkbox>`), `FormField` (label above a select/text/textarea),
+  `NumberField` (commit on blur/Enter, reason shown, Escape restores). Plain edit dialogs
+  use `.wiw-form-panel` with these fields; side-by-side fields go in `.wiw-form-row`.
+- Header buttons each have their own icon (asserted in `tests/unit/form-controls.test.ts`).
 
 ## Symbols and emojis
 

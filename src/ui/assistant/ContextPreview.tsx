@@ -1,4 +1,5 @@
 import type { ContextItem, ContextSnapshot } from '../../core/assistant/types';
+import { MenuPanel } from '../formControls';
 
 /**
  * What goes (or went) into one assistant request, and why (spec 007 US1,
@@ -64,7 +65,7 @@ function Group({ title, items }: { title: string; items: ContextItem[] }): JSX.E
         return null;
     }
     return (
-        <section className="wiw-context-section">
+        <section className="wiw-section">
             <h4>
                 {title} ({String(items.length)})
             </h4>
@@ -92,46 +93,31 @@ export function ContextPreview({
 }): JSX.Element {
     const items = snapshot.items;
     return (
-        <div className="wiw-overlay" onClick={onClose}>
-            <div
-                className="wiw-panel wiw-context-menu wiw-context-preview"
-                role="dialog"
-                aria-label={title}
-                onClick={(event) => event.stopPropagation()}
-            >
-                <div className="wiw-context-header">
-                    <h3>{title}</h3>
-                    <button type="button" className="wiw-button wiw-icon-button" title="Close" onClick={onClose}>
-                        <i className="fa-solid fa-xmark" />
-                    </button>
-                </div>
-                <p>{subtitle}</p>
-                <div className="wiw-context-body">
-                    {items === undefined ? (
-                        <p className="wiw-context-hint">
-                            This request was sent before item details were recorded:{' '}
-                            {String(snapshot.included.fullItems)} entries in full,{' '}
-                            {snapshot.included.outline ? 'with' : 'without'} the structure, ≈
-                            {String(snapshot.estimatedTokens)} tokens.
-                        </p>
-                    ) : (
-                        <>
-                            <Group title="Included" items={items.filter((item) => item.state === 'included')} />
-                            <Group title="Shortened" items={items.filter((item) => item.state === 'truncated')} />
-                            <Group title="Left out" items={items.filter((item) => item.state === 'omitted')} />
-                        </>
-                    )}
-                </div>
-                <div className="wiw-context-footer">
-                    <span className="wiw-context-hint">
-                        ≈{String(snapshot.estimatedTokens)} of {String(budgetTokens)} tokens (estimated, ~3.5
-                        characters per token)
-                    </span>
-                    <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
+        <MenuPanel
+            title={title}
+            intro={subtitle}
+            className="wiw-context-preview"
+            footerHint={`≈${String(snapshot.estimatedTokens)} of ${String(budgetTokens)} tokens (estimated, ~3.5 characters per token)`}
+            footerActions={
+                <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
+                    Close
+                </button>
+            }
+            onClose={onClose}
+        >
+            {items === undefined ? (
+                <p className="wiw-hint">
+                    This request was sent before item details were recorded: {String(snapshot.included.fullItems)}{' '}
+                    entries in full, {snapshot.included.outline ? 'with' : 'without'} the structure, ≈
+                    {String(snapshot.estimatedTokens)} tokens.
+                </p>
+            ) : (
+                <>
+                    <Group title="Included" items={items.filter((item) => item.state === 'included')} />
+                    <Group title="Shortened" items={items.filter((item) => item.state === 'truncated')} />
+                    <Group title="Left out" items={items.filter((item) => item.state === 'omitted')} />
+                </>
+            )}
+        </MenuPanel>
     );
 }

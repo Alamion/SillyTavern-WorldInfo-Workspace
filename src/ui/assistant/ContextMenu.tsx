@@ -3,6 +3,7 @@ import type { AssistantSnapshot } from '../../adapters/assistantController';
 import { resolveScope } from '../../core/assistant/scope';
 import type { CatalogMode, ContextSet, ContextSettings, ContextScope, EntryContents } from '../../core/assistant/types';
 import type { FolderNode, TreeNode, WorkspaceState } from '../../core/state/schema';
+import { MenuPanel, OptionRow } from '../formControls';
 
 /**
  * What the assistant may see for this conversation (spec 005 FR-021, FR-021a,
@@ -108,42 +109,6 @@ export function contextSummary(
     return parts.join(' · ');
 }
 
-function Option({
-    type,
-    checked,
-    disabled,
-    title,
-    hint,
-    onChange,
-    children,
-}: {
-    type: 'radio' | 'checkbox';
-    checked: boolean;
-    disabled?: boolean;
-    title: string;
-    hint?: string;
-    onChange: (checked: boolean) => void;
-    children?: React.ReactNode;
-}): JSX.Element {
-    return (
-        <label className={`wiw-context-option${checked ? ' wiw-context-option-checked' : ''}`}>
-            <input
-                type={type}
-                checked={checked}
-                disabled={disabled}
-                onChange={(event) => onChange(event.target.checked)}
-            />
-            <span className="wiw-context-option-text">
-                <span className="wiw-context-option-title">
-                    {title}
-                    {children}
-                </span>
-                {hint !== undefined && <span className="wiw-context-hint">{hint}</span>}
-            </span>
-        </label>
-    );
-}
-
 function FolderChooser({
     state,
     chosen,
@@ -191,7 +156,7 @@ function FolderChooser({
                     />
                     <i className="fa-solid fa-folder" />
                     <span className="wiw-context-folder-name">{child.name}</span>
-                    <span className="wiw-context-hint" title="Entries inside">
+                    <span className="wiw-hint" title="Entries inside">
                         {entryCounts.get(child.id) ?? 0}
                     </span>
                 </label>
@@ -202,7 +167,7 @@ function FolderChooser({
     walk(state.root, 0, false);
     return (
         <div className="wiw-context-folders">
-            {rows.length > 0 ? rows : <span className="wiw-context-hint">The workspace has no folders.</span>}
+            {rows.length > 0 ? rows : <span className="wiw-hint">The workspace has no folders.</span>}
         </div>
     );
 }
@@ -255,246 +220,227 @@ export function ContextMenu({
     const workspaceSize = countEntries(resolveScope(state, { kind: 'workspace' }, []).nodeIds, state);
 
     return (
-        <div className="wiw-overlay" onClick={onClose}>
-            <div
-                className="wiw-panel wiw-context-menu"
-                role="dialog"
-                aria-label="Assistant context"
-                onClick={(event) => event.stopPropagation()}
-            >
-                <div className="wiw-context-header">
-                    <h3>Assistant context</h3>
+        <MenuPanel
+            title="Assistant context"
+            intro="What this conversation sends to the model with each message."
+            footerHint={
+                snapshot.settingsLocked
+                    ? 'Kept for this conversation; new conversations keep their start until the recovery banner is resolved.'
+                    : 'New conversations start with these choices.'
+            }
+            footerActions={
+                <>
                     <button
                         type="button"
-                        className="wiw-button wiw-icon-button"
-                        title="Close"
-                        onClick={onClose}
+                        className="wiw-button"
+                        title="Everything the next message would send, with the reason and size of each part"
+                        onClick={onPreview}
                     >
-                        <i className="fa-solid fa-xmark" />
+                        <i className="fa-solid fa-layer-group" /> Preview context
                     </button>
-                </div>
-                <p>What this conversation sends to the model with each message.</p>
-
-                <div className="wiw-context-body">
-                    <section className="wiw-context-section">
-                        <h4>Context sets</h4>
-                        <p className="wiw-context-hint">
-                            Saved choices for this menu. Applying one copies it into this conversation.
-                        </p>
-                        {snapshot.settings.contextSets.map((set) => (
-                            <div
-                                key={set.id}
-                                className={`wiw-context-set${snapshot.activeConversation?.contextSetName === set.name ? ' wiw-context-option-checked' : ''}`}
-                            >
-                                <button type="button" className="wiw-button" title="Apply this set" onClick={() => sets.apply(set)}>
-                                    <i className="fa-solid fa-layer-group" /> {set.name}
-                                </button>
-                                <span className="wiw-context-hint">{contextSummary(set.context, state, selectedIds)}</span>
-                                <button type="button" className="wiw-button wiw-icon-button" title="Rename" onClick={() => sets.rename(set)}>
-                                    <i className="fa-solid fa-pencil" />
-                                </button>
-                                <button type="button" className="wiw-button wiw-icon-button" title="Delete" onClick={() => sets.remove(set)}>
-                                    <i className="fa-solid fa-trash-can" />
-                                </button>
-                            </div>
-                        ))}
-                        <button type="button" className="wiw-button" onClick={sets.saveAs}>
-                            <i className="fa-solid fa-floppy-disk" /> Save current choices as a set…
+                    <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
+                        Done
+                    </button>
+                </>
+            }
+            onClose={onClose}
+        >
+            <section className="wiw-section">
+                <h4>Context sets</h4>
+                <p className="wiw-hint">
+                    Saved choices for this menu. Applying one copies it into this conversation.
+                </p>
+                {snapshot.settings.contextSets.map((set) => (
+                    <div
+                        key={set.id}
+                        className={`wiw-context-set${snapshot.activeConversation?.contextSetName === set.name ? ' wiw-option-checked' : ''}`}
+                    >
+                        <button type="button" className="wiw-button" title="Apply this set" onClick={() => sets.apply(set)}>
+                            <i className="fa-solid fa-layer-group" /> {set.name}
                         </button>
-                    </section>
+                        <span className="wiw-hint">{contextSummary(set.context, state, selectedIds)}</span>
+                        <button type="button" className="wiw-button wiw-icon-button" title="Rename" onClick={() => sets.rename(set)}>
+                            <i className="fa-solid fa-pencil" />
+                        </button>
+                        <button type="button" className="wiw-button wiw-icon-button" title="Delete" onClick={() => sets.remove(set)}>
+                            <i className="fa-solid fa-trash-can" />
+                        </button>
+                    </div>
+                ))}
+                <button type="button" className="wiw-button" onClick={sets.saveAs}>
+                    <i className="fa-solid fa-floppy-disk" /> Save current choices as a set…
+                </button>
+            </section>
 
-                    <section className="wiw-context-section">
-                        <h4>Structure</h4>
-                        <p className="wiw-context-hint">
-                            The part of the tree the assistant sees. It can only change items inside it.
-                        </p>
-                        <Option
-                            type="radio"
-                            checked={context.scope.kind === 'selection'}
-                            title="Current folder"
-                            hint={`Follows your selection in the tree · ${selectionLabel}`}
-                            onChange={() => setScope({ kind: 'selection' })}
-                        />
-                        <Option
-                            type="radio"
-                            checked={context.scope.kind === 'folders'}
-                            title="Chosen folders"
+            <section className="wiw-section">
+                <h4>Structure</h4>
+                <p className="wiw-hint">
+                    The part of the tree the assistant sees. It can only change items inside it.
+                </p>
+                <OptionRow
+                    type="radio"
+                    checked={context.scope.kind === 'selection'}
+                    title="Current folder"
+                    hint={`Follows your selection in the tree · ${selectionLabel}`}
+                    onChange={() => setScope({ kind: 'selection' })}
+                />
+                <OptionRow
+                    type="radio"
+                    checked={context.scope.kind === 'folders'}
+                    title="Chosen folders"
+                    hint={
+                        context.scope.kind === 'folders'
+                            ? chosenFolders.length === 0
+                                ? 'Tick at least one folder below'
+                                : sizeLabel(countEntries(chosenScope.nodeIds, state, chosenScope.folderIds))
+                            : 'A fixed set of folders, whatever is selected'
+                    }
+                    onChange={() => setScope({ kind: 'folders', folderIds: chosenFolders })}
+                />
+                {context.scope.kind === 'folders' && (
+                    <FolderChooser
+                        state={state}
+                        chosen={chosenFolders}
+                        onChange={(folderIds) => setScope({ kind: 'folders', folderIds })}
+                    />
+                )}
+                <OptionRow
+                    type="radio"
+                    checked={context.scope.kind === 'workspace'}
+                    title="Whole workspace"
+                    hint={sizeLabel(workspaceSize)}
+                    onChange={() => setScope({ kind: 'workspace' })}
+                />
+            </section>
+
+            <section className="wiw-section">
+                <h4>Entry contents</h4>
+                <p className="wiw-hint">
+                    Every entry of the structure is listed by title and keys. Contents are sent for:
+                </p>
+                <OptionRow
+                    type="radio"
+                    checked={context.entryContents !== 'all'}
+                    title="Selected and mentioned entries (recommended)"
+                    hint="Selected entries, plus entries whose keys or title appear in your message, the chat or another sent entry — recursively, up to the context size."
+                    onChange={() => setContents('triggered')}
+                />
+                <OptionRow
+                    type="radio"
+                    checked={context.entryContents === 'all'}
+                    title="All entries of the structure"
+                    hint="For small structures. Whatever does not fit the context size is left out."
+                    onChange={() => setContents('all')}
+                />
+                <OptionRow
+                    type="checkbox"
+                    checked={context.fuzzy}
+                    disabled={context.entryContents === 'all'}
+                    title="Also near matches"
+                    hint="Up to 5 entries that share words with your message even when no key matches exactly (other word forms, partial names)."
+                    onChange={(checked) => onChange({ fuzzy: checked })}
+                />
+            </section>
+
+            <section className="wiw-section">
+                <h4>Large libraries</h4>
+                <p className="wiw-hint">
+                    A catalog lists entries by name, folder and summary; the model asks for the full
+                    text of the ones it needs (it may take a few extra seconds).
+                </p>
+                {(
+                    [
+                        ['auto', 'Auto (recommended)', 'Only when the entry contents above do not fit the context size.'],
+                        ['on', 'Always use the catalog', 'Selected entries are still sent in full.'],
+                        ['off', 'Never', 'Entries that do not fit are left out, as before.'],
+                    ] as Array<[CatalogMode, string, string]>
+                ).map(([mode, title, hint]) => (
+                    <OptionRow
+                        key={mode}
+                        type="radio"
+                        checked={context.catalog === mode}
+                        title={title}
+                        hint={hint}
+                        onChange={() => onChange({ catalog: mode })}
+                    />
+                ))}
+            </section>
+
+            <section className="wiw-section">
+                <h4>Current chat</h4>
+                <OptionRow
+                    type="checkbox"
+                    checked={context.chatMessages > 0}
+                    title="Recent messages"
+                    onChange={(checked) => onChange({ chatMessages: checked ? chatCount : 0 })}
+                >
+                    <input
+                        type="number"
+                        className="wiw-count-input"
+                        min={1}
+                        max={200}
+                        value={chatCount}
+                        aria-label="Number of chat messages"
+                        onClick={(event) => event.preventDefault()}
+                        onChange={(event) => {
+                            const value = Math.min(200, Math.max(1, Math.round(Number(event.target.value) || 1)));
+                            setChatCount(value);
+                            onChange({ chatMessages: value });
+                        }}
+                    />
+                </OptionRow>
+                <OptionRow
+                    type="checkbox"
+                    checked={context.characterCard}
+                    title="Character card"
+                    onChange={(checked) => onChange({ characterCard: checked })}
+                />
+                <OptionRow
+                    type="checkbox"
+                    checked={context.persona}
+                    title="Persona description"
+                    onChange={(checked) => onChange({ persona: checked })}
+                />
+                <OptionRow
+                    type="checkbox"
+                    checked={context.activatedEntries}
+                    title="Entries activated in the chat"
+                    hint="Sent with their contents when they are inside the structure."
+                    onChange={(checked) => onChange({ activatedEntries: checked })}
+                />
+            </section>
+
+            {(interop.scene || interop.deeplore || context.sources.scene || context.sources.deeplore) && (
+                <section className="wiw-section">
+                    <h4>Other extensions</h4>
+                    {(interop.scene || context.sources.scene) && (
+                        <OptionRow
+                            type="checkbox"
+                            checked={context.sources.scene}
+                            title="Current scene (Doom's Enhancement Suite)"
                             hint={
-                                context.scope.kind === 'folders'
-                                    ? chosenFolders.length === 0
-                                        ? 'Tick at least one folder below'
-                                        : sizeLabel(countEntries(chosenScope.nodeIds, state, chosenScope.folderIds))
-                                    : 'A fixed set of folders, whatever is selected'
+                                interop.scene
+                                    ? 'Who is present and where; entries named after present characters are preferred.'
+                                    : 'No tracked scene in this chat yet.'
                             }
-                            onChange={() => setScope({ kind: 'folders', folderIds: chosenFolders })}
+                            onChange={(checked) => onChange({ sources: { ...context.sources, scene: checked } })}
                         />
-                        {context.scope.kind === 'folders' && (
-                            <FolderChooser
-                                state={state}
-                                chosen={chosenFolders}
-                                onChange={(folderIds) => setScope({ kind: 'folders', folderIds })}
-                            />
-                        )}
-                        <Option
-                            type="radio"
-                            checked={context.scope.kind === 'workspace'}
-                            title="Whole workspace"
-                            hint={sizeLabel(workspaceSize)}
-                            onChange={() => setScope({ kind: 'workspace' })}
-                        />
-                    </section>
-
-                    <section className="wiw-context-section">
-                        <h4>Entry contents</h4>
-                        <p className="wiw-context-hint">
-                            Every entry of the structure is listed by title and keys. Contents are sent for:
-                        </p>
-                        <Option
-                            type="radio"
-                            checked={context.entryContents !== 'all'}
-                            title="Selected and mentioned entries (recommended)"
-                            hint="Selected entries, plus entries whose keys or title appear in your message, the chat or another sent entry — recursively, up to the context size."
-                            onChange={() => setContents('triggered')}
-                        />
-                        <Option
-                            type="radio"
-                            checked={context.entryContents === 'all'}
-                            title="All entries of the structure"
-                            hint="For small structures. Whatever does not fit the context size is left out."
-                            onChange={() => setContents('all')}
-                        />
-                        <Option
-                            type="checkbox"
-                            checked={context.fuzzy}
-                            disabled={context.entryContents === 'all'}
-                            title="Also near matches"
-                            hint="Up to 5 entries that share words with your message even when no key matches exactly (other word forms, partial names)."
-                            onChange={(checked) => onChange({ fuzzy: checked })}
-                        />
-                    </section>
-
-                    <section className="wiw-context-section">
-                        <h4>Large libraries</h4>
-                        <p className="wiw-context-hint">
-                            A catalog lists entries by name, folder and summary; the model asks for the full
-                            text of the ones it needs (it may take a few extra seconds).
-                        </p>
-                        {(
-                            [
-                                ['auto', 'Auto (recommended)', 'Only when the entry contents above do not fit the context size.'],
-                                ['on', 'Always use the catalog', 'Selected entries are still sent in full.'],
-                                ['off', 'Never', 'Entries that do not fit are left out, as before.'],
-                            ] as Array<[CatalogMode, string, string]>
-                        ).map(([mode, title, hint]) => (
-                            <Option
-                                key={mode}
-                                type="radio"
-                                checked={context.catalog === mode}
-                                title={title}
-                                hint={hint}
-                                onChange={() => onChange({ catalog: mode })}
-                            />
-                        ))}
-                    </section>
-
-                    <section className="wiw-context-section">
-                        <h4>Current chat</h4>
-                        <Option
-                            type="checkbox"
-                            checked={context.chatMessages > 0}
-                            title="Recent messages"
-                            onChange={(checked) => onChange({ chatMessages: checked ? chatCount : 0 })}
-                        >
-                            <input
-                                type="number"
-                                className="wiw-context-count"
-                                min={1}
-                                max={200}
-                                value={chatCount}
-                                aria-label="Number of chat messages"
-                                onClick={(event) => event.preventDefault()}
-                                onChange={(event) => {
-                                    const value = Math.min(200, Math.max(1, Math.round(Number(event.target.value) || 1)));
-                                    setChatCount(value);
-                                    onChange({ chatMessages: value });
-                                }}
-                            />
-                        </Option>
-                        <Option
-                            type="checkbox"
-                            checked={context.characterCard}
-                            title="Character card"
-                            onChange={(checked) => onChange({ characterCard: checked })}
-                        />
-                        <Option
-                            type="checkbox"
-                            checked={context.persona}
-                            title="Persona description"
-                            onChange={(checked) => onChange({ persona: checked })}
-                        />
-                        <Option
-                            type="checkbox"
-                            checked={context.activatedEntries}
-                            title="Entries activated in the chat"
-                            hint="Sent with their contents when they are inside the structure."
-                            onChange={(checked) => onChange({ activatedEntries: checked })}
-                        />
-                    </section>
-
-                    {(interop.scene || interop.deeplore || context.sources.scene || context.sources.deeplore) && (
-                        <section className="wiw-context-section">
-                            <h4>Other extensions</h4>
-                            {(interop.scene || context.sources.scene) && (
-                                <Option
-                                    type="checkbox"
-                                    checked={context.sources.scene}
-                                    title="Current scene (Doom's Enhancement Suite)"
-                                    hint={
-                                        interop.scene
-                                            ? 'Who is present and where; entries named after present characters are preferred.'
-                                            : 'No tracked scene in this chat yet.'
-                                    }
-                                    onChange={(checked) => onChange({ sources: { ...context.sources, scene: checked } })}
-                                />
-                            )}
-                            {(interop.deeplore || context.sources.deeplore) && (
-                                <Option
-                                    type="checkbox"
-                                    checked={context.sources.deeplore}
-                                    title="DeepLore matches"
-                                    hint={
-                                        interop.deeplore
-                                            ? "Entries DeepLore's keyword matching finds for the recent chat, as one block."
-                                            : 'DeepLore is not available right now.'
-                                    }
-                                    onChange={(checked) => onChange({ sources: { ...context.sources, deeplore: checked } })}
-                                />
-                            )}
-                        </section>
                     )}
-                </div>
-
-                <div className="wiw-context-footer">
-                    <span className="wiw-context-hint">
-                        {snapshot.settingsLocked
-                            ? 'Kept for this conversation; new conversations keep their start until the recovery banner is resolved.'
-                            : 'New conversations start with these choices.'}
-                    </span>
-                    <span className="wiw-context-footer-actions">
-                        <button
-                            type="button"
-                            className="wiw-button"
-                            title="Everything the next message would send, with the reason and size of each part"
-                            onClick={onPreview}
-                        >
-                            <i className="fa-solid fa-layer-group" /> Preview context
-                        </button>
-                        <button type="button" className="wiw-button wiw-button-active" onClick={onClose}>
-                            Done
-                        </button>
-                    </span>
-                </div>
-            </div>
-        </div>
+                    {(interop.deeplore || context.sources.deeplore) && (
+                        <OptionRow
+                            type="checkbox"
+                            checked={context.sources.deeplore}
+                            title="DeepLore matches"
+                            hint={
+                                interop.deeplore
+                                    ? "Entries DeepLore's keyword matching finds for the recent chat, as one block."
+                                    : 'DeepLore is not available right now.'
+                            }
+                            onChange={(checked) => onChange({ sources: { ...context.sources, deeplore: checked } })}
+                        />
+                    )}
+                </section>
+            )}
+        </MenuPanel>
     );
 }

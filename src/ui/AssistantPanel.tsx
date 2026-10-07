@@ -139,6 +139,21 @@ export function AssistantPanel({
                 : 'Context',
         [activeContext, state, selectedList, setName]
     );
+    const openPreview = (): void => {
+        void assistant
+            .ensureConversation()
+            .then(() => assistant.prepareSources())
+            .then(() => {
+                const next = assistant.previewContext(createComposerDraft().load());
+                if (next) {
+                    setPreview({
+                        snapshot: next,
+                        title: 'Context preview',
+                        subtitle: 'What your next message would send, with the text in the message box now.',
+                    });
+                }
+            });
+    };
 
     return (
         <div className="wiw-assistant">
@@ -244,6 +259,7 @@ export function AssistantPanel({
                 onOpenContext={() => {
                     void assistant.ensureConversation().then(() => setContextOpen(true));
                 }}
+                onPreviewContext={openPreview}
             />
 
             {settingsOpen && (
@@ -309,18 +325,7 @@ export function AssistantPanel({
                         },
                     }}
                     interop={assistant.interopAvailability()}
-                    onPreview={() => {
-                        void assistant.prepareSources().then(() => {
-                            const next = assistant.previewContext(createComposerDraft().load());
-                            if (next) {
-                                setPreview({
-                                    snapshot: next,
-                                    title: 'Context preview',
-                                    subtitle: 'What your next message would send, with the text in the message box now.',
-                                });
-                            }
-                        });
-                    }}
+                    onPreview={openPreview}
                 />
             )}
             {preview && (

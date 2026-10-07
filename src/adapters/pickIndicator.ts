@@ -35,7 +35,7 @@ export function mountPickIndicator(picking: PickingController, onRecorded: (list
     const template = document.querySelector('#message_template .mes_buttons .extraMesButtons');
     if (template && !template.querySelector(`.${BUTTON_CLASS}`)) {
         const button = document.createElement('div');
-        button.className = `mes_button ${BUTTON_CLASS} fa-solid fa-book-bookmark interactable`;
+        button.className = `mes_button ${BUTTON_CLASS} fa-solid fa-book-open-reader interactable`;
         button.title = 'Lore picked for this reply';
         button.tabIndex = 0;
         template.prepend(button);

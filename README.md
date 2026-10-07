@@ -147,8 +147,8 @@ live in your browser, per profile, never in your settings.
 **Summaries.** Each entry has a short *Summary* field under its title: one or two
 sentences saying when the entry matters. It is stored inside the native entry (so it
 travels with the book, with markdown as `wi_summary`, and with character cards), and the
-assistant can write summaries for you — ask it to summarize a folder and review the
-proposals as usual.
+assistant can write them for you — ask it to "write summaries for the entries in this
+folder" and review one proposal per entry as usual. Folders themselves have no summary.
 
 **Large libraries.** When the entries you chose do not fit the context size, the
 assistant gets a *catalog* instead: every entry by name, folder and summary. It asks for
@@ -162,10 +162,11 @@ words with your message even when no key matches exactly ("taverns" for a key
 sentence end. Choices you use often can be saved as a named *context set* and applied to
 any conversation in one click.
 
-**Preview context** (in the context menu) lists everything your next message would send:
+**Preview context** (the layers button next to the context chip under the conversation,
+also in the context menu) lists everything your next message would send:
 each entry with the reason it is there (selected, the key that matched, the entry that
 pulled it in through recursion…), its estimated size, and what was left out because it
-did not fit. The layers icon on a reply shows the same list for what was actually sent.
+did not fit. The same layers icon on a reply shows the list for what was actually sent.
 
 It needs the Connection Manager extension and at least one
 [connection profile](https://docs.sillytavern.app/usage/core-concepts/connection-profiles/).
@@ -174,7 +175,7 @@ happened.
 
 ## Lore picking in the main chat
 
-Off by default (the wand icon in the workspace header). When it is on, a model of your
+Off by default (the reader icon in the workspace header). When it is on, a model of your
 choice reads the recent chat and a catalog of the entries in your **active** lorebooks —
 names, folders and summaries — and picks the ones the next reply needs. They are activated
 through World Info itself, alongside the entries your keywords trigger, so position, depth,
@@ -184,7 +185,7 @@ order and budget behave exactly as for keyword matches; nothing is injected arou
   background while you read and type, so most replies do not wait at all; only when your
   message names an entry the prepared pick lacks does it pick again, waiting at most the
   time you set (20 s by default) before going ahead with the earlier pick or keywords only.
-- The book icon on a reply shows what was picked, why, and whether World Info inserted it.
+- The same reader icon on a reply shows what was picked, why, and whether World Info inserted it.
 - Summaries make picking much better: the model decides from them.
 - Folders can be left out with *Exclude from lore picking*; disabled entries never take part.
 - Quiet generations (other extensions' background requests) and impersonation are skipped.

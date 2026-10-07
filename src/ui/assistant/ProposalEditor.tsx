@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { OperationProposal, ProposedValues } from '../../core/assistant/types';
+import { FormField } from '../formControls';
 
 /**
  * Edits a proposal before it is accepted (spec 005 FR-009): the adjusted values
@@ -51,33 +52,28 @@ export function ProposalEditor({
     return (
         <div className="wiw-overlay" onClick={onClose}>
             <div
-                className="wiw-panel wiw-assistant-settings"
+                className="wiw-panel wiw-form-panel"
                 onClick={(event) => event.stopPropagation()}
             >
                 <h3>Edit proposal</h3>
-                <label>
-                    Title
+                <FormField label="Title">
                     <input value={title} onChange={(event) => setTitle(event.target.value)} />
-                </label>
-                <label>
-                    Keywords (comma separated)
+                </FormField>
+                <FormField label="Keywords (comma separated)">
                     <input value={keys} onChange={(event) => setKeys(event.target.value)} />
-                </label>
-                <label>
-                    Secondary keywords
+                </FormField>
+                <FormField label="Secondary keywords">
                     <input
                         value={secondaryKeys}
                         onChange={(event) => setSecondaryKeys(event.target.value)}
                     />
-                </label>
-                <label>
-                    Summary (when the entry matters)
+                </FormField>
+                <FormField label="Summary (when the entry matters)">
                     <input value={summary} onChange={(event) => setSummary(event.target.value)} />
-                </label>
-                <label>
-                    Content
+                </FormField>
+                <FormField label="Content">
                     <textarea value={content} onChange={(event) => setContent(event.target.value)} />
-                </label>
+                </FormField>
                 <div className="wiw-panel-actions">
                     <button type="button" className="wiw-button" onClick={save}>
                         <i className="fa-solid fa-check" /> Use these values

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { AssistantSnapshot } from '../../adapters/assistantController';
 import { DEFAULT_INSTRUCTIONS } from '../../core/assistant/prompts';
 import { tokenLimitProblem } from '../../core/assistant/settingsOps';
@@ -7,74 +7,7 @@ import {
     RESPONSE_TOKENS_RANGE,
     type AssistantSettings,
 } from '../../core/assistant/types';
-
-/**
- * A token limit typed as a whole: saved on blur or Enter, never per keystroke (each
- * intermediate value like "9" was repaired to the default and the field jumped).
- * An unusable value stays in the field with the reason; Escape restores the saved one.
- */
-function TokenLimitField({
-    label,
-    field,
-    settings,
-    min,
-    max,
-    disabled,
-    onChange,
-}: {
-    label: string;
-    field: 'responseTokens' | 'contextTokens';
-    settings: AssistantSettings;
-    min: number;
-    max: number;
-    disabled: boolean;
-    onChange: (patch: Partial<AssistantSettings>) => void;
-}): JSX.Element {
-    const saved = settings[field];
-    const [draft, setDraft] = useState(String(saved));
-    const [problem, setProblem] = useState<string | null>(null);
-    useEffect(() => {
-        setDraft(String(saved));
-        setProblem(null);
-    }, [saved]);
-    const commit = (): void => {
-        if (draft.trim() === String(saved)) {
-            setProblem(null);
-            return;
-        }
-        const value = Number(draft.trim());
-        const reason = draft.trim() === '' ? 'Enter a number.' : tokenLimitProblem(field, value, settings);
-        setProblem(reason);
-        if (reason === null) {
-            onChange({ [field]: value });
-        }
-    };
-    return (
-        <label>
-            {label}
-            <input
-                type="number"
-                min={min}
-                max={max}
-                value={draft}
-                disabled={disabled}
-                aria-invalid={problem !== null}
-                onChange={(event) => setDraft(event.target.value)}
-                onBlur={commit}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                        commit();
-                    } else if (event.key === 'Escape') {
-                        event.stopPropagation();
-                        setDraft(String(saved));
-                        setProblem(null);
-                    }
-                }}
-            />
-            {problem !== null && <span className="wiw-field-error">{problem}</span>}
-        </label>
-    );
-}
+import { FormField, NumberField } from '../formControls';
 
 /**
  * Assistant settings (spec 005 FR-018–FR-020, FR-024): which connection profile
@@ -99,7 +32,7 @@ export function SettingsMenu({
     return (
         <div className="wiw-overlay" onClick={onClose}>
         <div
-            className="wiw-panel wiw-assistant-settings"
+            className="wiw-panel wiw-form-panel"
             onClick={(event) => event.stopPropagation()}
         >
             <h3>AI settings</h3>
@@ -109,8 +42,7 @@ export function SettingsMenu({
                     resolved.
                 </p>
             )}
-            <label>
-                Connection profile
+            <FormField label="Connection profile">
                 <select
                     value={settings.profileId ?? ''}
                     disabled={settingsLocked}
@@ -137,7 +69,7 @@ export function SettingsMenu({
                         ))}
                     </optgroup>
                 </select>
-            </label>
+            </FormField>
             {profile?.api === 'text-completion' && (
                 <p className="wiw-banner wiw-banner-warn">
                     Text Completion profiles are supported on a best-effort basis; proposals may be
@@ -147,35 +79,34 @@ export function SettingsMenu({
                         : ''}
                 </p>
             )}
-            <div className="wiw-assistant-settings-row">
-                <TokenLimitField
+            <div className="wiw-form-row">
+                <NumberField
                     label="Response length (tokens)"
-                    field="responseTokens"
-                    settings={settings}
+                    value={settings.responseTokens}
                     min={RESPONSE_TOKENS_RANGE.min}
                     max={RESPONSE_TOKENS_RANGE.max}
                     disabled={settingsLocked}
-                    onChange={onChange}
+                    problem={(value) => tokenLimitProblem('responseTokens', value, settings)}
+                    onCommit={(value) => onChange({ responseTokens: value })}
                 />
-                <TokenLimitField
+                <NumberField
                     label="Context size (tokens)"
-                    field="contextTokens"
-                    settings={settings}
+                    value={settings.contextTokens}
                     min={CONTEXT_TOKENS_RANGE.min}
                     max={CONTEXT_TOKENS_RANGE.max}
                     disabled={settingsLocked}
-                    onChange={onChange}
+                    problem={(value) => tokenLimitProblem('contextTokens', value, settings)}
+                    onCommit={(value) => onChange({ contextTokens: value })}
                 />
             </div>
-            <label>
-                Instructions
+            <FormField label="Instructions">
                 <textarea
                     value={instructions}
                     disabled={settingsLocked}
                     onChange={(event) => setInstructions(event.target.value)}
                     onBlur={() => onChange({ instructions: instructions.trim() === '' ? null : instructions })}
                 />
-            </label>
+            </FormField>
             <div className="wiw-notice-actions">
                 <button
                     type="button"

@@ -49,6 +49,7 @@ import { isMemoryEntry, losesMemoryNumber } from '../core/interop/memoryBooks';
 import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { PickingSettings } from './PickingSettings';
+import { FormSection, OptionRow } from './formControls';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
 import { LayoutContext, type LayoutContextValue } from './layoutContext';
@@ -651,34 +652,35 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     onRenameBook={(nextName) => void sync.renameRootBook(folder.id, nextName)}
                     onResolveOrphan={(uid, mode) => void resolveOrphan(folder.book!.bookName, uid, mode)}
                 />
-                <div className="wiw-editor-actions">
-                    <label className="wiw-checkbox-row" title="Main-chat lore picking never offers entries below this folder">
-                        <input
-                            type="checkbox"
-                            checked={folder.pickExcluded === true}
-                            onChange={(event) =>
-                                applyOperation((current) => setFolderPickExcluded(current, folder.id, event.target.checked))
-                            }
-                        />
-                        Exclude from lore picking
-                    </label>
-                    {folder.isWiRoot && services.assistant.interopAvailability().memoryBooks && (
-                        <button
-                            type="button"
-                            className="wiw-button"
-                            title="Runs Memory Books' own /creatememory for the scene marked in the current chat"
-                            onClick={() =>
-                                void services.assistant.createMemory().then((ok) => {
-                                    if (!ok) {
-                                        notifyError('Memory Books is not available.');
-                                    }
-                                })
-                            }
-                        >
-                            <i className="fa-solid fa-brain" /> Create memory (Memory Books)
-                        </button>
-                    )}
-                </div>
+                <FormSection title="Main-chat lore picking">
+                    <OptionRow
+                        type="checkbox"
+                        checked={folder.pickExcluded === true}
+                        title="Exclude from lore picking"
+                        hint="The picking model is never offered entries below this folder."
+                        onChange={(checked) => applyOperation((current) => setFolderPickExcluded(current, folder.id, checked))}
+                    />
+                </FormSection>
+                {folder.isWiRoot && services.assistant.interopAvailability().memoryBooks && (
+                    <FormSection title="Memory Books">
+                        <div className="wiw-editor-actions">
+                            <button
+                                type="button"
+                                className="wiw-button"
+                                title="Runs Memory Books' own /creatememory for the scene marked in the current chat"
+                                onClick={() =>
+                                    void services.assistant.createMemory().then((ok) => {
+                                        if (!ok) {
+                                            notifyError('Memory Books is not available.');
+                                        }
+                                    })
+                                }
+                            >
+                                <i className="fa-solid fa-brain" /> Create memory
+                            </button>
+                        </div>
+                    </FormSection>
+                )}
             </>
         ),
     };
@@ -717,7 +719,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                         title="Lore picking: let a model choose the entries for main-chat replies"
                         onClick={() => setPickingOpen(true)}
                     >
-                        <i className="fa-solid fa-wand-magic-sparkles" />
+                        <i className="fa-solid fa-book-open-reader" />
                     </button>
                     <button
                         type="button"

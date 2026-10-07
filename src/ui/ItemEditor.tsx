@@ -320,16 +320,14 @@ function FolderView({
                     ? 'World Info root - collects every entry beneath it into its own book'
                     : 'Plain folder - organizes items; holds no own content'}
             </p>
-            {extras?.(folder)}
-            <div className="wiw-editor-actions">
-                <button
-                    type="button"
-                    className="wiw-button"
-                    onClick={() => onToggleWiRoot(folder.id)}
-                >
-                    <i className={`fa-solid ${folder.isWiRoot ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
-                    {folder.isWiRoot ? 'Disable World Info root' : 'Make World Info root'}
-                </button>
+            <div className="wiw-editor-stack">
+                {extras?.(folder)}
+                <div className="wiw-editor-actions">
+                    <button type="button" className="wiw-button" onClick={() => onToggleWiRoot(folder.id)}>
+                        <i className={`fa-solid ${folder.isWiRoot ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
+                        {folder.isWiRoot ? 'Disable World Info root' : 'Make World Info root'}
+                    </button>
+                </div>
             </div>
         </div>
     );

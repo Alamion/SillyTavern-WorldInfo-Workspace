@@ -78,6 +78,65 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 }
 
 // ---------------------------------------------------------------------------
+// Form controls — EVERY input, select and textarea inside the workspace (tree,
+// editor, assistant, every overlay panel) is themed here, so a new panel never
+// shows the browser's white field on a dark theme. Zero-specificity `:where`
+// keeps any component rule declared later in charge of its own look; the app's
+// global element rules (`select`, `textarea`) lose to it.
+// Components: `src/ui/formControls.tsx` (OptionRow, NumberField, FormField,
+// FormSection) — use them instead of bare labels in panels.
+// ---------------------------------------------------------------------------
+
+.wiw-root
+    :where(input[type='text'], input[type='number'], input[type='search'], input:not([type]), select, textarea) {
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    font: inherit;
+    min-width: 0;
+
+    &:focus {
+        outline: none;
+        border-color: var(--SmartThemeQuoteColor);
+    }
+
+    &:disabled {
+        opacity: 0.55;
+    }
+}
+
+.wiw-root :where(option, optgroup) {
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+}
+
+.wiw-root :where(input[type='checkbox'], input[type='radio']) {
+    accent-color: var(--SmartThemeQuoteColor);
+}
+
+// A labelled control in a panel: label text above the control (FormField).
+.wiw-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    font-size: 0.85em;
+}
+
+// Several FormFields side by side, wrapping on narrow panels.
+.wiw-form-row {
+    display: flex;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+
+    > .wiw-form-field {
+        flex: 1 1 8rem;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Overlays — the only modal primitive (backdrop + centered panel).
 // ---------------------------------------------------------------------------
 
@@ -1041,45 +1100,6 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     min-height: 0;
 }
 
-// Form controls of the assistant (inputs, number fields, selects, textareas —
-// including its settings, context and editor overlays): themed like the editor
-// fields instead of the browser's default white background.
-.wiw-assistant {
-    input[type='text'],
-    input[type='number'],
-    input:not([type]),
-    select,
-    textarea {
-        padding: 0.2rem 0.4rem;
-        border: 1px solid var(--SmartThemeBorderColor);
-        border-radius: 4px;
-        background: var(--SmartThemeBlurTintColor);
-        color: var(--SmartThemeBodyColor);
-        font: inherit;
-        min-width: 0;
-
-        &:focus {
-            outline: none;
-            border-color: var(--SmartThemeQuoteColor);
-        }
-
-        &:disabled {
-            opacity: 0.55;
-        }
-    }
-
-    option,
-    optgroup {
-        background: var(--SmartThemeBlurTintColor);
-        color: var(--SmartThemeBodyColor);
-    }
-
-    input[type='checkbox'],
-    input[type='radio'] {
-        accent-color: var(--SmartThemeQuoteColor);
-    }
-}
-
 .wiw-assistant-header {
     display: flex;
     align-items: center;
@@ -1153,6 +1173,27 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
+}
+
+// Context chip + preview button: one unbreakable group; the chip shrinks with an
+// ellipsis, so the preview button stays beside it.
+.wiw-context-controls {
+    display: flex;
+    gap: 0.4rem;
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+.wiw-context-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+
+    > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
 .wiw-assistant-status {
@@ -1406,32 +1447,17 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     font-size: 0.9em;
 }
 
-.wiw-assistant-settings {
+// A settings/edit panel inside an overlay (assistant settings, lore picking,
+// proposal editor): a column of FormFields, FormRows and OptionRows.
+.wiw-form-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: $spacing-md;
     min-width: 16rem;
-
-    label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        font-size: 0.85em;
-    }
 
     textarea {
         min-height: 7rem;
         resize: vertical;
-    }
-}
-
-.wiw-assistant-settings-row {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-
-    > label {
-        flex: 1 1 8rem;
     }
 }
 
@@ -1458,7 +1484,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         }
     }
 
-    .wiw-assistant-settings {
+    .wiw-form-panel {
         min-width: 0;
         width: 94%;
     }
@@ -1468,13 +1494,14 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     }
 }
 
-// Assistant context menu (spec 005 FR-021/FR-022): grouped sections, options as
-// one clickable row (control + title + hint), folder chooser as an indented tree.
-.wiw-context-menu {
+// Menu panels (MenuPanel: assistant context, context preview, lore picking) and
+// their parts — sections (FormSection), options as one clickable row (OptionRow:
+// control + title + hint); the context folder chooser is an indented tree.
+.wiw-menu-panel {
     width: min(520px, 94%);
     max-height: 86%;
 
-    .wiw-context-header {
+    .wiw-menu-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -1482,7 +1509,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     }
 }
 
-.wiw-context-body {
+.wiw-menu-body {
     display: flex;
     flex-direction: column;
     gap: $spacing-xl;
@@ -1491,7 +1518,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     padding-right: $spacing-xs;
 }
 
-.wiw-context-section {
+.wiw-section {
     display: flex;
     flex-direction: column;
     gap: $spacing-xs;
@@ -1505,17 +1532,17 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
         color: var(--SmartThemeEmColor);
     }
 
-    > .wiw-context-hint {
+    > .wiw-hint {
         margin-bottom: $spacing-xs;
     }
 }
 
-.wiw-context-hint {
+.wiw-hint {
     font-size: 0.8rem;
     opacity: 0.7;
 }
 
-.wiw-context-option {
+.wiw-option {
     display: flex;
     align-items: flex-start;
     gap: $spacing-md;
@@ -1540,34 +1567,28 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     }
 }
 
-.wiw-context-option-checked {
+.wiw-option-checked {
     border-color: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 55%);
     background: color-mix(in srgb, var(--SmartThemeQuoteColor), transparent 90%);
 }
 
-.wiw-context-option-text {
+.wiw-option-text {
     display: flex;
     flex-direction: column;
     gap: $spacing-xs;
     min-width: 0;
 }
 
-.wiw-context-option-title {
+.wiw-option-title {
     display: flex;
     align-items: center;
     gap: $spacing-md;
     font-size: 0.92rem;
 }
 
-.wiw-assistant .wiw-context-count,
-.wiw-context-count {
+.wiw-count-input {
     width: 4.5rem;
     padding: 0.1rem 0.35rem;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor);
-    color: var(--SmartThemeBodyColor);
-    font: inherit;
 }
 
 .wiw-context-folders {
@@ -1607,7 +1628,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     white-space: nowrap;
 }
 
-.wiw-context-footer {
+.wiw-menu-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1673,7 +1694,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     opacity: 0.7;
 }
 
-.wiw-context-footer-actions {
+.wiw-menu-footer-actions {
     display: flex;
     gap: $spacing-sm;
     flex-wrap: wrap;
@@ -1688,7 +1709,7 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     padding: $spacing-xs;
     border-radius: 6px;
 
-    > .wiw-context-hint {
+    > .wiw-hint {
         flex: 1 1 auto;
         min-width: 0;
         overflow: hidden;
@@ -1701,19 +1722,6 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 .wiw-badge-memory {
     border-color: var(--SmartThemeQuoteColor);
     color: var(--SmartThemeQuoteColor);
-}
-
-// A checkbox with its label as one clickable row (folder lore-picking exclusion).
-.wiw-checkbox-row {
-    display: inline-flex;
-    align-items: center;
-    gap: $spacing-sm;
-    cursor: pointer;
-    font-size: 0.9em;
-
-    input {
-        accent-color: var(--SmartThemeQuoteColor);
-    }
 }
 
 // Main-chat lore picking (spec 007 US5): the reply icon lives in the app's message
