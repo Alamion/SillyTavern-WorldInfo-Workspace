@@ -40,13 +40,15 @@ Generation extension with its own settings."
 
 ## Availability marking (all gated controls)
 
-- Shared helper in `ui/formControls.tsx`: `useAvailability(feature)` and `gated(state,
-  onRun)` → props `{ 'aria-disabled', title, onClick, className: 'wiw-unavailable' }`.
+- Shared helper in `ui/formControls.tsx`: `useFeature(service, feature)` and
+  `<GatedButton state onClick>`; `explainUnavailable(state)` for custom triggers.
 - Look: normal control at reduced emphasis plus a small `fa-triangle-exclamation` badge;
   never `opacity` alone (the old markdown look is replaced).
 - Activation (click, tap, Enter/Space) opens a text popup: reason, fix, and "Reload the
   page after enabling an extension." when `reload`.
-- Gated controls: assistant Send and the assistant panel's empty state; header lore
-  picking button and its panel's enable switch; markdown header button; Write prompt,
-  Generate, Write caption, folder caption action; Memory Books "Create memory", DES/
-  DeepLore context options (existing hints become the shared look).
+- Gated controls: assistant Send (the panel's existing banners stay); the header lore
+  picking button (badge + reason in its title; the panel still opens so a profile can be
+  chosen, and shows the reason on top); the markdown header button and the tree's "Export
+  folder to markdown…"; Write prompt, Generate, Write caption, the folder caption action.
+  Memory Books "Create memory" and the DES/DeepLore options are unchanged: they only
+  appear while the extension is present.

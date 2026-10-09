@@ -226,8 +226,33 @@ describe('folder records', () => {
         expect(model.root).toBe(true);
         expect(model.book).toBe('Kingdoms East');
         expect(model.order).toEqual(['B.md', 'A.md', 'Map — old.png', 'Remote']);
-        expect(model.images.get('Map — old.png')).toEqual({ title: undefined, caption: 'Old survey', src: undefined });
-        expect(model.images.get('Remote')).toEqual({ title: undefined, caption: undefined, src: 'https://example.org/p.png' });
+        expect(model.images.get('Map — old.png')).toEqual({ title: undefined, caption: 'Old survey', src: undefined, prompt: undefined });
+        expect(model.images.get('Remote')).toEqual({
+            title: undefined,
+            caption: undefined,
+            src: 'https://example.org/p.png',
+            prompt: undefined,
+        });
+    });
+
+    it('writes and reads the generation prompt only when set (spec 009 markdown delta)', () => {
+        const folder = createFolderNode({ id: 'f1', parentId: 'r', name: 'Cities', now: NOW });
+        const cliff = createImageNode({ id: 'i', parentId: 'f1', name: 'Cliff town', now: NOW });
+        cliff.src = 'user/images/WorldInfoWorkspace/cliff.jpg';
+        cliff.prompt = 'red cliff at dusk, lanterns';
+        const plain = createImageNode({ id: 'j', parentId: 'f1', name: 'Plain', now: NOW });
+        plain.src = 'user/images/WorldInfoWorkspace/plain.jpg';
+        folder.children = [cliff, plain];
+        const names = new Map([
+            ['i', 'Cliff town.jpg'],
+            ['j', 'Plain.jpg'],
+        ]);
+        const text = renderFolderRecord({ folder, dirName: 'Cities', childNames: names }, yaml)!;
+        expect(text).toContain('wi_prompt: red cliff at dusk, lanterns');
+        expect(text).not.toContain('Plain.jpg');
+        const model = parseFolderRecord(text, yaml);
+        expect(model.images.get('Cliff town.jpg')?.prompt).toBe('red cliff at dusk, lanterns');
+        expect(parseFolderRecord('wi_images:\n  a.png:\n    wi_prompt: 5\n', yaml).images.get('a.png')?.prompt).toBeUndefined();
     });
 
     it('omits the title for the top folder and preserves foreign keys', () => {

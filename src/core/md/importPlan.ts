@@ -8,6 +8,7 @@ import {
     type TreeNode,
     type WorkspaceState,
 } from '../state/schema';
+import { applyRecordedPrompt } from './convention';
 import { bytesToDataUri } from './dataUri';
 import { EXT_MIME, compareDiskNames, splitName } from './naming';
 import { baseName, type RelPath } from './ports';
@@ -151,6 +152,7 @@ export function planImport(input: ImportPlanInput): ImportPlan {
         const id = takeId(undefined, item.path);
         const node = createImageNode({ id, parentId: 'pending', name: record?.title ?? splitName(item.fileName).stem, now });
         node.caption = record?.caption ?? '';
+        applyRecordedPrompt(node, record?.prompt);
         if (input.acceptsUpload(item.ext)) {
             uploads.push({ nodeId: id, bytes: item.bytes, ext: item.ext, stem: node.name, path: item.path });
         } else {
@@ -177,6 +179,7 @@ export function planImport(input: ImportPlanInput): ImportPlan {
             const node: ImageNode = createImageNode({ id: takeId(undefined, scanned.path), parentId: 'pending', name: key, now });
             node.src = image.src;
             node.caption = image.caption ?? '';
+            applyRecordedPrompt(node, image.prompt);
             pushChild(scanned.path, key, false, node);
             lines.push({ path: `${scanned.path}${scanned.path === '' ? '' : '/'}${key}`, outcome: 'created', message: 'External image (URL).' });
         }

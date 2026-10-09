@@ -384,16 +384,16 @@ entries and lists them.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T044 [P] Markdown prompt (contracts/markdown-delta.md):
+- [X] T044 [P] (The linked-folder reconcile compares the rendered folder record text, so a prompt change is detected without code in `reconcile.ts`; the mapping reference got a `wi_prompt` row.) Markdown prompt (contracts/markdown-delta.md):
   - write and read `wi_images.<file>.wi_prompt` in `src/core/md/convention.ts`, plus the
     image metadata comparison in `src/core/md/reconcile.ts`;
   - tests in `tests/unit/md-convention.test.ts` and `tests/unit/md-reconcile.test.ts`
     (round trip; non-string ignored).
-- [ ] T045 [P] Amend `specs/003-core-workspace-mvp/contracts/persistence-schema.md` and
+- [X] T045 [P] Amend `specs/003-core-workspace-mvp/contracts/persistence-schema.md` and
   `specs/004-markdown-folder-sync/contracts/markdown-convention.md` per the deltas; add the
   FR-027 amendment line (captions via a connection profile) to
   `specs/001-workspace-plugin-roadmap/spec.md`.
-- [ ] T046 [P] Update `README.md`:
+- [X] T046 [P] Update `README.md`:
   - "Images" section: generate, write prompt, write caption, caption all; temp-file note
     on reload during a pending candidate.
   - "Optional dependencies" table (FR-022): Connection Manager, Image Generation, browser
@@ -401,16 +401,16 @@ entries and lists them.
     without it.
   - Correct the markdown note: all markdown functions need desktop Chromium on a secure
     page, not embedded frames.
-- [ ] T047 [P] Update `AGENTS.md`:
+- [X] T047 [P] Update `AGENTS.md`:
   - increment line for spec 009;
   - structure entries (`core/images/`, `core/availability.ts`, `adapters/availability.ts`,
     `imageGeneration.ts`, `imageCaption.ts`, `ui/images/`);
   - Settings paragraph (`settings.images`, `ImageNode.prompt`);
   - Style system rule: "functions with an optional dependency use `gated()`; never fade
     a control without a reason".
-- [ ] T048 [P] Add a `CHANGELOG.md` entry under a new 0.6.0 (unreleased) section, and bump
+- [X] T048 [P] (Version stays 0.5.0 until the owner's release decision; changelog section "0.6.0 — unreleased".) Add a `CHANGELOG.md` entry under a new 0.6.0 (unreleased) section, and bump
   the version in `package.json` / `manifest.json` per the release decision at closing.
-- [ ] T049 Run all four gates (`pnpm exec tsc --noEmit`, `pnpm run lint`, `pnpm run test`,
+- [X] T049 Run all four gates (`pnpm exec tsc --noEmit`, `pnpm run lint`, `pnpm run test`,
   `pnpm run build`) and commit `dist/`.
 - [ ] T050 Live pass of quickstart I0–I14 on `dev` (own server, spend-limited key); record
   the results in `specs/009-ai-images/quickstart.md`; fix findings with regression tests.

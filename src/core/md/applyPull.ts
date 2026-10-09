@@ -9,7 +9,7 @@ import {
     type WorkspaceState,
 } from '../state/schema';
 import { deleteSubtree, moveNode, renameNode } from '../tree/operations';
-import type { FolderRecordModel } from './convention';
+import { applyRecordedPrompt, type FolderRecordModel } from './convention';
 import { compareDiskNames, splitName } from './naming';
 import { baseName, type RelPath } from './ports';
 import type { WorkspaceChange } from './reconcile';
@@ -137,6 +137,7 @@ export function applyPull(input: PullApplyInput): PullApplyResult {
             const meta = recordImage(scanned);
             const image = createImageNode({ id, parentId: parent.id, name: meta?.title ?? splitName(scanned.fileName).stem, now });
             image.caption = meta?.caption ?? '';
+            applyRecordedPrompt(image, meta?.prompt);
             image.src = input.imageSrcByPath.get(change.path) ?? '';
             node = image;
         }
@@ -254,6 +255,7 @@ export function applyPull(input: PullApplyInput): PullApplyResult {
             const title = meta?.title ?? (key !== undefined && pathOf.has(child.id) ? splitName(key).stem : child.name);
             child.name = title;
             child.caption = meta?.caption ?? '';
+            applyRecordedPrompt(child, meta?.prompt);
             if (meta?.src && !pathOf.has(child.id)) {
                 child.src = meta.src;
             }

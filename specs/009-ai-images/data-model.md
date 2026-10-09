@@ -6,16 +6,16 @@
 
 | Field | Type | Rule |
 |---|---|---|
-| `prompt` | `string?` | The generation prompt of the kept picture. Written on Keep; editable in the image editor; absent or `''` = none. Content for the stale-tab hash. Never pushed to books (images are workspace-only). |
+| `prompt` | `string?` | The prompt of the picture. Written as typed in the image editor (and by Write prompt) and on Keep of a generated picture; absent or `''` = none. Content for the stale-tab hash. Never pushed to books (images are workspace-only). |
 
 ### `settings.images?: ImageSettings` (new)
 
 | Field | Type | Default | Repair |
 |---|---|---|---|
-| `captionProfileId` | `string` | `''` (none) | non-string → default; unknown id kept (shown as missing → feature unavailable) |
+| `captionProfileId` | `string \| null` | `null` (none) | non-string → default; unknown id kept (shown as missing → feature unavailable) |
 | `captionModel` | `string` | `''` (profile's model) | trimmed string |
 | `captionInstruction` | `string` | "Describe this picture in one or two sentences for a lore library: what it shows, notable details, mood. No preamble." | empty → default |
-| `promptProfileId` | `string` | `''` (= the assistant's profile) | as above |
+| `promptProfileId` | `string \| null` | `null` (= the assistant's profile) | as above |
 | `promptModel` | `string` | `''` | trimmed string |
 | `promptInstruction` | `string` | R4 default | empty → default |
 | `promptContextTokens` | `number` | 2000 | integer 200–16000, else default |
@@ -54,7 +54,9 @@ retry? }` — one at a time; the review list is its view.
 `Record<FeatureId, { ok: true } | { ok: false; reason: string; fix: string; reload?: boolean }>`
 
 `FeatureId = 'assistant' | 'picking' | 'image-prompt' | 'image-caption' | 'image-generate'
-| 'md-folders' | 'memory-books' | 'des' | 'deeplore'`
+| 'md-folders'` — Memory Books, DES and DeepLore are not listed: their controls only
+appear while the extension is present (implementation decision, so none can fail
+silently).
 
 Facts → states table (core/availability.ts, unit-tested):
 
@@ -65,7 +67,6 @@ Facts → states table (core/availability.ts, unit-tested):
 | image-caption | CM disabled; no caption profile chosen; profile missing or text completion | choose a chat-completion profile with a vision model |
 | image-generate | `stable-diffusion` disabled (reload) or `imagine` missing; no source selected | enable Image Generation / choose a source in its settings |
 | md-folders | insecure page; no folder picker; inside a frame; picker raised `SecurityError` this session | open SillyTavern directly in desktop Chrome/Edge over HTTPS or localhost |
-| memory-books, des, deeplore | existing probes | install/enable the extension |
 
 ## Markdown (folder record `.wiw-folder.yaml`)
 

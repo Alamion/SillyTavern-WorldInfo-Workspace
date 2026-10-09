@@ -146,3 +146,14 @@ Full delta: `specs/008-stale-tab-protection/contracts/persistence-delta.md`. In 
 - The recovery no-publish rule is unchanged and takes precedence; a valid newer saved
   payload during a recovery is offered, never loaded silently.
 
+
+## Amendment 2026-10-09 — AI images (spec 009, additive)
+
+Full delta: `specs/009-ai-images/contracts/persistence-delta.md`.
+
+- Image item: optional `prompt` (string; absent = none) — the prompt of the picture,
+  written as typed in the image editor and on Keep of a generated picture; a non-string
+  value is dropped on load. Content for the stale-tab hash; never part of a native book.
+- `settings.images` (optional): caption and prompt-drafting profiles, models,
+  instructions and lore size — repaired field by field by `getImageSettings`; not
+  written while a data recovery is pending (same rule as `settings.assistant`).

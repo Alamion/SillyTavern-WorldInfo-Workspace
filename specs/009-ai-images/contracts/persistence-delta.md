@@ -5,7 +5,8 @@ payloads written by spec 009 load in earlier versions (unknown fields are carrie
 
 ## `ImageNode.prompt?: string`
 
-- The prompt of the kept generated picture; the user may edit it.
+- The prompt of the picture: written as typed in the image editor (and by Write prompt)
+  and on Keep of a generated picture.
 - `migrate`: a non-string value is dropped; absent stays absent.
 - Content for the stale-tab content hash (spec 008) — the projection is unchanged.
 - Never part of a native book (images are workspace-only).

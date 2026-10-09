@@ -3,6 +3,31 @@
 User-visible changes, newest first. Internal-only work (refactors, tests, tooling) is not
 listed here — see the git history for that.
 
+## 0.6.0 — unreleased
+
+### Added
+
+- **AI images** in the image editor: *Generate* a picture from a prompt with
+  SillyTavern's Image Generation extension (kept only when you press *Keep*, stored with
+  the workspace's images); *Write prompt* drafts the prompt from the lore in the image's
+  folder and lists the entries it used; *Write caption* lets a picture-reading model
+  describe the image for review. The prompt stays on the item and travels with markdown
+  (`wi_prompt`).
+- **Caption all images without captions** for a folder (folder editor and tree menu): one
+  confirmed run with progress and *Stop*, then one list to choose which captions to keep.
+- **Image settings** (gear in the image editor): profile and optional model for captions
+  and for prompt drafts.
+
+### Changed
+
+- **Functions that need something missing are marked up front.** The assistant, lore
+  picking, markdown folders and the new image actions show a warning badge when their
+  extension, profile or browser support is missing; pressing them says exactly what to
+  enable or choose instead of failing later. Markdown folders now also detect embedded
+  browsers (such as VS Code's), where the folder picker exists but cannot be used.
+- README: new "Optional dependencies" section; corrected the markdown note — export and
+  import need the same browser support as linking.
+
 ## 0.5.0 — 2026-10-09
 
 ### Added

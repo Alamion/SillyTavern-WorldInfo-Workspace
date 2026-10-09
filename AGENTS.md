@@ -36,7 +36,18 @@ field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (mat
 opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
 interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
 contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
-**Current increment (spec 008, implemented and owner-approved 2026-10-09)**: stale-tab protection (maintenance
+**Current increment (spec 009, implemented 2026-10-09; owner review pending)**: roadmap Phase 5 —
+AI images, plus a cross-cutting availability rule. Image editor: *Generate* through the
+Image Generation extension's `imagine` command object (called directly, `quiet`,
+`gallery=false`, `extend=false`, `multimodal=false`; the temporary file is copied into
+our storage on Keep and deleted on Keep/Discard), *Write prompt* (prompt draft from the
+image's folder entries) and *Write caption* (vision model) through Connection Manager
+profiles with an optional model per task (`LlmMessage.images` → content parts,
+`LlmRequest.model` → `overridePayload`); folder action "Caption all images without
+captions" with one review list. `core/availability.ts` + `adapters/availability.ts` mark
+every function whose optional dependency is missing (`GatedButton`). Design:
+`specs/009-ai-images/` (research R1–R8).
+**Previous increment (spec 008, implemented and owner-approved 2026-10-09)**: stale-tab protection (maintenance
 backlog B1, option 1). A `_save` marker `{ rev, writer, at, hash }` in the namespace; a
 save gate in `settingsStore.ts` checks the saved copy (`/api/settings/get`) on
 visibility/focus/workspace shown, before saves and native pushes, and every 2 minutes
@@ -168,6 +179,12 @@ src/
 │   ├── assistant/ (spec 007) catalog.ts (catalog lines, folder narrowing), bm25.ts
 │   │                    #   (local near matches + ranking), truncate.ts (sentence cut),
 │   │                    #   contextSets.ts; context.ts returns typed ContextItems
+│   ├── images/          # AI images (spec 009): settings.ts (ImageSettings repair),
+│   │                    #   sanitize.ts (Image Generation trigger words), draftRequest.ts
+│   │                    #   (prompt draft from folder entries + reply cleanup),
+│   │                    #   captionRequest.ts (caption messages, uncaptioned selection),
+│   │                    #   failures.ts (no-vision classification)
+│   ├── availability.ts  # Spec 009: facts → per-feature state (reason, fix, reload)
 │   ├── picking/         # Main-chat lore picking (spec 007): request.ts (picking prompt +
 │   │                    #   catalog), pickParser.ts, decide.ts (prepared vs fresh),
 │   │                    #   forced.ts (forced-activation objects), settings.ts, display.ts
@@ -215,6 +232,11 @@ src/
 │   ├── viewportScrollGuard.ts # Restores a non-user-scrollable page root that the
 │   │                        #   browser scrolled for the mobile keyboard (host layouts
 │   │                        #   taller than the screen, e.g. AstraProjecta)
+│   ├── availability.ts      # Spec 009: collects availability facts (extensions, profiles,
+│   │                        #   imagine command, folder access), re-checks on app events
+│   ├── imageGeneration.ts   # Spec 009: imagine call, candidates, keep/discard file lifecycle
+│   ├── imageCaption.ts      # Spec 009: prompt drafts, captions, folder runs; preparePicture
+│   │                        #   (canvas → ≤1024 px JPEG data URL)
 │   ├── pickingController.ts # Lore picking: interceptor, background preparation, forced
 │   │                        #   activation, per-reply record (spec 007)
 │   ├── pickIndicator.ts     # Reply icon in the app's message template + details popup
@@ -233,7 +255,11 @@ src/
 │   ├── Sheet.tsx            # Mobile bottom sheet (reaches the drawer top, snap animation)
 │   ├── VirtualList.tsx      # Fixed-row windowing (inactive below 200 rows)
 │   ├── formControls.tsx     # Shared panel pieces: MenuPanel, FormSection, OptionRow,
-│   │                        #   FormField, NumberField (see "Style system")
+│   │                        #   FormField, NumberField, GatedButton + useFeature (see
+│   │                        #   "Style system")
+│   ├── images/              # Spec 009: ImageAiSection (prompt, generate, candidate,
+│   │                        #   caption tools), ImageSettingsPanel, BulkCaptionPanel,
+│   │                        #   FolderImagesSection
 │   ├── useDraftField.ts     # Local text draft + debounced commit; flushes on blur,
 │   │                        #   unmount, generation start and workspace close
 │   ├── Splitter.tsx         # usePointerResize + <Splitter>: DOM writes while dragging,
@@ -302,7 +328,10 @@ defaultContext }`, repaired field by field by `getAssistantSettings`; it is NOT 
 a data recovery is unresolved (`settingsStore.isRecoveryPending()`). Conversations never
 live in settings. Node kinds: folder (expanded,
 isWiRoot, book binding `{ bookName, orphans, tombstones }`), entry (full native entry
-incl. `triggers` and the native `characterFilter` object + sync), image (src/caption).
+incl. `triggers` and the native `characterFilter` object + sync), image (src/caption, optional
+`prompt` — spec 009). `settings.images` (spec 009, optional/additive) = `{ captionProfileId,
+captionModel, captionInstruction, promptProfileId, promptModel, promptInstruction,
+promptContextTokens }`, repaired by `getImageSettings`, not saved while a recovery is pending.
 Sync is PER BOOK: `sync.books[bookName] = { uid, hash (FNV-1a), status in-sync|dirty }`.
 
 Saving (spec 008): the workspace is published into the app's settings ONLY by the save
@@ -518,6 +547,12 @@ assistant and its labels inherited a column layout. Rules:
   `NumberField` (commit on blur/Enter, reason shown, Escape restores). Plain edit dialogs
   use `.wiw-form-panel` with these fields; side-by-side fields go in `.wiw-form-row`.
 - Header buttons each have their own icon (asserted in `tests/unit/form-controls.test.ts`).
+- **Optional dependencies (spec 009)**: a function that needs an extension, a profile or a
+  browser capability the user may not have is a `GatedButton` (or uses `useFeature` +
+  `explainUnavailable` for a custom trigger) with a `FeatureId` from `core/availability.ts`.
+  It stays visible with a warning badge and explains what to enable when pressed. Never
+  fade a control without a reason (an inline `opacity` is asserted against). Nothing in
+  the core workspace is a required dependency.
 
 ## Symbols and emojis
 

@@ -77,6 +77,7 @@ export function folderReferenceRows(): ReferenceRow[] {
         { key: 'wi_order', meaning: 'Custom child order by file/directory name', type: 'list of names', defaultValue: 'folders first, then by name' },
         { key: 'wi_images.<file>.wi_title', meaning: 'Image item name', type: 'text', defaultValue: 'file name' },
         { key: 'wi_images.<file>.wi_caption', meaning: 'Image caption', type: 'text', defaultValue: '(empty)' },
+        { key: 'wi_images.<file>.wi_prompt', meaning: 'Prompt the picture was generated from', type: 'text', defaultValue: '(empty)' },
         { key: 'wi_images.<name>.wi_src', meaning: 'External image URL (no file)', type: 'URL', defaultValue: '(none)' },
     ];
 }

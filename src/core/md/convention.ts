@@ -101,6 +101,17 @@ export interface FolderRecordImage {
     title?: string;
     caption?: string;
     src?: string;
+    /** Spec 009: the image's generation prompt (`wi_prompt`). */
+    prompt?: string;
+}
+
+/** Applies a recorded prompt to an image item: absent or empty = no prompt. */
+export function applyRecordedPrompt(image: ImageNode, prompt: string | undefined): void {
+    if (prompt !== undefined && prompt !== '') {
+        image.prompt = prompt;
+    } else {
+        delete image.prompt;
+    }
 }
 
 export interface FolderRecordModel {
@@ -400,6 +411,9 @@ function renderImageRecord(
         if (image.caption !== '') {
             value['wi_caption'] = image.caption;
         }
+        if (image.prompt !== undefined && image.prompt !== '') {
+            value['wi_prompt'] = image.prompt;
+        }
         return { key: image.name, value };
     }
     if (image.name !== splitName(fileName).stem) {
@@ -407,6 +421,9 @@ function renderImageRecord(
     }
     if (image.caption !== '') {
         value['wi_caption'] = image.caption;
+    }
+    if (image.prompt !== undefined && image.prompt !== '') {
+        value['wi_prompt'] = image.prompt;
     }
     return hasKeys(value) ? { key: fileName, value } : null;
 }
@@ -436,6 +453,7 @@ export function parseFolderRecord(text: string, yaml: YamlCodec): FolderRecordMo
                 title: typeof value['wi_title'] === 'string' ? value['wi_title'] : undefined,
                 caption: typeof value['wi_caption'] === 'string' ? value['wi_caption'] : undefined,
                 src: typeof value['wi_src'] === 'string' ? value['wi_src'] : undefined,
+                prompt: typeof value['wi_prompt'] === 'string' ? value['wi_prompt'] : undefined,
             });
         }
     }

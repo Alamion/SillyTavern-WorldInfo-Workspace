@@ -143,6 +143,7 @@ wi_images:                  # only images with non-default metadata
   "Aldermeer map.png":
     wi_title: "Aldermeer — map"   # only when it differs from the file stem
     wi_caption: "Old survey map"  # only when non-empty
+    wi_prompt: "ink map, parchment"  # spec 009: generation prompt, only when non-empty
   "Remote portrait":              # URL-only image (no file could be written)
     wi_src: "https://example.org/p.png"
 ```
@@ -155,6 +156,7 @@ wi_images:                  # only images with non-default metadata
 | `wi_order` | custom child order by name | folders first, then case-insensitive name |
 | `wi_images.<file>.wi_title` | image item name | file stem |
 | `wi_images.<file>.wi_caption` | image caption | `""` |
+| `wi_images.<file>.wi_prompt` | image generation prompt (spec 009, additive) | `""` |
 | `wi_images.<name>.wi_src` | URL of an image without a file | — |
 
 Foreign keys in the record are preserved like in entry files. Expand/collapse state and

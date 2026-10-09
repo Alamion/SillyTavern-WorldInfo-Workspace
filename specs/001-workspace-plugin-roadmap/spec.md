@@ -306,6 +306,10 @@ editable.
 - **FR-027**: Image generation and captioning MUST use the image-generation and
   image-captioning connections already configured in the app where available; the user
   MUST NOT need to manage separate credentials (consistent with FR-017).
+  *Amended 2026-10-09 (spec 009, owner decision)*: generation uses the Image Generation
+  extension's own settings; captions use a connection profile chosen in the workspace's
+  image settings (a vision-capable model) instead of the Captioning extension — still no
+  separate credentials.
 
 ### Delivery Phases (Proposed Roadmap)
 
@@ -323,6 +327,11 @@ editable.
 Phase order is a proposal; the owner confirms or reshuffles it during review/clarification.
 
 **Order amendments**:
+
+- 2026-10-09: Phase 5 (AI Images) implemented as spec 009 (generation via the Image
+  Generation extension, captions and prompt drafts via connection profiles, folder
+  captions) together with a cross-cutting availability rule: every function whose
+  optional dependency is missing is marked up front and says what to enable.
 
 - 2026-10-09: Phase 6 closed by the owner (spec 007; two live passes, the second with
   request logs from an own server process; the C19/C40 rates are measured in real use).

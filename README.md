@@ -131,9 +131,11 @@ anything is removed.
 
 ![The built-in mapping reference: how folders map, and every front-matter key](docs/images/markdown-reference.png)
 
-**Linking needs a desktop Chromium-based browser on a secure page** (`https://` or
-`localhost`), because it uses the File System Access API. Elsewhere the control is disabled
-and says so — one-off export and import still work everywhere.
+**Markdown folders need a desktop Chromium-based browser on a secure page** (`https://` or
+`localhost`), in its own tab — linking, export and import all use the browser's folder
+access. In Firefox, Safari, on phones, over plain `http://` from another device, or inside
+an embedded browser (such as the one in VS Code), the control carries a warning badge and
+explains why when you press it.
 
 ## The AI assistant
 
@@ -188,6 +190,33 @@ It needs the Connection Manager extension and at least one
 Free models are rate-limited often; the assistant retries by itself and tells you what
 happened.
 
+## AI images
+
+Image items can get their picture and caption from AI, right in the image editor. Nothing
+replaces what you have until you keep it.
+
+- **Generate** — type what the picture should show and press *Generate*. The picture is
+  made by SillyTavern's **Image Generation** extension with its own settings (source,
+  model, size, style). It appears next to the current one with *Keep*, *Discard* and
+  *Generate again*; a kept picture is stored with the workspace's other images and
+  exported with markdown. The prompt stays on the item.
+- **Write prompt** — a model reads the lore entries in the image's folder (or the folder
+  above, if it has none) and drafts the prompt for you; whatever you typed is used as
+  guidance. The editor lists which entries it used. Edit, then generate.
+- **Write caption** — a model that can read pictures describes it; review, edit, keep.
+- **Caption all images without captions** — in a folder's editor or its menu in the tree:
+  one confirmed run over every uncaptioned image below the folder, with progress and
+  *Stop*, then one list where you choose which captions to keep.
+
+Captions and prompt drafts use the connection profiles chosen under *Image settings* (the
+gear in the image editor), with an optional model per task — for captions, a Chat
+Completion profile whose model accepts pictures (on OpenRouter, for example,
+`google/gemma-3-12b-it`). Prompt drafts use the assistant's profile unless you choose
+another.
+
+If you reload the page while a generated picture waits for *Keep* or *Discard*, its file
+stays in SillyTavern's image gallery (top level).
+
 ## Lore picking in the main chat
 
 Off by default (the reader icon in the workspace header). When it is on, a model of your
@@ -204,6 +233,21 @@ order and budget behave exactly as for keyword matches; nothing is injected arou
 - Summaries make picking much better: the model decides from them.
 - Folders can be left out with *Exclude from lore picking*; disabled entries never take part.
 - Quiet generations (other extensions' background requests) and impersonation are skipped.
+
+## Optional dependencies
+
+The workspace itself — the tree, World Info sync, markdown folders — needs nothing but
+SillyTavern. Everything below is optional. A function whose dependency is missing keeps
+its place with a small warning badge, and pressing it tells you exactly what to enable or
+choose (enabling an extension needs a page reload).
+
+| Needs | For | Without it |
+| --- | --- | --- |
+| **Connection Manager** (built in) and a connection profile | The assistant, lore picking, Write prompt, Write caption | Those functions are marked; everything else works |
+| A profile with a picture-reading model (Image settings) | Write caption, Caption all images | Captions are marked until one is chosen |
+| **Image Generation** (built in) with a source chosen | Generate | Generate is marked |
+| A desktop Chromium-based browser, secure page, own tab | Markdown folders | The markdown control is marked |
+| Memory Books, Doom's Enhancement Suite, DeepLore | See below | Their options do not appear |
 
 ## Other lore extensions
 
