@@ -572,6 +572,57 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     }
 }
 
+.wiw-image-ai-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h4 {
+        margin: 0;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.8;
+    }
+}
+
+.wiw-bulk-caption-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+}
+
+.wiw-bulk-caption-row {
+    display: flex;
+    gap: $spacing-md;
+    align-items: flex-start;
+
+    img {
+        flex: 0 0 72px;
+        width: 72px;
+        height: 72px;
+        object-fit: cover;
+        border: 1px solid var(--SmartThemeBorderColor);
+        border-radius: $radius-md;
+    }
+
+    textarea {
+        width: 100%;
+        resize: vertical;
+    }
+}
+
+.wiw-bulk-caption-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+}
+
 .wiw-field-actions {
     display: flex;
     flex-wrap: wrap;

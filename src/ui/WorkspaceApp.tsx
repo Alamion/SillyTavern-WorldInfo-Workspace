@@ -5,7 +5,7 @@ import { getAppContext } from '../adapters/appApi';
 import { confirmDialog, inputDialog } from '../adapters/popups';
 import { onSaveEvent } from '../adapters/saveEvents';
 import { openNativeMode } from '../adapters/shell';
-import { notifyError, notifySuccess } from '../adapters/logger';
+import { notifyError, notifyInfo, notifySuccess } from '../adapters/logger';
 import {
     discardRecovered,
     isRecoveryPending,
@@ -51,8 +51,11 @@ import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { PickingSettings } from './PickingSettings';
 import { StaleBanner } from './StaleBanner';
-import { ImageGenerationSection, type ImageAiServices } from './images/ImageAiSection';
-import { FormSection, OptionRow, useFeature } from './formControls';
+import { ImageCaptionTools, ImageGenerationSection, type ImageAiServices } from './images/ImageAiSection';
+import { BulkCaptionPanel } from './images/BulkCaptionPanel';
+import { FolderImagesSection } from './images/FolderImagesSection';
+import { ImageSettingsPanel } from './images/ImageSettingsPanel';
+import { explainUnavailable, FormSection, OptionRow, useFeature } from './formControls';
 import { describeUnavailable } from '../core/availability';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
@@ -78,6 +81,8 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     const [movePickerFor, setMovePickerFor] = useState<{ ids: string[] } | null>(null);
     const [lorebooksOpen, setLorebooksOpen] = useState(false);
     const [pickingOpen, setPickingOpen] = useState(false);
+    const [imageSettingsOpen, setImageSettingsOpen] = useState(false);
+    const [bulkCaptionsOpen, setBulkCaptionsOpen] = useState(false);
     const [reportsTick, setReportsTick] = useState(0);
     const [lastFailure, setLastFailure] = useState<{ message: string; bookName?: string } | null>(null);
     const [retrying, setRetrying] = useState(false);
@@ -469,7 +474,15 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                 void handleDelete([id]);
                 break;
             case 'export-md':
+                // Spec 009: folder access may be missing here (shared availability rule).
+                if (!mdState.ok) {
+                    explainUnavailable(mdState);
+                    break;
+                }
                 void services.md.exportFolder(id);
+                break;
+            case 'caption-images':
+                void captionFolder(id);
                 break;
         }
     };
@@ -568,10 +581,36 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
     };
 
     const pickingState = useFeature(services.availability, 'picking');
+    const captionState = useFeature(services.availability, 'image-caption');
+    const mdState = useFeature(services.availability, 'md-folders');
     const imageAi: ImageAiServices = {
         availability: services.availability,
         generation: services.imageGeneration,
+        caption: services.imageCaption,
         commitPrompt: (imageId, prompt) => commitImage(imageId, { prompt }),
+        openSettings: () => setImageSettingsOpen(true),
+    };
+
+    /** US4: confirm, then caption every uncaptioned image below the folder. */
+    const captionFolder = async (folderId: string): Promise<void> => {
+        if (!captionState.ok) {
+            explainUnavailable(captionState);
+            return;
+        }
+        const count = services.imageCaption.countUncaptioned(folderId);
+        if (count === 0) {
+            notifyInfo('No images without captions in this folder.');
+            return;
+        }
+        const imageSettings = services.imageCaption.settings();
+        const profile = services.assistant.getSnapshot().profiles.find((item) => item.id === imageSettings.captionProfileId);
+        const model = imageSettings.captionModel !== '' ? imageSettings.captionModel : profile?.model ?? '';
+        const target = `${profile?.name ?? 'the caption profile'}${model !== '' ? ` (${model})` : ''}`;
+        if (!(await confirmDialog(`Send ${String(count)} picture${count === 1 ? '' : 's'} to ${target} for captions?`))) {
+            return;
+        }
+        setBulkCaptionsOpen(true);
+        void services.imageCaption.startBulk(folderId);
     };
 
     const commitImage = (imageId: string, patch: { src?: string; caption?: string; prompt?: string }): void => {
@@ -658,7 +697,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         },
         imageExtras: {
             generation: (image: ImageNode) => <ImageGenerationSection image={image} services={imageAi} />,
-            caption: () => null,
+            caption: (image: ImageNode) => <ImageCaptionTools image={image} services={imageAi} />,
         },
         folderExtras: (folder: FolderNode) => (
             <>
@@ -666,6 +705,11 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     folder={folder}
                     onRenameBook={(nextName) => void sync.renameRootBook(folder.id, nextName)}
                     onResolveOrphan={(uid, mode) => void resolveOrphan(folder.book!.bookName, uid, mode)}
+                />
+                <FolderImagesSection
+                    count={services.imageCaption.countUncaptioned(folder.id)}
+                    state={captionState}
+                    onCaption={() => void captionFolder(folder.id)}
                 />
                 <FormSection title="Main-chat lore picking">
                     <OptionRow
@@ -924,6 +968,17 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                         assistantProfileName={services.assistant.getSnapshot().profile?.name ?? null}
                         onClose={() => setPickingOpen(false)}
                     />
+                )}
+                {imageSettingsOpen && (
+                    <ImageSettingsPanel
+                        caption={services.imageCaption}
+                        profiles={services.assistant.getSnapshot().profiles}
+                        assistantProfileName={services.assistant.getSnapshot().profile?.name ?? null}
+                        onClose={() => setImageSettingsOpen(false)}
+                    />
+                )}
+                {bulkCaptionsOpen && (
+                    <BulkCaptionPanel caption={services.imageCaption} onClose={() => setBulkCaptionsOpen(false)} />
                 )}
                 {lorebooksOpen && (
                     <LorebooksPanel

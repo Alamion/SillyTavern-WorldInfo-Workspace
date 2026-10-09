@@ -30,6 +30,7 @@ import { getLiveAppContext } from './appApi';
 import { fsaAccess } from './fsaDisk';
 import { createAvailability, type AvailabilityService } from './availability';
 import { createImageGeneration, fetchImageBytes, type ImageGeneration } from './imageGeneration';
+import { createImageCaption, preparePicture, type ImageCaption } from './imageCaption';
 import type { SlashCommandObject } from '../global';
 import { createImageStore } from './imageStore';
 import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
@@ -56,6 +57,8 @@ export interface WorkspaceStateServices {
     availability: AvailabilityService;
     /** Spec 009: picture generation for image items (Image Generation extension). */
     imageGeneration: ImageGeneration;
+    /** Spec 009: prompt drafts and captions through connection profiles. */
+    imageCaption: ImageCaption;
 }
 
 /** Spec 008 clarification: a visible tab nobody touches checks every 2 minutes. */
@@ -255,6 +258,8 @@ export function initWorkspaceState(): WorkspaceStateServices {
         warn: notifyWarning,
     });
 
+    const imageCaption = createImageCaption({ store, llm, preparePicture, isRecoveryPending });
+
     services = {
         store,
         worldInfo,
@@ -266,6 +271,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
         gate,
         availability,
         imageGeneration,
+        imageCaption,
     };
     return services;
 }

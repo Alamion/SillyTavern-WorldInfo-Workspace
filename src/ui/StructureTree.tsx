@@ -21,7 +21,8 @@ export type TreeMenuAction =
     | 'move-down'
     | 'duplicate'
     | 'delete'
-    | 'export-md';
+    | 'export-md'
+    | 'caption-images';
 
 export interface TreeMenuState {
     id: string;
@@ -144,6 +145,7 @@ const MENU_ITEMS: ReadonlyArray<{ action: TreeMenuAction; icon: string; label: s
     { action: 'move-down', icon: 'fa-arrow-down', label: 'Move down' },
     { action: 'duplicate', icon: 'fa-clone', label: 'Duplicate' },
     { action: 'export-md', icon: 'fa-file-export', label: 'Export folder to markdown…', folderOnly: true },
+    { action: 'caption-images', icon: 'fa-closed-captioning', label: 'Caption images without captions…', folderOnly: true },
     { action: 'delete', icon: 'fa-trash-can', label: 'Delete' },
 ];
 

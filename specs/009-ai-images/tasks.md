@@ -94,7 +94,7 @@ story uses
 - [X] T007 Add the "Image settings" line to the conflict summary in
   `src/core/state/staleness.ts` (same mechanism as "Assistant settings") + case in
   `tests/unit/staleness.test.ts`.
-- [ ] T008 Keep `settings.images` out of saves while a recovery is pending, exactly like
+- [X] T008 (Implemented as `imageCaption.updateSettings`, same guard as the picking settings.) Keep `settings.images` out of saves while a recovery is pending, exactly like
   `settings.assistant`, in `src/adapters/settingsStore.ts`, and add a settings update
   helper `updateImageSettings(patch)` on services.
 - [X] T009 [P] Unit test `tests/unit/llm-client-images.test.ts`: a message with
@@ -258,7 +258,7 @@ entries and lists them.
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Unit tests `tests/unit/images-draft.test.ts` for
+- [X] T029 [P] [US2] Unit tests `tests/unit/images-draft.test.ts` for
   `buildPromptDraftRequest`:
   - entry selection order: direct entries, then subfolder entries, then the parent's
     entries when the folder has none;
@@ -273,14 +273,14 @@ entries and lists them.
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Create `src/core/images/draftRequest.ts` (reuse
+- [X] T030 [US2] Create `src/core/images/draftRequest.ts` (reuse
   `src/core/assistant/truncate.ts`, `src/core/tree/summary.ts`). Make T029 pass.
-- [ ] T031 [US2] In `src/adapters/imageCaption.ts`, add `draftPrompt(imageId, idea)`:
+- [X] T031 [US2] In `src/adapters/imageCaption.ts`, add `draftPrompt(imageId, idea)`:
   - profile = `promptProfileId` or the assistant's `profileId`, plus model override;
   - non-streamed `llmClient.run`;
   - result `{ text, basis }` or a failure;
   - per-image running state + Stop.
-- [ ] T032 [US2] Add to `ImageAiSection.tsx`, part 2:
+- [X] T032 [US2] Add to `ImageAiSection.tsx`, part 2:
   - Write prompt button gated `image-prompt`;
   - confirm before replacing non-empty text;
   - "Based on: …" hint;
@@ -296,7 +296,7 @@ entries and lists them.
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Unit tests `tests/unit/images-caption.test.ts`:
+- [X] T033 [P] [US3] Unit tests `tests/unit/images-caption.test.ts`:
   - `buildCaptionRequest`: instruction + one user message with `images: [dataUrl]`;
   - `classifyCaptionFailure`:
     - empty reply → `no-vision`;
@@ -305,7 +305,7 @@ entries and lists them.
     - 429/network → retryable;
     - else generic;
   - `cleanCaptionReply`: strips a "Here's a caption:" preamble and quotes.
-- [ ] T034 [P] [US3] Integration test `tests/integration/image-captions.test.ts`, part 1,
+- [X] T034 [P] [US3] Integration test `tests/integration/image-captions.test.ts`, part 1,
   with the fake LLM:
   - a single caption request carries the image and the model override;
   - a proposal is returned;
@@ -314,9 +314,9 @@ entries and lists them.
 
 ### Implementation for User Story 3
 
-- [ ] T035 [US3] Create `src/core/images/captionRequest.ts` and
+- [X] T035 [US3] Create `src/core/images/captionRequest.ts` and
   `src/core/images/failures.ts`. Make T033 pass.
-- [ ] T036 [US3] In `src/adapters/imageCaption.ts`:
+- [X] T036 [US3] In `src/adapters/imageCaption.ts`:
   - `preparePicture(src)`:
     - fetch same-origin or `data:`;
     - `createImageBitmap`, or an `Image` element for SVG;
@@ -325,12 +325,12 @@ entries and lists them.
     - tainted/unreachable → `not-captionable`.
   - `writeCaption(imageId)` with per-image proposal state.
   - Make T034 pass (inject `preparePicture` in tests).
-- [ ] T037 [US3] Add to `ImageAiSection.tsx`, part 3:
+- [X] T037 [US3] Add to `ImageAiSection.tsx`, part 3:
   - Write caption button next to the Caption field, gated `image-caption`, hidden without
     a picture;
   - proposal block with an editable text, Keep / Discard;
   - failure line with the FR-016 message.
-- [ ] T038 [US3] Create `src/ui/images/ImageSettingsPanel.tsx` (MenuPanel).
+- [X] T038 [US3] Create `src/ui/images/ImageSettingsPanel.tsx` (MenuPanel).
   - Captions section: chat-completion profiles, model, instruction.
   - Prompt drafting section: profile with "Same as the assistant", model, instruction,
     lore size NumberField.
@@ -348,10 +348,10 @@ entries and lists them.
 
 ### Tests for User Story 4
 
-- [ ] T039 [P] [US4] Unit test in `tests/unit/images-caption.test.ts`:
+- [X] T039 [P] [US4] Unit test in `tests/unit/images-caption.test.ts`:
   `selectUncaptioned(folder)` returns images at any depth that have a picture and an empty
   (trimmed) caption, in tree order.
-- [ ] T040 [P] [US4] Integration test `tests/integration/image-captions.test.ts`, part 2:
+- [X] T040 [P] [US4] Integration test `tests/integration/image-captions.test.ts`, part 2:
   - a run over 3 images is sequential;
   - Stop before the 2nd request sends nothing more;
   - a 429 retries after the backoff (fake timers), at most twice;
@@ -361,17 +361,17 @@ entries and lists them.
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] Add `selectUncaptioned` to `src/core/images/captionRequest.ts`; add
+- [X] T041 [US4] Add `selectUncaptioned` to `src/core/images/captionRequest.ts`; add
   `startBulk(folderId)`, `stopBulk`, `keepSelected(edits)` and the bulk state to
   `src/adapters/imageCaption.ts`, with retries reused from
   `src/core/assistant/failures.ts`. Make T039/T040 pass.
-- [ ] T042 [US4] Create `src/ui/images/BulkCaptionPanel.tsx` (MenuPanel "Captions for
+- [X] T042 [US4] Create `src/ui/images/BulkCaptionPanel.tsx` (MenuPanel "Captions for
   <folder>").
   - Progress, Stop.
   - Rows with thumbnail, name, editable caption or failure, Keep checkbox.
   - Footer Keep selected / Close; confirm when closing with unkept proposals.
   - Mount it in `src/ui/WorkspaceApp.tsx`.
-- [ ] T043 [US4] Entry points:
+- [X] T043 [US4] Entry points:
   - folder editor section "Images" (count + button, disabled "No images without
     captions" at 0) via `folderExtras` in `src/ui/WorkspaceApp.tsx`;
   - tree folder context menu item "Caption images without captions…" in
