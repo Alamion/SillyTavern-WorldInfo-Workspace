@@ -72,7 +72,7 @@ Two or three concurrent tabs or devices.
 
 | Principle | Check | Status |
 |-----------|-------|--------|
-| I. Holistic, modular | Pure module `core/state/staleness.ts` (content projection + hash, marker trust, classification, conflict summary); the gate lives in `adapters/settingsStore.ts` plus a small `adapters/savedSettings.ts` (fetch + parse); banner component `ui/StaleBanner.tsx`; one bundle | ✅ |
+| I. Holistic, modular | Pure module `core/state/staleness.ts` (content projection + hash, marker trust, classification, conflict summary); the gate is a factory in `adapters/saveGate.ts` wired by `adapters/settingsStore.ts`, plus a small `adapters/savedSettings.ts` (fetch + parse); banner component `ui/StaleBanner.tsx`; one bundle | ✅ |
 | II. App API first | Saved settings read through the app's own endpoint with `getRequestHeaders()`; saves still through `saveSettingsDebounced`; no app internals imported | ✅ |
 | III. Strict TS | `global.d.ts`: nothing new beyond what is typed (`getRequestHeaders` exists); the `_save` type in `schema.ts` | ✅ |
 | IV. Lint & format | Unchanged | ✅ |
@@ -115,8 +115,11 @@ src/
 │                           #   conflictSummary (diffTree → names, 10 + more)
 ├── adapters/
 │   ├── savedSettings.ts    # NEW: read the saved namespace (/api/settings/get), parse
-│   ├── settingsStore.ts    # save gate: seen copy, guarded save, load, restore, conflict
-│   │                       #   state, check triggers and the 2-minute visible interval
+│   ├── saveGate.ts         # NEW: createSaveGate(deps) — seen copy, guarded save, load,
+│   │                       #   restore, conflict state, check scheduling (testable: store,
+│   │                       #   readSaved, publish/save, timers and visibility injected)
+│   ├── settingsStore.ts    # wires the gate instead of publish-on-every-change; check
+│   │                       #   triggers (visibility, focus, 2-minute visible interval)
 │   ├── syncEngine.ts       # pushes await the gate; held while in conflict
 │   └── shell.ts            # workspace-shown → check (existing callback)
 ├── ui/
