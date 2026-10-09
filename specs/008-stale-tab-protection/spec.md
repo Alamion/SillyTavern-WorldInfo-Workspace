@@ -29,6 +29,25 @@ The workspace lost the summaries without any warning; the native book kept them.
   gains an optional, additive marker and new load rules. The hook surface is NOT changed
   (FR-012).
 
+## Clarifications
+
+### Session 2026-10-09
+
+- Q: What counts as a tab's own edits that block a silent load — any change of the saved
+  workspace, or only content? → A: Only content: the tree, entries, folders, images, and
+  assistant and picking settings. Folder expand state, panel sizes and the sort mode are
+  bookkeeping: they never block a silent load and are kept from the tab when it loads a
+  newer workspace (FR-015).
+- Q: Should a visible tab nobody touches check the server by itself, or only on focus,
+  on showing the workspace and before its own saves? → A: Also every 2 minutes while the
+  page is visible; a hidden page never polls (FR-003).
+- Q: When the saved copy is older than the tab's own, should the tab write its version
+  back by itself or ask first? → A: By itself, with a notice (FR-007); deliberate banner
+  choices always produce the newest marker, so only genuine stale overwrites are restored.
+- Q: What should the conflict banner offer besides the two buttons? → A: A short list of
+  differences on each side — items changed, added and removed in this tab and in the
+  saved version, up to ~10 names, then "and N more" (FR-016).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A tab picks up newer changes when you come back to it (Priority: P1)
@@ -79,7 +98,7 @@ result.
 
 1. **Given** A is stale and the user edits in A, **When** A is about to save its
    workspace, **Then** it does not save, and a banner offers "Use the saved version" and
-   "Keep this version".
+   "Keep this version", and lists what differs on each side (FR-016).
 2. **Given** the banner, **When** the user picks "Use the saved version", **Then** A shows
    the saved workspace and A's unsaved edit is gone (the banner said so before the
    choice).
@@ -157,6 +176,9 @@ it only while it is open. The workspace's lorebooks are not affected by this.
   changes follow the existing link rules.
 - **Unsent text in an editor field** when a newer workspace is loaded silently: the field
   draft is a local edit; it turns the situation into story 2 instead of being dropped.
+- **Only bookkeeping changed in the tab** (folders expanded, a panel resized, the sort
+  mode switched): a newer saved workspace still loads silently; the tab keeps its expand
+  state, sizes and sort mode (FR-015).
 - **Many checks in a row** (fast window switching): at most one check runs at a time,
   and checks closer together than a few seconds reuse the last result.
 - **Very large workspaces** (spec 006 scale, ~1000 entries): a check and a load must not
@@ -173,18 +195,21 @@ it only while it is open. The workspace's lorebooks are not affected by this.
   last loaded or saved ("last seen copy").
 - **FR-003**: A tab MUST compare the saved workspace with its last seen copy (a "check")
   when the page becomes visible, when the window regains focus, when the workspace is
-  shown, and before every save of its own workspace.
+  shown, before every save of its own workspace, and every 2 minutes while the page is
+  visible. A hidden page MUST NOT check on a timer.
 - **FR-004**: If the saved workspace is newer than the last seen copy and the tab has no
   local edits since then, the tab MUST load it without asking and show a short notice
   (story 1).
-- **FR-005**: If the saved workspace is newer and the tab has local edits (including
-  uncommitted field drafts), or the age cannot be decided (FR-009), the tab MUST NOT save
+- **FR-005**: If the saved workspace is newer and the tab has local edits (content only,
+  FR-015; including uncommitted field drafts), or the age cannot be decided (FR-009), the tab MUST NOT save
   its workspace and MUST show a banner with "Use the saved version" and "Keep this
   version", stating what each discards (story 2).
 - **FR-006**: "Use the saved version" MUST load the saved workspace and drop the tab's
   local edits; "Keep this version" MUST save the tab's workspace as the newest.
 - **FR-007**: If the saved workspace is OLDER than the tab's own (a stale writer replaced
-  it), the tab MUST save its own workspace back and show a notice (story 3).
+  it), the tab MUST save its own workspace back without asking and show a notice
+  (story 3). Banner choices (FR-006) always leave the newest marker on the saved
+  workspace, so a deliberate choice made in another tab is never undone by this rule.
 - **FR-008**: Detection MUST also work for changes written without a marker update
   (previous extension versions): a saved workspace whose content differs from the last
   seen copy while its marker does not is a change of unknown age.
@@ -204,6 +229,14 @@ it only while it is open. The workspace's lorebooks are not affected by this.
 - **FR-014**: The README MUST describe what is protected, the residual risk (stale tabs
   can still write an old copy through the app's own saves; repaired only while a newer
   tab is open), and that lorebooks are unaffected (story 4).
+- **FR-015**: "Local edits" MUST mean content changes only: the tree structure, entries,
+  folders, images, and assistant and picking settings. Folder expand state, panel sizes
+  and the sort mode are bookkeeping: they MUST NOT block a silent load, and a load MUST
+  keep the tab's own values for them.
+- **FR-016**: The conflict banner MUST list the differences on each side: items changed,
+  added and removed in this tab since the last seen copy, and in the saved version since
+  then — by item name, at most 10 per side, the rest as "and N more". Bookkeeping
+  (FR-015) is not listed.
 
 ### Key Entities
 
@@ -231,14 +264,15 @@ it only while it is open. The workspace's lorebooks are not affected by this.
   banners for entries already in sync.
 - **SC-006**: With a single tab, the user notices no difference: no extra notices, no
   banners, and edits save as quickly as before.
+- **SC-007**: A visible tab left untouched shows another device's changes within
+  2 minutes (plus the time of one check).
 
 ## Assumptions
 
-- Checks happen at the moments in FR-003; there is no background polling while a tab
-  stays visible and untouched. A tab left visible next to another device's edits catches
-  up when the user returns focus to it or edits in it (story 2 then applies).
-- Reading the saved settings for a check is acceptable in cost at these moments; the plan
-  verifies this and may narrow what is read.
+- Checks happen at the moments in FR-003. A visible tab left untouched next to another
+  window catches up within 2 minutes; the residual window is the time until that check.
+- Reading the saved settings for a check is acceptable in cost at a 2-minute interval;
+  the plan verifies this and may narrow what is read.
 - The workspace's own saves still go through the app's settings save; only the decision
   of whether to save (and with which workspace) is new.
 - A tab's identity lives only as long as the tab; reloading the page makes it a new
