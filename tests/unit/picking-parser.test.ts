@@ -14,12 +14,14 @@ describe('parsePicks', () => {
                 { id: 'e1', reason: 'Selene appears' },
             ],
             ignored: [],
+            none: false,
+            stray: 'Here you go: Done.',
         });
     });
 
     it('counts unknown ids as ignored and collapses duplicates', () => {
         const reply = '<pick id="e9">nope</pick><pick id="e1">a</pick><pick id="e1">again</pick>';
-        expect(parsePicks(reply, VALID, 8)).toEqual({ picks: [{ id: 'e1', reason: 'a' }], ignored: ['e9'] });
+        expect(parsePicks(reply, VALID, 8)).toMatchObject({ picks: [{ id: 'e1', reason: 'a' }], ignored: ['e9'] });
     });
 
     it('keeps at most maxPicks', () => {
@@ -32,7 +34,23 @@ describe('parsePicks', () => {
         expect(parsePicks(reply, VALID, 8).picks.map((pick) => pick.id)).toEqual(['e1', 'e2']);
     });
 
-    it('returns nothing for a reply without picks', () => {
-        expect(parsePicks('None of these matter now.', VALID, 8)).toEqual({ picks: [], ignored: [] });
+    it('returns no picks for a reply without picks and keeps its stray text', () => {
+        expect(parsePicks('None of these matter now.', VALID, 8)).toEqual({
+            picks: [],
+            ignored: [],
+            none: false,
+            stray: 'None of these matter now.',
+        });
+    });
+
+    it('recognises an explicit <none/> as "nothing is needed"', () => {
+        for (const reply of ['<none/>', '<none />', '<think>hm</think>\n<NONE></none>']) {
+            expect(parsePicks(reply, VALID, 8)).toMatchObject({ picks: [], none: true, stray: '' });
+        }
+    });
+
+    it('shortens long stray text (live 2026-10-09: a safety classifier answered "User Safety: safe")', () => {
+        expect(parsePicks('User Safety: safe', VALID, 8).stray).toBe('User Safety: safe');
+        expect(parsePicks('x'.repeat(200), VALID, 8).stray).toHaveLength(81);
     });
 });

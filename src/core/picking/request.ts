@@ -62,7 +62,7 @@ export function pickSystemPrompt(maxPicks: number): string {
         'rules that are present, mentioned, or about to matter. Prefer fewer, clearly relevant entries.',
         'Reply ONLY with one line per pick, nothing else:',
         '<pick id="e12">short reason</pick>',
-        'If nothing is needed, reply with nothing.',
+        'If nothing is needed, reply with exactly: <none/>',
     ].join('\n');
 }
 

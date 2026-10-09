@@ -260,6 +260,13 @@ export function createPickingController(host: PickingHost): PickingController {
         if (parsed.picks.length === 0 && parsed.ignored.length > 0) {
             return { ok: false, kind: 'malformed', message: 'The picking model named only unknown entries.', profileName: profile.name };
         }
+        if (parsed.picks.length === 0 && !parsed.none) {
+            const message =
+                parsed.stray === ''
+                    ? 'The picking model gave an empty reply.'
+                    : `The picking model did not answer in the pick format ("${parsed.stray}").`;
+            return { ok: false, kind: 'malformed', message, profileName: profile.name };
+        }
         const picked = parsed.picks.flatMap((pick) => {
             const target = request.handles.get(pick.id);
             return target ? [{ ...target, reason: pick.reason, inserted: null }] : [];

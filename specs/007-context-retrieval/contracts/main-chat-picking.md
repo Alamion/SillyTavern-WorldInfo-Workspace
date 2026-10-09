@@ -41,9 +41,14 @@ How the plugin takes part in main-chat generation (spec FR-019–FR-025; researc
   with pick lines); user = recent chat (`chatMessages` messages, oldest first, `Name:
   text`) + optional scene block (Doom's suite) + catalog (`catalogTokens` budget, folders
   as groups, R4/R5 narrowing; excluded folders and disabled entries left out).
-- Reply format, one per line: `<pick id="e12">short reason</pick>`. Tolerant: extra
-  prose ignored; unknown ids → `ignored`; duplicates collapsed; more than `maxPicks` →
-  first `maxPicks`.
+- Reply format, one per line: `<pick id="e12">short reason</pick>`, or exactly `<none/>`
+  when nothing is needed. Tolerant: prose around picks ignored; unknown ids → `ignored`;
+  duplicates collapsed; more than `maxPicks` → first `maxPicks`.
+- A reply with neither a valid pick nor `<none/>` (empty, or in another format) is a
+  `malformed` failure with the stray text (≤ 80 chars) in its message, handled like any
+  failure (earlier pick or keywords only) — never a silent empty pick. Live 2026-10-09:
+  the free router sent a pick request to a safety classifier that answered "User Safety:
+  safe".
 
 ## Forcing
 

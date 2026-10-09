@@ -139,7 +139,7 @@ describe('main-chat picking (spec 007 US5)', () => {
                 lore.children[0].pickExcluded = true;
             }
         });
-        rig.llm.reply('');
+        rig.llm.reply('<none/>');
         await generate(rig);
         const catalog = rig.llm.requests[0]?.messages[1]?.content ?? '';
         expect(catalog).toContain('Harbor');
@@ -180,6 +180,27 @@ describe('main-chat picking (spec 007 US5)', () => {
         expect(rig.notices[0]).toMatch(/timed out.*keywords only/);
         expect(rig.host.forced).toHaveLength(0);
         expect(rig.emitted[0]).toMatchObject({ payload: { source: 'fallback' } });
+    });
+
+    it('a reply in another format is a visible failure, not a silent empty pick (live 2026-10-09)', async () => {
+        const rig = setup();
+        rig.llm.reply('User Safety: safe');
+        rig.host.chat.push({ name: 'User', is_user: true, mes: 'Selene, are you there?' });
+        await generate(rig);
+        const record = rig.host.chat.at(-1)?.extra?.[PICK_EXTRA_KEY] as PickRecord;
+        expect(record).toMatchObject({ source: 'fallback', picked: [] });
+        expect(record.failure?.message).toMatch(/did not answer in the pick format.*User Safety: safe/);
+        expect(rig.host.forced).toHaveLength(0);
+    });
+
+    it('an explicit <none/> is a successful empty pick', async () => {
+        const rig = setup();
+        rig.llm.reply('<none/>');
+        rig.host.chat.push({ name: 'User', is_user: true, mes: 'Selene, are you there?' });
+        await generate(rig);
+        const record = rig.host.chat.at(-1)?.extra?.[PICK_EXTRA_KEY] as PickRecord;
+        expect(record).toMatchObject({ source: 'fresh', picked: [] });
+        expect(record.failure).toBeUndefined();
     });
 
     it('skips quiet and impersonate generations', async () => {
