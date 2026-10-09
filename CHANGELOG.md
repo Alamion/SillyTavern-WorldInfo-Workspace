@@ -13,7 +13,8 @@ listed here — see the git history for that.
   same icon on a reply shows what was sent for it.
 - **Entry summaries**: a short "when does this matter" field on every entry, stored in the
   native entry (travels with the book, with markdown as `wi_summary`, and with character
-  cards). The assistant can write the summaries of every entry in a folder in one go.
+  cards). The assistant can write the summaries of every entry in a folder in one go. The
+  Aldermeer demo's lore cards come with summaries.
 - **Large libraries**: when the chosen entries do not fit, the assistant gets a catalog
   (names, folders, summaries) and reads the entries it needs before answering.
 - **Near matches** (other word forms of keys), **sentence-boundary truncation** of the

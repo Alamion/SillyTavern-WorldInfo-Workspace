@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultState, deepValidateState, findNode, migrate, type TreeNode } from '../../src/core/state/schema';
 import { createDemoState } from '../../src/core/demo/dataset';
+import { getSummary, isSummaryTooLong } from '../../src/core/tree/summary';
 
 let counter = 0;
 function demoCounter(): number {
@@ -74,5 +75,26 @@ describe('demo dataset (FR-001, research R9)', () => {
         };
         walk(state.root);
         expect(findNode(state, state.root.id)?.kind).toBe('folder');
+    });
+
+    it('shows entry summaries on the lore cards, not on notes or sandbox entries (spec 007)', () => {
+        const state = createDemoState(() => `id-${demoCounter()}`);
+        const withSummary: string[] = [];
+        const without: string[] = [];
+        const walk = (node: TreeNode): void => {
+            if (node.kind === 'entry') {
+                const summary = getSummary(node.native);
+                (summary === '' ? without : withSummary).push(node.name);
+                expect(isSummaryTooLong(summary)).toBe(false);
+            } else if (node.kind === 'folder') {
+                node.children.forEach(walk);
+            }
+        };
+        walk(state.root);
+        expect(withSummary).toEqual(
+            expect.arrayContaining(['Bristlemark', 'The Verdant Span', 'Vesk Harrow', 'Aldermeer, Realm of Two Rivers'])
+        );
+        expect(withSummary).toHaveLength(9);
+        expect(without).toEqual(expect.arrayContaining(['City naming ideas', 'Sandbox Entry 01']));
     });
 });

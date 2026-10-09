@@ -1,4 +1,5 @@
 import type { NativeWorldInfoEntry } from '../../global';
+import { SUMMARY_KEY } from '../tree/summary';
 
 export interface WiRootSettingsMock {
     bookName: string;
@@ -103,6 +104,8 @@ interface EntrySeed {
     bookMemberships?: string[];
     contentLengthClass?: 'normal' | 'long';
     fields?: Partial<NativeWorldInfoEntry>;
+    /** When the entry matters (spec 007 entry summary); lore cards only, not notes. */
+    summary?: string;
 }
 
 function makeEntry(seed: EntrySeed): SampleEntryNode {
@@ -116,6 +119,9 @@ function makeEntry(seed: EntrySeed): SampleEntryNode {
     };
     fields.displayIndex = fields.displayIndex ?? seed.uid;
     fields.extensions = fields.extensions ?? {};
+    if (seed.summary !== undefined) {
+        fields.extensions = { ...fields.extensions, [SUMMARY_KEY]: seed.summary };
+    }
     return {
         id: seed.id,
         parentId: seed.parentId,
@@ -223,6 +229,8 @@ const tree: SampleFolderNode = makeFolder({
                                     id: 'card-bristlemark',
                                     parentId: 'cities',
                                     name: 'Bristlemark',
+                                    summary:
+                                        'The capital: when the story is in the city, at the Bridgehold or the harbor, or turns to river law, tolls, manifests or the archives.',
                                     uid: 0,
                                     keys: ['Bristlemark', 'the Bridgehold'],
                                     content:
@@ -238,6 +246,8 @@ const tree: SampleFolderNode = makeFolder({
                                     id: 'card-cinderhollow',
                                     parentId: 'cities',
                                     name: 'Cinderhollow',
+                                    summary:
+                                        'When travelers reach the edge of the Verdant Span or the start of the Pale Roads, or need charcoal, resin or a marcher market.',
                                     uid: 1,
                                     keys: ['Cinderhollow', 'Cinder hollow'],
                                     content:
@@ -265,6 +275,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-verdant-span',
                             parentId: 'geography',
                             name: 'The Verdant Span',
+                            summary:
+                                'When anyone enters the eastern forest, stays out near dusk, or the mist rule and missing party members come up.',
                             uid: 2,
                             keys: ['Verdant Span', 'the deep woods'],
                             content:
@@ -297,6 +309,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-gilded-circle',
                             parentId: 'factions',
                             name: 'The Gilded Circle',
+                            summary:
+                                'When money, loans, cargo, tolls or Bristlemark trade politics drive the scene, or a merchant wants something done quietly.',
                             uid: 3,
                             keys: ['Gilded Circle', 'the consortium'],
                             content:
@@ -311,6 +325,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-quiet-flame',
                             parentId: 'factions',
                             name: 'Order of the Quiet Flame',
+                            summary:
+                                'When someone is sick, dying or grieving, when a hearthhall is visited, or when an old event needs a trusted written record.',
                             uid: 4,
                             keys: ['Quiet Flame', 'Flamekeepers', 'hearthhall'],
                             content:
@@ -337,6 +353,8 @@ const tree: SampleFolderNode = makeFolder({
                     id: 'card-realm-overview',
                     parentId: 'realm-root',
                     name: 'Aldermeer, Realm of Two Rivers',
+                    summary:
+                        'Background for the whole realm: rivers, regions, peoples and customs. Useful when the scene leaves a single place or the user asks how Aldermeer works.',
                     uid: 5,
                     keys: ['Aldermeer', 'the realm'],
                     content: REALM_OVERVIEW_CONTENT,
@@ -374,6 +392,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-vesk-harrow',
                             parentId: 'marches-root',
                             name: 'Vesk Harrow',
+                            summary:
+                                "When the Marches, the border oath, the beacons or marcher lords appear, or a character needs the frontier's authority.",
                             uid: 6,
                             keys: ['Vesk Harrow', 'Lord of the Marches'],
                             content:
@@ -389,6 +409,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-pale-roads',
                             parentId: 'marches-root',
                             name: 'The Pale Roads',
+                            summary:
+                                "When a journey crosses the Marches, a caravan or courier is on the road, or the road's eerie reputation matters.",
                             uid: 7,
                             keys: ['Pale Roads'],
                             content:
@@ -403,6 +425,8 @@ const tree: SampleFolderNode = makeFolder({
                             id: 'card-cinderfall-watch',
                             parentId: 'marches-root',
                             name: 'Cinderfall Watch',
+                            summary:
+                                'When the beacons are lit or tested, the border is threatened, or a scene needs the old watchtower and its garrison.',
                             uid: 8,
                             keys: ['Cinderfall Watch', 'the watchtower'],
                             content:
