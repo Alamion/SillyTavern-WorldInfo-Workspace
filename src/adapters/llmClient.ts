@@ -151,7 +151,7 @@ export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
                 onEvent({ type: 'failed', failure: classifyError(error, {}) });
                 return;
             }
-            const streaming = resolveStreaming(profile);
+            const streaming = request.stream === false ? false : resolveStreaming(profile);
             // Own controller so the port can time out without touching the app's
             // generation abort controller (FR-029).
             const controller = new AbortController();

@@ -412,7 +412,7 @@ entries and lists them.
   the version in `package.json` / `manifest.json` per the release decision at closing.
 - [X] T049 Run all four gates (`pnpm exec tsc --noEmit`, `pnpm run lint`, `pnpm run test`,
   `pnpm run build`) and commit `dist/`.
-- [ ] T050 Live pass of quickstart I0–I14 on `dev` (own server, spend-limited key); record
+- [X] T050 Live pass of quickstart I0–I14 on `dev` (own server, spend-limited key); record
   the results in `specs/009-ai-images/quickstart.md`; fix findings with regression tests.
 
 ---

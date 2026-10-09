@@ -140,7 +140,7 @@ export function createImageCaption(deps: ImageCaptionDeps): ImageCaption {
 
     const run = (profileId: string, model: string, messages: LlmMessage[], maxTokens: number, signal: AbortSignal): Promise<RunResult> =>
         new Promise((resolve) => {
-            void deps.llm.run({ profileId, messages, maxTokens, signal, model }, (event: LlmEvent) => {
+            void deps.llm.run({ profileId, messages, maxTokens, signal, model, stream: false }, (event: LlmEvent) => {
                 if (event.type === 'done') {
                     resolve({ ok: true, text: event.text });
                 } else if (event.type === 'failed') {

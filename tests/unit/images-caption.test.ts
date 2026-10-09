@@ -34,6 +34,15 @@ describe('caption failures (FR-016)', () => {
                 retryable: true,
             }).kind
         ).toBe('no-vision');
+        // What the page actually receives for a text-only model on OpenRouter (live 2026-10-09).
+        expect(
+            classifyCaptionFailure({
+                kind: 'provider',
+                message: 'The provider rejected the request.',
+                detail: 'API request failed: Not Found',
+                retryable: true,
+            }).kind
+        ).toBe('no-vision');
     });
 
     it('rate limits and network problems are retryable; the rest is passed on', () => {

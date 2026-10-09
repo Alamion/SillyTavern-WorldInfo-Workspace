@@ -43,3 +43,31 @@ criteria; implementation detail belongs in `tasks.md`.
   endpoint (keep/discard/replace file lifecycle); LLM client builds image content parts;
   bulk caption run with stop and retries (fake LLM).
 - Style guard: gated controls use the shared helper.
+
+## Results
+
+### Live pass — 2026-10-09 (owner's server, `dev`, Image Generation on OpenRouter `google/gemini-3.1-flash-lite-image`, captions and prompt drafts on profile "openrouter almost free" with model `google/gemma-3-12b-it`)
+
+| # | Result |
+|---|---|
+| I0 | PASS — existing items show the new section; nothing is sent until a button is pressed |
+| I1 | PASS — new image item "Cinderhollow cliffs": prompt → Generate (~4 s) → candidate beside "No picture yet"; chat unchanged |
+| I2 | PASS — Keep: file in `user/images/WorldInfoWorkspace/`, temporary file deleted (server log), prompt on the item, survives reload |
+| I3 | PASS — Discard on "Aldermeer map sketch": temporary file deleted, item unchanged |
+| I4 | PASS — a kept replacement: the previous owned file was deleted by the existing cleanup |
+| I5 | PASS — prompt "you": the extension logged `mode FREE triggered with "you."`; its prompt prefix was applied |
+| I6 | PASS — Stop during generation: no candidate, no file left |
+| I7 | PASS — Write prompt (with confirmation over existing text): a draft naming cliffs, lanterns and stone dwellings; "Based on: Bristlemark, Cinderhollow, City naming ideas" |
+| I8 | PASS — Write caption: proposal beside the empty caption, Keep stored it |
+| I9 | PASS after a fix — a text-only model (`mistralai/mistral-nemo`): the app passes only "Not Found" on (OpenRouter's "No endpoints found that support image input"); a 404 for a caption request is now explained as "The model likely does not accept pictures…" |
+| I10 | PASS — Geography folder: confirmation "Send 1 picture to openrouter almost free (google/gemma-3-12b-it)", review list, Keep selected stored it. Stop and retries: automated |
+| I11 | PASS — Connection Manager and Image Generation disabled (`/extension-disable`), reload: lore picking button, Send, Write prompt, Write caption and Generate carry the badge and the reason; pressing Generate opened "Not available" with reason, fix and the reload note |
+| I12 | Owner (VS Code browser, phone) — frame detection is automated |
+| I13 | PASS — both re-enabled, reload: no marks |
+| I14 | Automated only (folder record round trip with `wi_prompt`; reconcile compares the record text) |
+
+Fixes from this pass: the image source type now follows a stored file that arrives from
+elsewhere (it stayed "Resource URL" after Keep); captions and prompt drafts never stream
+(`LlmRequest.stream = false`); a 404 for a caption request is classified as "no image
+support". Note for live automation: Playwright refuses to click `aria-disabled` buttons —
+click marked controls from inside the page.

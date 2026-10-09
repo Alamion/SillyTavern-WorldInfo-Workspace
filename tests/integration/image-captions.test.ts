@@ -55,7 +55,7 @@ describe('single caption (US3)', () => {
         const { llm, caption, image } = setup();
         llm.reply("Here's a caption:\n\nA red cliff town.");
         await caption.writeCaption('a');
-        expect(llm.requests[0]).toMatchObject({ profileId: 'p-router', model: 'google/gemma-3-12b-it' });
+        expect(llm.requests[0]).toMatchObject({ profileId: 'p-router', model: 'google/gemma-3-12b-it', stream: false });
         expect(llm.requests[0]?.messages[0]?.images).toEqual(['data:image/jpeg;base64,user/images/WorldInfoWorkspace/a.png']);
         expect(caption.captionView('a')).toEqual({ running: false, proposal: 'A red cliff town.', error: null });
         expect(image('a').caption).toBe('');

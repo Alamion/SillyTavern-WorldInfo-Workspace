@@ -35,5 +35,11 @@ export function classifyCaptionFailure(failure: AssistantFailure): CaptionFailur
     if (failure.kind === 'provider' && VISION_ERROR.test(raw) && /\b(400|404|not support|unsupported|no endpoints)\b/i.test(raw)) {
         return { kind: 'no-vision', message: NO_VISION_MESSAGE };
     }
+    // The app passes only the status text on: OpenRouter's "No endpoints found that
+    // support image input" arrives as "Not Found" (live 2026-10-09). An unknown model
+    // is a 400 there, so a 404 for a request with a picture means no image support.
+    if (failure.kind === 'provider' && /\bnot found\b|\b404\b/i.test(failure.detail ?? '')) {
+        return { kind: 'no-vision', message: NO_VISION_MESSAGE };
+    }
     return { kind: 'other', message: failure.message };
 }

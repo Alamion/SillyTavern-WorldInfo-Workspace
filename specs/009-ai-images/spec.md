@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-09
 
-**Status**: Draft
+**Status**: Implemented (2026-10-09; live pass I0–I14 in quickstart.md; owner review pending)
 
 **Input**: Roadmap Phase 5 (US7, FR-025–FR-027) with the owner's decisions of 2026-10-09,
 plus a cross-cutting rule for functions whose dependency is missing. Owner decisions:

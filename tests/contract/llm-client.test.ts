@@ -390,6 +390,15 @@ describe('llmClient pictures and model override (spec 009 R3)', () => {
         expect(calls[0]?.overridePayload).toEqual({ model: 'google/gemma-3-12b-it' });
     });
 
+    it('stream: false overrides a streaming preset', async () => {
+        const { ctx, calls } = createHost({ presets: { 'openai:Default': { stream_openai: true } } });
+        const client = createLlmClient(() => ctx);
+        await collect((onEvent) =>
+            client.run({ profileId: 'p-cc', messages: [{ role: 'user', content: 'hi' }], maxTokens: 50, signal, stream: false }, onEvent)
+        );
+        expect(calls[0]?.custom?.stream).toBe(false);
+    });
+
     it('keeps plain string content and no override for ordinary requests', async () => {
         const { ctx, calls } = createHost({});
         const client = createLlmClient(() => ctx);

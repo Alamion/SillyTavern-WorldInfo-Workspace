@@ -35,6 +35,11 @@ export interface LlmRequest {
     signal: AbortSignal;
     /** Overrides the profile's model for this request (spec 009 R3); empty = profile's. */
     model?: string;
+    /**
+     * false = never stream, whatever the profile's preset says (spec 009: captions and
+     * prompt drafts are short and shown only when complete).
+     */
+    stream?: false;
 }
 
 export type LlmEvent =
