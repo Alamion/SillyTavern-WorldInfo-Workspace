@@ -24,3 +24,19 @@ export async function inputDialog(message: string, defaultValue: string): Promis
     }
     return result;
 }
+
+/** A plain message with a heading and lines (spec 009: why a function is unavailable). */
+export async function messageDialog(title: string, lines: string[]): Promise<void> {
+    const ctx = getAppContext();
+    const panel = document.createElement('div');
+    panel.className = 'wiw-confirm';
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    panel.appendChild(heading);
+    for (const line of lines) {
+        const text = document.createElement('p');
+        text.textContent = line;
+        panel.appendChild(text);
+    }
+    await ctx.callGenericPopup(panel, ctx.POPUP_TYPE.TEXT);
+}

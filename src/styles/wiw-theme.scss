@@ -513,6 +513,72 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     border-radius: $radius-md;
 }
 
+// Spec 009: prompt, generation candidate and caption proposals in the image editor.
+.wiw-image-ai {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    // Same inset as the field grid above it (prototype.scss .wiw-field-grid).
+    padding: 0 0.55rem 0.5rem;
+
+    .wiw-image-prompt {
+        width: 100%;
+        min-height: 4.5em;
+        resize: vertical;
+    }
+}
+
+.wiw-image-candidate {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+}
+
+// Side by side; each picture keeps at least 220 px, so a narrow editor stacks them.
+.wiw-image-pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+
+    figure {
+        flex: 1 1 220px;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $spacing-xs;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid var(--SmartThemeBorderColor);
+        border-radius: $radius-md;
+    }
+}
+
+.wiw-caption-proposal {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    margin-top: $spacing-sm;
+    padding: $spacing-sm;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: $radius-md;
+
+    textarea {
+        width: 100%;
+        resize: vertical;
+    }
+}
+
+.wiw-field-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+    margin-top: $spacing-xs;
+}
+
 .wiw-svg-editor {
     min-height: 140px;
     resize: vertical;
@@ -1586,6 +1652,21 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
 .wiw-hint {
     font-size: 0.8rem;
     opacity: 0.7;
+}
+
+// Spec 009: a function whose optional dependency is missing keeps its place and
+// shows why (GatedButton in ui/formControls.tsx) — never a faded control alone.
+.wiw-unavailable {
+    position: relative;
+    border-style: dashed;
+    color: var(--SmartThemeEmColor);
+    cursor: help;
+}
+
+.wiw-unavailable-badge {
+    margin-left: $spacing-xs;
+    font-size: 0.75em;
+    color: var(--warning);
 }
 
 .wiw-option {

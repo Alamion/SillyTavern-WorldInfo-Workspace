@@ -83,6 +83,8 @@ function initSurface(services: WorkspaceStateServices): void {
         announceVisibility();
         // Spec 008: pick up work saved by another tab or device before editing here.
         void services.gate.check();
+        // Spec 009: extensions and profiles may have changed while the workspace was away.
+        services.availability.refresh();
         void services.md.link.onWorkspaceOpened({ userActivation: navigator.userActivation?.isActive ?? true });
     });
 }

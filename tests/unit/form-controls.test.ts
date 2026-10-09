@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { NumberField, OptionRow } from '../../src/ui/formControls';
+import { GatedButton, NumberField, OptionRow } from '../../src/ui/formControls';
 
 /**
  * Shared form controls (AGENTS.md "Style system"). The lore picking panel shipped
@@ -106,6 +106,42 @@ describe('OptionRow', () => {
     });
 });
 
+describe('GatedButton (spec 009 FR-017/FR-018)', () => {
+    const unavailable = { ok: false as const, reason: 'Needs X.', fix: 'Enable X.', reload: true };
+
+    const render = (state: Parameters<typeof GatedButton>[0]['state'], onClick: () => void, explain: () => void) => {
+        act(() => {
+            root.render(createElement(GatedButton, { state, onClick, explain, children: 'Generate' }));
+        });
+        return container.querySelector('button')!;
+    };
+
+    it('marks an unavailable function up front and explains instead of running', () => {
+        const onClick = vi.fn();
+        const explain = vi.fn();
+        const button = render(unavailable, onClick, explain);
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        expect(button.classList.contains('wiw-unavailable')).toBe(true);
+        expect(button.querySelector('.wiw-unavailable-badge')).not.toBeNull();
+        expect(button.title).toBe('Needs X. Enable X. Reload the page after enabling an extension.');
+        // Click, tap and keyboard activation all arrive as a click on a button.
+        act(() => button.click());
+        expect(explain).toHaveBeenCalledWith(unavailable);
+        expect(onClick).not.toHaveBeenCalled();
+        expect(button.disabled).toBe(false);
+    });
+
+    it('runs the action when available', () => {
+        const onClick = vi.fn();
+        const explain = vi.fn();
+        const button = render({ ok: true }, onClick, explain);
+        expect(button.classList.contains('wiw-unavailable')).toBe(false);
+        act(() => button.click());
+        expect(onClick).toHaveBeenCalledOnce();
+        expect(explain).not.toHaveBeenCalled();
+    });
+});
+
 describe('style system guards', () => {
     const read = (path: string): string => readFileSync(resolve(__dirname, '../..', path), 'utf8');
 
@@ -125,5 +161,12 @@ describe('style system guards', () => {
         const icons = [...header.matchAll(/fa-solid (fa-[a-z-]+)/g)].map((match) => match[1]);
         expect(icons.length).toBeGreaterThanOrEqual(4);
         expect(new Set(icons).size).toBe(icons.length);
+    });
+
+    it('never marks unavailability by fading a control inline (spec 009)', () => {
+        const files = ['src/ui/MarkdownControl.tsx', 'src/ui/WorkspaceApp.tsx', 'src/ui/ItemEditor.tsx'];
+        for (const file of files) {
+            expect(read(file)).not.toMatch(/opacity:\s*0\.\d+/);
+        }
     });
 });

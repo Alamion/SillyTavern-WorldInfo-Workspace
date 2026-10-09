@@ -95,9 +95,6 @@ export interface MdController {
     readonly confirm: (message: string) => Promise<boolean>;
 }
 
-export const UNSUPPORTED_MESSAGE =
-    'Markdown folders need a desktop Chromium-based browser (Chrome, Edge, Opera…) and a secure page (HTTPS or localhost).';
-
 export function createMdController(deps: MdControllerDeps): MdController {
     let ui: MdUiState = { busy: null, lastReport: null, reportOpen: false, pending: null };
     const listeners = new Set<() => void>();

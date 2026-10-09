@@ -1,3 +1,4 @@
+import type { FolderAccessFact } from '../core/availability';
 import {
     DiskError,
     assertRelPath,
@@ -187,12 +188,51 @@ async function permission(
     }
 }
 
+/**
+ * Set when a picker threw `SecurityError` (spec 009 R6): the API exists but the
+ * page may not use it (e.g. shown in a frame by an embedded browser). Lasts for
+ * the session; listeners re-check availability.
+ */
+let pickerBlocked = false;
+const accessListeners = new Set<() => void>();
+
+export function onFolderAccessChanged(listener: () => void): () => void {
+    accessListeners.add(listener);
+    return () => accessListeners.delete(listener);
+}
+
+function isFramed(): boolean {
+    try {
+        return window.top !== window.self;
+    } catch {
+        // A cross-origin parent denies access to `top`: certainly framed.
+        return true;
+    }
+}
+
+/** Why folder access can or cannot be used here (core/availability.ts). */
+export function folderAccessFact(): FolderAccessFact {
+    if (typeof window === 'undefined' || window.isSecureContext !== true) {
+        return 'insecure';
+    }
+    if (typeof window.showDirectoryPicker !== 'function' || typeof indexedDB === 'undefined') {
+        return 'no-picker';
+    }
+    if (isFramed()) {
+        return 'framed';
+    }
+    return pickerBlocked ? 'blocked' : 'ok';
+}
+
+function noteBlocked(error: unknown): void {
+    if (error instanceof Error && error.name === 'SecurityError' && !pickerBlocked) {
+        pickerBlocked = true;
+        accessListeners.forEach((listener) => listener());
+    }
+}
+
 export const fsaAccess: DiskFolderAccess = {
-    isSupported: () =>
-        typeof window !== 'undefined' &&
-        window.isSecureContext === true &&
-        typeof window.showDirectoryPicker === 'function' &&
-        typeof indexedDB !== 'undefined',
+    isSupported: () => folderAccessFact() === 'ok',
 
     pick: async (mode) => {
         const picker = window.showDirectoryPicker;
@@ -206,6 +246,7 @@ export const fsaAccess: DiskFolderAccess = {
             if (error instanceof DOMException && error.name === 'AbortError') {
                 return null;
             }
+            noteBlocked(error);
             throw toDiskError(error, '');
         }
     },
@@ -239,6 +280,7 @@ export const fsaAccess: DiskFolderAccess = {
             if (error instanceof DOMException && error.name === 'AbortError') {
                 return null;
             }
+            noteBlocked(error);
             throw toDiskError(error, '');
         }
     },
@@ -266,3 +308,8 @@ export const fsaAccess: DiskFolderAccess = {
         return new FsaDiskFolder(link.handle);
     },
 };
+
+/** Test seam: forget a session block (tests/unit/fsa-access.test.ts). */
+export function resetFolderAccessForTests(): void {
+    pickerBlocked = false;
+}

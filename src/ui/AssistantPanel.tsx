@@ -16,6 +16,7 @@ import { Composer } from './assistant/Composer';
 import { ContextMenu, contextSummary } from './assistant/ContextMenu';
 import { SettingsMenu } from './assistant/SettingsMenu';
 import { useAssistant } from './assistant/useAssistant';
+import { useFeature } from './formControls';
 
 /**
  * Assistant region (spec 005 FR-001): conversation switcher, availability
@@ -52,6 +53,7 @@ export function AssistantPanel({
         }
     };
     const blocked = snapshot.availability !== 'ready';
+    const sendState = useFeature(services.availability, 'assistant');
 
     const actions: MessageActions = {
         onRetry: (seq) => void assistant.retry(seq),
@@ -260,6 +262,7 @@ export function AssistantPanel({
                     void assistant.ensureConversation().then(() => setContextOpen(true));
                 }}
                 onPreviewContext={openPreview}
+                sendState={sendState}
             />
 
             {settingsOpen && (

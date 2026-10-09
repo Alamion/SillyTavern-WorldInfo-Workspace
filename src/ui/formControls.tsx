@@ -1,4 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { describeUnavailable, type FeatureId, type FeatureState } from '../core/availability';
+import type { AvailabilityService } from '../adapters/availability';
+import { messageDialog } from '../adapters/popups';
 
 /**
  * Shared form controls for panels and menus (AGENTS.md "Style system"): every
@@ -11,6 +14,9 @@ import { useEffect, useState, type ReactNode } from 'react';
  * - `NumberField`: a number typed as a whole — committed on blur or Enter, never
  *   per keystroke; an unusable value stays with its reason; Escape restores.
  * - `FormSection`: a titled group (small uppercase heading + optional hint).
+ * - `GatedButton` + `useFeature`: a function whose optional dependency is missing
+ *   (spec 009 FR-017/FR-018) keeps its place, shows a warning badge and explains
+ *   what to enable when activated — never a faded control without a reason.
  */
 
 export function OptionRow({
@@ -210,5 +216,69 @@ export function MenuPanel({
                 </div>
             </div>
         </div>
+    );
+}
+
+/** The current availability of one feature; re-renders when it changes. */
+export function useFeature(service: AvailabilityService, id: FeatureId): FeatureState {
+    return useSyncExternalStore(service.subscribe, () => service.feature(id));
+}
+
+/** Explains why a function cannot run (click, tap or keyboard on a gated control). */
+export function explainUnavailable(state: FeatureState): void {
+    if (state.ok) {
+        return;
+    }
+    const lines = [state.reason, state.fix];
+    if (state.reload === true) {
+        lines.push('Reload the page after enabling an extension.');
+    }
+    void messageDialog('Not available', lines);
+}
+
+/**
+ * A button for a function with an optional dependency. While the dependency is
+ * missing the button stays visible with a warning badge; activating it explains
+ * what to enable instead of running the action.
+ */
+export function GatedButton({
+    state,
+    onClick,
+    className = 'wiw-button',
+    title,
+    disabled,
+    children,
+    explain = explainUnavailable,
+}: {
+    state: FeatureState;
+    onClick: () => void;
+    className?: string;
+    title?: string;
+    /** Disabled for a reason of its own (e.g. an empty prompt); ignored while unavailable. */
+    disabled?: boolean;
+    children: ReactNode;
+    explain?: (state: FeatureState) => void;
+}): JSX.Element {
+    if (!state.ok) {
+        return (
+            <button
+                type="button"
+                className={`${className} wiw-unavailable`}
+                aria-disabled="true"
+                title={describeUnavailable(state)}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    explain(state);
+                }}
+            >
+                {children}
+                <i className="fa-solid fa-triangle-exclamation wiw-unavailable-badge" aria-hidden="true" />
+            </button>
+        );
+    }
+    return (
+        <button type="button" className={className} title={title} disabled={disabled} onClick={onClick}>
+            {children}
+        </button>
     );
 }

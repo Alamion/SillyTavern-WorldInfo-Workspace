@@ -33,6 +33,8 @@ export interface LlmRequest {
     messages: LlmMessage[];
     maxTokens: number;
     signal: AbortSignal;
+    /** Overrides the profile's model for this request (spec 009 R3); empty = profile's. */
+    model?: string;
 }
 
 export type LlmEvent =

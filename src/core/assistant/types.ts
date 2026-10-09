@@ -174,6 +174,8 @@ export interface ContextIncluded {
 export interface LlmMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;
+    /** Pictures as data URLs, sent as image content parts (spec 009 R3). */
+    images?: string[];
 }
 
 /** Why an item is (or is not) in a request (spec 007 FR-002). */

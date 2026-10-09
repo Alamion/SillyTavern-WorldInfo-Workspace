@@ -28,6 +28,9 @@ import { createInteropSources } from './interopSources';
 import { createPickingController, type PickingController } from './pickingController';
 import { getLiveAppContext } from './appApi';
 import { fsaAccess } from './fsaDisk';
+import { createAvailability, type AvailabilityService } from './availability';
+import { createImageGeneration, fetchImageBytes, type ImageGeneration } from './imageGeneration';
+import type { SlashCommandObject } from '../global';
 import { createImageStore } from './imageStore';
 import { ownedSrcsReleasedBy } from '../core/md/imageRefs';
 
@@ -49,6 +52,10 @@ export interface WorkspaceStateServices {
     picking: PickingController;
     /** Spec 008: stale-tab protection (save gate, conflict banner state). */
     gate: SaveGate;
+    /** Spec 009: which optional functions can run now, and why not. */
+    availability: AvailabilityService;
+    /** Spec 009: picture generation for image items (Image Generation extension). */
+    imageGeneration: ImageGeneration;
 }
 
 /** Spec 008 clarification: a visible tab nobody touches checks every 2 minutes. */
@@ -231,7 +238,35 @@ export function initWorkspaceState(): WorkspaceStateServices {
     });
     picking.start();
 
-    services = { store, worldInfo, activeBooks, sync, md, assistant, picking, gate };
+    const availability = createAvailability({ context: getLiveAppContext, store });
+    availability.start();
+
+    const imageGeneration = createImageGeneration({
+        store,
+        getImagine: () => {
+            const command: unknown = getLiveAppContext().SlashCommandParser?.commands['imagine'];
+            return typeof command === 'object' && command !== null && typeof (command as SlashCommandObject).callback === 'function'
+                ? (command as SlashCommandObject)
+                : null;
+        },
+        fetchBytes: fetchImageBytes,
+        upload: (input) => imageStore.upload(input),
+        removeTemporary: (url) => imageStore.removeTemporary(url),
+        warn: notifyWarning,
+    });
+
+    services = {
+        store,
+        worldInfo,
+        activeBooks,
+        sync,
+        md,
+        assistant,
+        picking,
+        gate,
+        availability,
+        imageGeneration,
+    };
     return services;
 }
 

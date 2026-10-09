@@ -102,6 +102,8 @@ export interface ImageNode extends NodeBase {
     kind: 'image';
     src: string;
     caption: string;
+    /** Spec 009: prompt of the kept generated picture (optional, additive). */
+    prompt?: string;
     sync: SyncState;
 }
 
@@ -120,6 +122,11 @@ export interface WorkspaceSettings {
      * field by `getPickingSettings` (core/picking/settings.ts).
      */
     picking?: unknown;
+    /**
+     * AI image settings (spec 009, optional and additive); repaired field by field
+     * by `getImageSettings` (core/images/settings.ts).
+     */
+    images?: unknown;
     /**
      * Region sizes (2026-09-22). Optional and additive; repaired field by field by
      * `getLayoutSettings` (core/state/layout.ts).
@@ -720,6 +727,9 @@ function repairMissingSync(node: TreeNode): void {
     }
     if (!isRecord(node.sync)) {
         node.sync = createDefaultSyncState();
+    }
+    if (node.kind === 'image' && node.prompt !== undefined && typeof node.prompt !== 'string') {
+        delete node.prompt;
     }
     if (node.kind === 'entry') {
         const sync = node.sync as unknown as Record<string, unknown>;

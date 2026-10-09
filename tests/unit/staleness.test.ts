@@ -185,9 +185,10 @@ describe('conflictSummary (FR-016)', () => {
         mine.settings.picking = { defaultEnabled: true };
         const theirs = clone(seenState);
         folder(theirs).children = folder(theirs).children.filter((node) => node.id !== 'i1');
+        theirs.settings.images = { captionModel: 'google/gemma-3-12b-it' };
         const summary = conflictSummary(seenState, mine, theirs);
         expect(summary.mine.lines).toEqual(['Harbor — edited', 'New one — added', 'Lore picking settings — changed']);
-        expect(summary.theirs.lines).toEqual(['Map — removed']);
+        expect(summary.theirs.lines).toEqual(['Map — removed', 'Image settings — changed']);
         expect(summary.mine.more).toBe(0);
     });
 

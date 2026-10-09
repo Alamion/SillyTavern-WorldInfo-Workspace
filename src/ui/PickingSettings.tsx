@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { PickingController } from '../adapters/pickingController';
 import type { ProfileInfo } from '../core/assistant/ports';
+import type { FeatureState } from '../core/availability';
 import { PICKING_RANGES, type ChatPickingChoice, type PickingSettings as Settings } from '../core/picking/settings';
 import { FormField, FormSection, MenuPanel, NumberField, OptionRow } from './formControls';
 
@@ -14,7 +15,10 @@ export function PickingSettings({
     profiles,
     assistantProfileName,
     onClose,
+    availability,
 }: {
+    /** Spec 009: why picking cannot run now (shown above the options). */
+    availability: FeatureState;
     picking: PickingController;
     profiles: ProfileInfo[];
     assistantProfileName: string | null;
@@ -49,6 +53,12 @@ export function PickingSettings({
             }${status.prepared ? ' · a pick is prepared for the next reply' : ''}`}
             onClose={onClose}
         >
+            {!availability.ok && (
+                <p className="wiw-banner wiw-banner-warn">
+                    <i className="fa-solid fa-triangle-exclamation" /> {availability.reason} {availability.fix}
+                    {availability.reload === true ? ' Reload the page after enabling an extension.' : ''}
+                </p>
+            )}
             {locked && (
                 <p className="wiw-banner wiw-banner-warn">
                     Settings can be changed after the workspace recovery banner is resolved.

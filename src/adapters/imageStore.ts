@@ -26,7 +26,7 @@ function randomSuffix(): string {
 export function createImageStore(deps: {
     getRequestHeaders: () => Record<string, string>;
     fetchFn?: typeof fetch;
-}): ImageStorePort {
+}): ImageStorePort & { removeTemporary(src: string): Promise<void> } {
     const fetchFn = deps.fetchFn ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
     return {
         accepts: (ext) => ACCEPTED.has(ext.toLowerCase()),
@@ -61,6 +61,23 @@ export function createImageStore(deps: {
                 throw new Error('upload returned no path');
             }
             return normalize(body.path);
+        },
+
+        removeTemporary: async (src) => {
+            // Only a file at the top of user/images/: where Image Generation saves
+            // with gallery=false (spec 009 R2). Gallery folders are never touched.
+            const path = normalize(src.split('?')[0] ?? '');
+            if (!/^user\/images\/[^/]+$/.test(path)) {
+                return;
+            }
+            const response = await fetchFn('/api/images/delete', {
+                method: 'POST',
+                headers: deps.getRequestHeaders(),
+                body: JSON.stringify({ path }),
+            });
+            if (!response.ok && response.status !== 404) {
+                throw new Error(`delete failed (${response.status})`);
+            }
         },
 
         remove: async (src) => {

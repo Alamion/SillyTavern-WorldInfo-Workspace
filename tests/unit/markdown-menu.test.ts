@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { MarkdownControl } from '../../src/ui/MarkdownControl';
 import type { MdController } from '../../src/adapters/mdController';
+import type { AvailabilityService } from '../../src/adapters/availability';
 
 /**
  * The markdown header button toggles its menu. The outside-press handler closes the
@@ -25,6 +26,12 @@ const md = {
     link: { subscribe: noop, getStatus: () => status },
 } as unknown as MdController;
 
+const available = { ok: true as const };
+const availability = {
+    subscribe: noop,
+    feature: () => available,
+} as unknown as AvailabilityService;
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -41,6 +48,7 @@ beforeEach(() => {
                 exportScopeLabel: 'workspace',
                 importTargetId: 'root',
                 importTargetLabel: 'workspace',
+                availability,
             }),
         );
     });

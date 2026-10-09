@@ -60,17 +60,17 @@ implementation task and must fail first.
 
 **Purpose**: app API typings and test support used by every story
 
-- [ ] T001 Extend `src/global.d.ts`:
+- [X] T001 Extend `src/global.d.ts`:
   - `SlashCommandParser.commands: Record<string, { callback(args: Record<string, unknown>, value: string): Promise<unknown> }>`;
   - the `overridePayload` (5th) parameter of `ConnectionManagerRequestServiceApi.sendRequest`;
   - `extensionSettings.sd?: { source?: string }`;
   - `eventTypes` `SETTINGS_UPDATED` / `EXTENSION_SETTINGS_LOADED` if missing.
-- [ ] T002 [P] Add to `tests/support/fakeHost.ts` (or a new `tests/support/fakeImageHost.ts`):
+- [X] T002 [P] (Done inside `tests/integration/image-generation.test.ts`: the fakes are local to that file.) Add to `tests/support/fakeHost.ts` (or a new `tests/support/fakeImageHost.ts`):
   - a fake `imagine` command that records args, returns a configurable URL or `''`, and
     honours an `abort` event on `args._abortController`;
   - a fake image endpoint map (upload/delete/fetch bytes) listing files under
     `user/images/`.
-- [ ] T003 [P] Extend `tests/support/fakeLlm.ts` so a run can inspect `images` on messages
+- [X] T003 [P] (`FakeLlm.requests` already exposes `images` and `model`; no change needed.) Extend `tests/support/fakeLlm.ts` so a run can inspect `images` on messages
   and the model override, and script replies, failures and 429s per call.
 
 ---
@@ -80,33 +80,33 @@ implementation task and must fail first.
 **Purpose**: data, settings, image-capable requests, and the availability core that every
 story uses
 
-- [ ] T004 [P] Unit tests `tests/unit/images-settings.test.ts`: `getImageSettings` defaults,
+- [X] T004 [P] Unit tests `tests/unit/images-settings.test.ts`: `getImageSettings` defaults,
   field-by-field repair (non-string ids, model trim, empty instruction → default,
   `promptContextTokens` clamped to 200–16000), invalid object → defaults (data-model.md).
-- [ ] T005 [P] Unit tests in `tests/unit/state.test.ts` (or new
+- [X] T005 [P] Unit tests in `tests/unit/state.test.ts` (or new
   `tests/unit/image-prompt-schema.test.ts`): `migrate` keeps a string `ImageNode.prompt`,
   drops a non-string one, and leaves an absent prompt absent; `settings.images` survives
   migrate.
-- [ ] T006 Add `ImageNode.prompt?: string` and `WorkspaceSettings.images?: ImageSettings`
+- [X] T006 Add `ImageNode.prompt?: string` and `WorkspaceSettings.images?: ImageSettings`
   with migrate rules in `src/core/state/schema.ts`; create `src/core/images/settings.ts`
   (types, defaults incl. the R4 prompt instruction and the caption instruction text from
   data-model.md, `getImageSettings`). Makes T004/T005 pass.
-- [ ] T007 Add the "Image settings" line to the conflict summary in
+- [X] T007 Add the "Image settings" line to the conflict summary in
   `src/core/state/staleness.ts` (same mechanism as "Assistant settings") + case in
   `tests/unit/staleness.test.ts`.
 - [ ] T008 Keep `settings.images` out of saves while a recovery is pending, exactly like
   `settings.assistant`, in `src/adapters/settingsStore.ts`, and add a settings update
   helper `updateImageSettings(patch)` on services.
-- [ ] T009 [P] Unit test `tests/unit/llm-client-images.test.ts`: a message with
+- [X] T009 [P] Unit test `tests/unit/llm-client-images.test.ts`: a message with
   `images: [dataUrl]` is sent as `[{type:'text',text}, {type:'image_url',image_url:{url}}]`
   for chat-completion profiles; a model override is passed as
   `overridePayload = { model }`; no images → plain string content (unchanged behaviour).
-- [ ] T010 Add `LlmMessage.images?: string[]` in `src/core/assistant/types.ts` and
+- [X] T010 Add `LlmMessage.images?: string[]` in `src/core/assistant/types.ts` and
   `LlmRequest.model?: string` in `src/core/assistant/ports.ts`.
   - Implement both in `src/adapters/llmClient.ts`: content parts, and the 5th
     `sendRequest` argument when `model` is non-empty.
   - Make T009 pass; existing assistant tests stay green.
-- [ ] T011 [P] Unit tests `tests/unit/availability.test.ts`: every row of the data-model
+- [X] T011 [P] Unit tests `tests/unit/availability.test.ts`: every row of the data-model
   facts → states table (reason, fix, `reload`), incl.:
   - Connection Manager disabled vs absent;
   - no profiles; chosen profile missing;
@@ -114,9 +114,9 @@ story uses
   - `stable-diffusion` disabled; `imagine` missing; no `sd.source`;
   - insecure page; no picker; in a frame; picker `SecurityError` this session;
   - prompt profile unset → the assistant's profile is used.
-- [ ] T012 Create `src/core/availability.ts` (`FeatureId`, `AvailabilityFacts`,
+- [X] T012 Create `src/core/availability.ts` (`FeatureId`, `AvailabilityFacts`,
   `computeAvailability(facts)`). Make T011 pass.
-- [ ] T013 Create `src/adapters/availability.ts`.
+- [X] T013 Create `src/adapters/availability.ts`.
   - It collects the facts from `getContext()`:
     - `disabledExtensions`, `ConnectionManagerRequestService`, profiles;
     - assistant, picking and image settings;
@@ -128,13 +128,13 @@ story uses
     profile changes, plus `subscribe`/`get` for React.
   - Wire it as `services.availability` in `src/adapters/settingsStore.ts`, and trigger a
     re-check from `onWorkspaceShown` in `src/index.ts`.
-- [ ] T014 [P] Extend `tests/unit/form-controls.test.ts`:
+- [X] T014 [P] Extend `tests/unit/form-controls.test.ts`:
   - `gated()` on an unavailable state renders `aria-disabled`, the warning badge and the
     reason title;
   - click, Enter and Space open the explanation and do NOT call the action;
   - an available state calls the action.
   - Style guard: no inline `opacity` used for unavailability under `src/ui/**`.
-- [ ] T015 Add `useAvailability(feature)` and `gated(state, onRun)` (plus a
+- [X] T015 Add `useAvailability(feature)` and `gated(state, onRun)` (plus a
   `<GatedButton>` convenience) to `src/ui/formControls.tsx`.
   - The explanation popup goes through `adapters/popups.ts`.
   - Add `.wiw-unavailable` and the badge styles to `src/styles/wiw-theme.scss`.
@@ -155,14 +155,14 @@ picture in our storage with the prompt remembered; Discard leaves nothing behind
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] Unit tests `tests/unit/images-sanitize.test.ts`.
+- [X] T016 [P] [US1] Unit tests `tests/unit/images-sanitize.test.ts`.
   - A prompt equal to a trigger word (any case, surrounding spaces) gets a trailing
     period; other prompts are unchanged except trimming.
   - Empty → rejected.
   - Trigger list mirrored from the extension: `you, me, scene, last, raw_last, background,
     face, portrait, character, …`; copy the exact list from
     `context/SillyTavern/public/scripts/extensions/stable-diffusion/index.js` `triggerWords`.
-- [ ] T017 [P] [US1] Integration tests `tests/integration/image-generation.test.ts` with the
+- [X] T017 [P] [US1] Integration tests `tests/integration/image-generation.test.ts` with the
   fake `imagine` command and fake image endpoint:
   - args are `quiet:'true', gallery:'false', extend:'false', multimodal:'false'`;
   - a candidate keeps the temp URL;
@@ -178,9 +178,9 @@ picture in our storage with the prompt remembered; Discard leaves nothing behind
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Create `src/core/images/sanitize.ts` (trigger words +
+- [X] T018 [US1] Create `src/core/images/sanitize.ts` (trigger words +
   `sanitizeGenerationPrompt`). Make T016 pass.
-- [ ] T019 [US1] Create `src/adapters/imageGeneration.ts`
+- [X] T019 [US1] Create `src/adapters/imageGeneration.ts`
   (`createImageGeneration(deps: { getImagine, imageStore, fetchBytes, deleteImage, store,
   applyImageChange })`).
   - State per image id: run, candidate, error.
@@ -190,9 +190,9 @@ picture in our storage with the prompt remembered; Discard leaves nothing behind
   - Keep goes through the same commit path as manual image edits
     (`workspaceActions`/store), so tree-changed and stale-tab protection apply.
   - Make T017 pass.
-- [ ] T020 [US1] Wire `services.imageGeneration` in `src/adapters/settingsStore.ts`, and
+- [X] T020 [US1] (Deleted items are detected through a store subscription inside the adapter — covers folders above the image and loads from other tabs — instead of a call from `deleteNodes`.) Wire `services.imageGeneration` in `src/adapters/settingsStore.ts`, and
   call `onNodesDeleted` from the single delete path in `src/adapters/workspaceActions.ts`.
-- [ ] T021 [US1] Create `src/ui/images/ImageAiSection.tsx`, part 1:
+- [X] T021 [US1] Create `src/ui/images/ImageAiSection.tsx`, part 1:
   - prompt textarea (draft state; shows `image.prompt` when set; editing commits `prompt`
     on blur via `useDraftField`);
   - Generate button gated `image-generate`, disabled when empty;
@@ -203,7 +203,7 @@ picture in our storage with the prompt remembered; Discard leaves nothing behind
   
   Mount it in the image view of `src/ui/ItemEditor.tsx` per contracts/ui-contract.md
   order; styles in `src/styles/wiw-theme.scss`.
-- [ ] T022 [US1] Add `prompt` to the image commit patch type (`onCommitImage` in
+- [X] T022 [US1] Add `prompt` to the image commit patch type (`onCommitImage` in
   `src/ui/ItemEditor.tsx` and its handler in `src/ui/WorkspaceApp.tsx`).
 
 **Checkpoint**: US1 works end to end with a configured Image Generation (MVP).
@@ -219,7 +219,7 @@ click/tap/hover; the markdown control detects frames.
 
 ### Tests for User Story 5
 
-- [ ] T023 [P] [US5] Unit test in `tests/unit/markdown-menu.test.ts` (or a new
+- [X] T023 [P] [US5] Unit test in `tests/unit/markdown-menu.test.ts` (or a new
   `fsa-access.test.ts`):
   - `fsaAccess.isSupported()` is false inside a frame;
   - a `SecurityError` from the picker marks folder access unavailable for the session and
@@ -227,20 +227,20 @@ click/tap/hover; the markdown control detects frames.
 
 ### Implementation for User Story 5
 
-- [ ] T024 [US5] `src/adapters/fsaDisk.ts`: frame detection in `isSupported`; `pick`
+- [X] T024 [US5] `src/adapters/fsaDisk.ts`: frame detection in `isSupported`; `pick`
   records a `SecurityError` in a session flag read by the availability adapter. Make T023
   pass.
-- [ ] T025 [US5] `src/ui/MarkdownControl.tsx`: replace the opacity look and the custom
+- [X] T025 [US5] `src/ui/MarkdownControl.tsx`: replace the opacity look and the custom
   popup with `gated(useAvailability('md-folders'), …)`; keep `UNSUPPORTED_MESSAGE` as the
   fix text source in `src/adapters/mdController.ts`.
-- [ ] T026 [P] [US5] Assistant: gate Send and "answer last" in
+- [X] T026 [P] [US5] Assistant: gate Send and "answer last" in
   `src/ui/assistant/Composer.tsx` and show the reason in the empty state of
   `src/ui/AssistantPanel.tsx` (feature `assistant`). The existing failure card for
   `connection-manager-disabled` stays as a fallback.
-- [ ] T027 [P] [US5] Lore picking: gate the header picking button (`src/ui/WorkspaceApp.tsx`)
+- [X] T027 [P] [US5] Lore picking: gate the header picking button (`src/ui/WorkspaceApp.tsx`)
   and the enable options in `src/ui/PickingSettings.tsx` (feature `picking`). The settings
   panel still opens, so a profile can be chosen.
-- [ ] T028 [P] [US5] Interop: move the Memory Books "Create memory" button
+- [X] T028 [P] [US5] (Resolved without change: the Memory Books, DES and DeepLore controls only appear while the extension is present, so none can fail silently; they were dropped from `FeatureId`.) Interop: move the Memory Books "Create memory" button
   (`src/ui/WorkspaceApp.tsx` folder extras) and the DES/DeepLore options in
   `src/ui/assistant/ContextMenu.tsx` onto `gated` with their existing probe reasons.
 

@@ -26,6 +26,7 @@ import {
     buildNodeIndex,
     findNode,
     type FolderNode,
+    type ImageNode,
     type LayoutSettings,
     type TreeNode,
     type WorkspaceState,
@@ -50,7 +51,9 @@ import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { PickingSettings } from './PickingSettings';
 import { StaleBanner } from './StaleBanner';
-import { FormSection, OptionRow } from './formControls';
+import { ImageGenerationSection, type ImageAiServices } from './images/ImageAiSection';
+import { FormSection, OptionRow, useFeature } from './formControls';
+import { describeUnavailable } from '../core/availability';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
 import { LayoutContext, type LayoutContextValue } from './layoutContext';
@@ -564,7 +567,14 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
         applyOperation((current) => commitEntryFieldOp(current, entryId, name as string, value));
     };
 
-    const commitImage = (imageId: string, patch: { src?: string; caption?: string }): void => {
+    const pickingState = useFeature(services.availability, 'picking');
+    const imageAi: ImageAiServices = {
+        availability: services.availability,
+        generation: services.imageGeneration,
+        commitPrompt: (imageId, prompt) => commitImage(imageId, { prompt }),
+    };
+
+    const commitImage = (imageId: string, patch: { src?: string; caption?: string; prompt?: string }): void => {
         applyOperation((current) => commitImageOp(current, imageId, patch));
     };
 
@@ -646,6 +656,10 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                 throw error;
             }
         },
+        imageExtras: {
+            generation: (image: ImageNode) => <ImageGenerationSection image={image} services={imageAi} />,
+            caption: () => null,
+        },
         folderExtras: (folder: FolderNode) => (
             <>
                 <RootBookSettings
@@ -701,6 +715,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     <div className="wiw-header-spacer" />
                     <MarkdownControl
                         md={services.md}
+                        availability={services.availability}
                         exportScopeId={selected?.kind === 'folder' ? selected.id : state.root.id}
                         exportScopeLabel={selected?.kind === 'folder' ? `"${selected.name}"` : 'workspace'}
                         importTargetId={importTarget().id}
@@ -716,11 +731,20 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                     </button>
                     <button
                         type="button"
-                        className={`wiw-button wiw-icon-button${services.picking.status().enabled ? ' wiw-button-active' : ''}`}
-                        title="Lore picking: let a model choose the entries for main-chat replies"
+                        className={`wiw-button wiw-icon-button${services.picking.status().enabled ? ' wiw-button-active' : ''}${
+                            pickingState.ok ? '' : ' wiw-unavailable'
+                        }`}
+                        title={
+                            pickingState.ok
+                                ? 'Lore picking: let a model choose the entries for main-chat replies'
+                                : `Lore picking — ${describeUnavailable(pickingState)}`
+                        }
                         onClick={() => setPickingOpen(true)}
                     >
                         <i className="fa-solid fa-book-open-reader" />
+                        {!pickingState.ok && (
+                            <i className="fa-solid fa-triangle-exclamation wiw-unavailable-badge" aria-hidden="true" />
+                        )}
                     </button>
                     <button
                         type="button"
@@ -894,6 +918,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                 )}
                 {pickingOpen && (
                     <PickingSettings
+                        availability={pickingState}
                         picking={services.picking}
                         profiles={services.assistant.getSnapshot().profiles}
                         assistantProfileName={services.assistant.getSnapshot().profile?.name ?? null}

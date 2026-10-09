@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { MdController } from '../adapters/mdController';
-import { UNSUPPORTED_MESSAGE } from '../adapters/mdController';
-import { getAppContext } from '../adapters/appApi';
+import type { AvailabilityService } from '../adapters/availability';
+import { describeUnavailable } from '../core/availability';
+import { explainUnavailable, useFeature } from './formControls';
 import { ConflictDialog } from './ConflictDialog';
 import { MappingReference } from './MappingReference';
 import { OperationReport } from './OperationReport';
@@ -31,6 +32,8 @@ export interface MarkdownControlProps {
     /** Folder "Import folder…" adds the imported subtree to. */
     importTargetId: string;
     importTargetLabel: string;
+    /** Spec 009: folder access availability (shared marking rule). */
+    availability: AvailabilityService;
 }
 
 function relativeTime(iso: string | null): string {
@@ -55,6 +58,7 @@ export function MarkdownControl({
     exportScopeLabel,
     importTargetId,
     importTargetLabel,
+    availability,
 }: MarkdownControlProps): JSX.Element {
     const ui = useSyncExternalStore(md.subscribe, md.getUi);
     const link = useSyncExternalStore(md.link.subscribe, md.link.getStatus);
@@ -62,7 +66,9 @@ export function MarkdownControl({
     const [referenceOpen, setReferenceOpen] = useState(false);
     const [, setTick] = useState(0);
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const supported = md.isSupported();
+    // Spec 009: the shared availability rule (frames and refused pickers included).
+    const access = useFeature(availability, 'md-folders');
+    const supported = access.ok;
     const busy = ui.busy ?? link.busy;
     // The header has a backdrop-filter, which makes it the containing block of any
     // absolute/fixed descendant: overlays and the dropdown must render outside it.
@@ -98,10 +104,6 @@ export function MarkdownControl({
         setMenuAt(rect ? { x: Math.max(8, rect.right - 250), y: rect.bottom + 4 } : { x: 8, y: 48 });
     };
 
-    const explainUnsupported = (): void => {
-        const ctx = getAppContext();
-        void ctx.callGenericPopup(UNSUPPORTED_MESSAGE, ctx.POPUP_TYPE.TEXT);
-    };
 
     const confirmUnlink = async (): Promise<void> => {
         const ok = await md.confirm(
@@ -270,14 +272,13 @@ export function MarkdownControl({
             <button
                 ref={buttonRef}
                 type="button"
-                className="wiw-button wiw-icon-button"
-                title={supported ? 'Markdown folders: link, export, import' : UNSUPPORTED_MESSAGE}
-                aria-disabled={!supported}
-                style={supported ? undefined : { opacity: 0.55 }}
+                className={`wiw-button wiw-icon-button${supported ? '' : ' wiw-unavailable'}`}
+                title={supported ? 'Markdown folders: link, export, import' : describeUnavailable(access)}
+                aria-disabled={supported ? undefined : 'true'}
                 onClick={(event) => {
                     event.stopPropagation();
                     if (!supported) {
-                        explainUnsupported();
+                        explainUnavailable(access);
                         return;
                     }
                     if (menuAt) {
@@ -288,6 +289,7 @@ export function MarkdownControl({
                 }}
             >
                 <i className="fa-solid fa-folder-tree" />
+                {!supported && <i className="fa-solid fa-triangle-exclamation wiw-unavailable-badge" aria-hidden="true" />}
             </button>
             {menuAt &&
                 outside(

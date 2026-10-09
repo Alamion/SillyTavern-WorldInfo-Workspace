@@ -1,8 +1,10 @@
 import type { LlmAvailability, LlmEvent, LlmPort, LlmRequest, ProfileApi, ProfileInfo } from '../core/assistant/ports';
 import { classifyError, describeFailure } from '../core/assistant/failures';
+import type { LlmMessage } from '../core/assistant/types';
 import type {
     ConnectionProfile,
     ExtractedLlmData,
+    LlmRequestMessage,
     LlmStreamFactory,
     SillyTavernContext,
 } from '../global';
@@ -44,6 +46,20 @@ function apiOf(profile: ConnectionProfile): ProfileApi {
 function readBoolean(source: Record<string, unknown> | undefined, key: string): boolean | undefined {
     const value = source?.[key];
     return typeof value === 'boolean' ? value : undefined;
+}
+
+/** Pictures become OpenAI-style content parts; plain messages stay strings (R3). */
+function toRequestMessage(message: LlmMessage): LlmRequestMessage {
+    if (!message.images || message.images.length === 0) {
+        return { role: message.role, content: message.content };
+    }
+    return {
+        role: message.role,
+        content: [
+            { type: 'text', text: message.content },
+            ...message.images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+        ],
+    };
 }
 
 export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
@@ -162,9 +178,10 @@ export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
             onEvent({ type: 'started', streaming });
             armTimeout(streaming ? STREAM_IDLE_TIMEOUT_MS : BLOCKING_TIMEOUT_MS);
             try {
+                const model = request.model?.trim() ?? '';
                 const result = await service.sendRequest(
                     request.profileId,
-                    request.messages,
+                    request.messages.map(toRequestMessage),
                     request.maxTokens,
                     {
                         stream: streaming,
@@ -172,7 +189,8 @@ export function createLlmClient(getContext: () => SillyTavernContext): LlmPort {
                         extractData: true,
                         includePreset: true,
                         includeInstruct: true,
-                    }
+                    },
+                    ...(model === '' ? [] : [{ model }])
                 );
                 if (!isStreamFactory(result)) {
                     const text = typeof result.content === 'string' ? result.content : String(result.content ?? '');

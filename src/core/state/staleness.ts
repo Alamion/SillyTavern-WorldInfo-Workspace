@@ -160,6 +160,7 @@ function sideOf(seen: WorkspaceState, side: WorkspaceState, limit: number): Conf
     };
     settingsChanged((state) => state.settings.assistant, 'Assistant settings');
     settingsChanged((state) => state.settings.picking, 'Lore picking settings');
+    settingsChanged((state) => state.settings.images, 'Image settings');
     return { lines: lines.slice(0, limit), more: Math.max(0, lines.length - limit) };
 }
 

@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { sendsOnEnter } from '../../adapters/appApi';
 import { createComposerDraft } from '../../adapters/composerDraft';
 import type { AssistantMode } from '../../core/assistant/types';
+import type { FeatureState } from '../../core/availability';
+import { GatedButton } from '../formControls';
 
 const draft = createComposerDraft();
 
@@ -35,7 +37,10 @@ export function Composer({
     onModeChange,
     onOpenContext,
     onPreviewContext,
+    sendState,
 }: {
+    /** Spec 009: whether the assistant can run (Connection Manager, profile). */
+    sendState: FeatureState;
     mode: AssistantMode;
     busy: boolean;
     disabled: boolean;
@@ -132,9 +137,8 @@ export function Composer({
                         <i className="fa-solid fa-stop" /> Stop
                     </button>
                 ) : (
-                    <button
-                        type="button"
-                        className="wiw-button"
+                    <GatedButton
+                        state={sendState}
                         disabled={disabled}
                         title={
                             text.trim() === '' && canSendEmpty
@@ -144,7 +148,7 @@ export function Composer({
                         onClick={send}
                     >
                         <i className="fa-solid fa-paper-plane" /> Send
-                    </button>
+                    </GatedButton>
                 )}
             </div>
         </div>

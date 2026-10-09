@@ -68,6 +68,15 @@ export interface SlashCommandParserApi {
     commands: Record<string, unknown>;
 }
 
+/**
+ * A registered slash command object (`SlashCommandParser.commands[name]`). Spec 009
+ * calls the Image Generation extension's `imagine` callback directly, so the user's
+ * prompt is never parsed as script (research R1). Narrowed at the call site.
+ */
+export interface SlashCommandObject {
+    callback(args: Record<string, unknown>, value: string): Promise<unknown>;
+}
+
 export interface NativeWorldInfoEntry {
     uid: number;
     key: string[];
@@ -195,9 +204,14 @@ export interface ConnectionProfile {
     exclude?: string[];
 }
 
+/** OpenAI-style content part (spec 009 R3: a picture sent to a vision model). */
+export type LlmContentPart =
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } };
+
 export interface LlmRequestMessage {
     role: 'system' | 'user' | 'assistant';
-    content: string;
+    content: string | LlmContentPart[];
 }
 
 export interface ConnectionManagerCustomParams {

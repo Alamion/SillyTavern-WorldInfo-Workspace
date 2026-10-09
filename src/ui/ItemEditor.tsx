@@ -14,7 +14,7 @@ export interface ItemEditorProps {
     resolveImage?: ImageResolver;
     substitute: (text: string) => string;
     onCommitEntryField: (entryId: string, name: keyof NativeWorldInfoEntry, value: unknown) => void;
-    onCommitImage: (imageId: string, patch: { src?: string; caption?: string }) => void;
+    onCommitImage: (imageId: string, patch: { src?: string; caption?: string; prompt?: string }) => void;
     /** Uniform name commit for EVERY node kind (entity keeps comment synced). */
     onCommitName: (nodeId: string, name: string) => void;
     onDuplicate: (id: string) => void;
@@ -26,6 +26,11 @@ export interface ItemEditorProps {
      */
     uploadImage?: (file: File) => Promise<string | null>;
     folderExtras?: (folder: Extract<TreeNode, { kind: 'folder' }>) => ReactNode;
+    /** Spec 009: AI blocks of the image editor (generation; caption tools beside the caption). */
+    imageExtras?: {
+        generation: (image: ImageNode) => ReactNode;
+        caption: (image: ImageNode) => ReactNode;
+    };
 }
 
 export function ItemEditor({
@@ -42,6 +47,7 @@ export function ItemEditor({
     onToggleWiRoot,
     uploadImage,
     folderExtras,
+    imageExtras,
 }: ItemEditorProps): JSX.Element {
     if (!node) {
         return <div className="wiw-editor-empty">Select an item in the tree to inspect it.</div>;
@@ -84,6 +90,7 @@ export function ItemEditor({
                 uploadImage={uploadImage}
                 onDuplicate={() => onDuplicate(node.id)}
                 onDelete={() => onDelete(node.id)}
+                extras={imageExtras}
             />
         );
     }
@@ -136,6 +143,7 @@ function ImageEditor({
     uploadImage,
     onDuplicate,
     onDelete,
+    extras,
 }: {
     image: ImageNode;
     banner?: ReactNode;
@@ -144,6 +152,7 @@ function ImageEditor({
     uploadImage?: ItemEditorProps['uploadImage'];
     onDuplicate(): void;
     onDelete(): void;
+    extras?: ItemEditorProps['imageExtras'];
 }): JSX.Element {
     const [mode, setMode] = useState<ImageSourceMode>(() => detectImageMode(image.src));
     const [svgDraft, setSvgDraft] = useState<string>(() =>
@@ -153,9 +162,13 @@ function ImageEditor({
     // Keep the textarea in sync when the source changes from elsewhere (demo
     // seed, import, undo).
     useEffect(() => {
-        if (detectImageMode(image.src) === 'svg') {
+        const detected = detectImageMode(image.src);
+        if (detected === 'svg') {
             setMode('svg');
             setSvgDraft(dataUriToSvg(image.src));
+        } else if (detected === 'file') {
+            // A stored file arriving from elsewhere (a kept generated picture, spec 009).
+            setMode('file');
         }
     }, [image.src]);
 
@@ -281,8 +294,10 @@ function ImageEditor({
                         value={image.caption}
                         onChange={(event) => onCommitImage(image.id, { caption: event.target.value })}
                     />
+                    {extras?.caption(image)}
                 </div>
             </div>
+            {extras?.generation(image)}
         </div>
     );
 }

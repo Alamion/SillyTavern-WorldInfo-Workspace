@@ -363,7 +363,7 @@ export function commitEntrySummary(state: WorkspaceState, entryId: string, summa
 export function commitImage(
     state: WorkspaceState,
     imageId: string,
-    patch: { src?: string; caption?: string }
+    patch: { src?: string; caption?: string; prompt?: string }
 ): WorkspaceState {
     const copied = withNodeCopied(state, imageId);
     if (!copied || copied.node.kind !== 'image') {
@@ -375,6 +375,14 @@ export function commitImage(
     }
     if (patch.caption !== undefined) {
         node.caption = patch.caption;
+    }
+    if (patch.prompt !== undefined) {
+        // Spec 009: an empty prompt is absent, so untouched items stay unchanged.
+        if (patch.prompt === '') {
+            delete node.prompt;
+        } else {
+            node.prompt = patch.prompt;
+        }
     }
     node.updatedAt = new Date().toISOString();
     return copied.state;

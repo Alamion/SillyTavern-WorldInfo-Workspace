@@ -339,3 +339,67 @@ describe('llmClient run', () => {
         expect(events.at(-1)).toMatchObject({ failure: { kind: 'timeout' } });
     });
 });
+
+describe('llmClient pictures and model override (spec 009 R3)', () => {
+    const signal = new AbortController().signal;
+
+    it('sends a message with images as text + image_url content parts', async () => {
+        const { ctx, calls } = createHost({});
+        const client = createLlmClient(() => ctx);
+        await collect((onEvent) =>
+            client.run(
+                {
+                    profileId: 'p-cc',
+                    messages: [
+                        { role: 'system', content: 'rules' },
+                        { role: 'user', content: 'Describe it.', images: ['data:image/jpeg;base64,AAAA'] },
+                    ],
+                    maxTokens: 200,
+                    signal,
+                },
+                onEvent
+            )
+        );
+        expect(calls[0]?.prompt).toEqual([
+            { role: 'system', content: 'rules' },
+            {
+                role: 'user',
+                content: [
+                    { type: 'text', text: 'Describe it.' },
+                    { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+                ],
+            },
+        ]);
+    });
+
+    it('passes a model override as the override payload', async () => {
+        const { ctx, calls } = createHost({});
+        const client = createLlmClient(() => ctx);
+        await collect((onEvent) =>
+            client.run(
+                {
+                    profileId: 'p-cc',
+                    messages: [{ role: 'user', content: 'hi' }],
+                    maxTokens: 50,
+                    signal,
+                    model: ' google/gemma-3-12b-it ',
+                },
+                onEvent
+            )
+        );
+        expect(calls[0]?.overridePayload).toEqual({ model: 'google/gemma-3-12b-it' });
+    });
+
+    it('keeps plain string content and no override for ordinary requests', async () => {
+        const { ctx, calls } = createHost({});
+        const client = createLlmClient(() => ctx);
+        await collect((onEvent) =>
+            client.run(
+                { profileId: 'p-cc', messages: [{ role: 'user', content: 'hi', images: [] }], maxTokens: 50, signal, model: '' },
+                onEvent
+            )
+        );
+        expect(calls[0]?.prompt).toEqual([{ role: 'user', content: 'hi' }]);
+        expect(calls[0]?.overridePayload).toBeUndefined();
+    });
+});
