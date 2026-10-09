@@ -119,6 +119,18 @@ describe('tolerance', () => {
         expect(parsed.blocks[0]?.tags.fields).toEqual({ position: 4, depth: 2 });
     });
 
+    it('never writes a summary through <fields> (it would replace the whole extensions object)', () => {
+        const parsed = parseReply(
+            '<op type="edit_entry" id="e1">\n<fields>order=50, summary=When it rains</fields>\n</op>',
+            { final: true }
+        );
+        expect(parsed.blocks).toEqual([]);
+        expect(parsed.unparsed[0]).toMatchObject({
+            kind: 'malformed-block',
+            reason: 'use the <summary> tag for the summary, not <fields>',
+        });
+    });
+
     it('tolerates sloppy attribute quoting', () => {
         const parsed = parseReply(fixture('broken-quotes.txt'), { final: true });
         expect(parsed.blocks).toHaveLength(2);

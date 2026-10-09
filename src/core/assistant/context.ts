@@ -70,8 +70,9 @@ export interface BuiltRequest {
     snapshot: ContextSnapshot;
 }
 
+// The summary has its own line (and lives inside `extensions`): never a field.
 const SCALAR_SPECS = FIELD_SPECS.filter(
-    (spec) => spec.type !== 'object' && spec.type !== 'filter'
+    (spec) => spec.type !== 'object' && spec.type !== 'filter' && spec.type !== 'summary'
 );
 const DEFAULT_ENTRY = createDefaultNativeEntry(0);
 

@@ -62,7 +62,8 @@ const EXCERPT_LIMIT = 200;
 /** Scalar field rows of the markdown convention, keyed without the `wi_` prefix. */
 const SCALAR_FIELDS = new Map(
     FIELD_SPECS.filter(
-        (spec) => spec.type !== 'list' && spec.type !== 'object' && spec.type !== 'filter'
+        (spec) =>
+            spec.type !== 'list' && spec.type !== 'object' && spec.type !== 'filter' && spec.type !== 'summary'
     ).map((spec) => [spec.key.slice(OWNED_PREFIX.length), spec])
 );
 
@@ -133,6 +134,10 @@ function parseFieldValue(
     name: string,
     raw: string
 ): { field: keyof NativeWorldInfoEntry; value: unknown } | { error: string } {
+    if (name === 'summary') {
+        // Its spec targets the whole `extensions` object: a plain value would replace it.
+        return { error: 'use the <summary> tag for the summary, not <fields>' };
+    }
     const spec = SCALAR_FIELDS.get(name);
     if (!spec) {
         return { error: `unknown field "${name}"` };

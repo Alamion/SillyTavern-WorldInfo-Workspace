@@ -525,7 +525,11 @@ describe('catalog mode (spec 007 FR-008/FR-009)', () => {
         const state = aldermeerState();
         const cities = (state.root.children[0] as FolderNode).children[0] as FolderNode;
         (cities.children[1] as EntryNode).native.extensions = { wiw_summary: 'When drinking.' };
-        expect(catalogText(build({ state, selection: [NODE_IDS.taverns] }))).toContain('summary: When drinking.');
+        const sent = catalogText(build({ state, selection: [NODE_IDS.taverns] }));
+        expect(sent).toContain('summary: When drinking.');
+        // Live 2026-10-09: the summary leaked into the fields line as "summary=[object Object]".
+        expect(sent).not.toContain('[object Object]');
+        expect(sent).not.toMatch(/fields: [^\n]*summary=/);
     });
 });
 
