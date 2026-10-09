@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-06
 
-**Status**: Draft
+**Status**: Implemented (owner-validated 2026-10-09; live passes in quickstart.md; rates C19/C40 measured in real use)
 
 **Input**: Owner request, distilled from a tester conversation: "You know how you have
 extensions like DeepLore that let the AI choose which entry can be sent to context

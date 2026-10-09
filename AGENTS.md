@@ -21,12 +21,12 @@ flattened pushes with divergence guards in both directions, orphan retention/res
 resolution, and the Lorebooks panel (all native books: activation, import next to the
 tree selection / update from native, delete — search, filters, pagination). Design contracts:
 `specs/003-core-workspace-mvp/` (research/data-model/contracts/quickstart/tasks).
-**Previous increment (spec 004, implemented and owner-validated 2026-09-15)**: roadmap Phase 3 — Markdown Folder Sync (roadmap order
+**Earlier increment (spec 004, implemented and owner-validated 2026-09-15)**: roadmap Phase 3 — Markdown Folder Sync (roadmap order
 amended 2026-09-14: Phase 3 before Phase 2). One-off export of any subtree and import of
 any markdown folder (Obsidian vaults included), plus ONE whole-workspace folder link with
 hybrid sync. Design: `specs/004-markdown-folder-sync/` (convention contract, disk port,
 UI contract, quickstart S0–S14).
-**Current increment (spec 007, implemented 2026-10-07; live validation in
+**Previous increment (spec 007, closed by the owner 2026-10-09; live validation in
 `specs/007-context-retrieval/quickstart.md`)**: roadmap Phase 6 — Context & Retrieval.
 Context preview with per-item reasons and costs; entry summaries
 (`extensions.wiw_summary`, markdown `wi_summary`); assistant protocol v2 (catalog section,
@@ -36,7 +36,7 @@ field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (mat
 opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
 interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
 contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
-**Current increment (spec 008, implemented 2026-10-09)**: stale-tab protection (maintenance
+**Current increment (spec 008, implemented and owner-approved 2026-10-09)**: stale-tab protection (maintenance
 backlog B1, option 1). A `_save` marker `{ rev, writer, at, hash }` in the namespace; a
 save gate in `settingsStore.ts` checks the saved copy (`/api/settings/get`) on
 visibility/focus/workspace shown, before saves and native pushes, and every 2 minutes
@@ -144,6 +144,8 @@ src/
 │   │                    #   (saved region sizes, repaired field by field),
 │   │                    #   sharing.ts (path-copy: a mutation copies only the
 │   │                    #   root→node spine), nodeIndex.ts (opt-in identity cache)
+│   │                    #   staleness.ts (spec 008: content hash without bookkeeping,
+│   │                    #   save-marker trust, saved-vs-seen classification, conflict summary)
 │   ├── tree/            # operations.ts, browse.ts, validation.ts, imageLinks.ts (image
 │   │                    #   references in content: img:<id>, names, paths, ![[…]], URLs)
 │   ├── sync/            # flatten.ts, fingerprint.ts, divergence.ts, import.ts,
@@ -185,6 +187,9 @@ src/
 │   ├── appApi.ts            # getAppContext() (memoized API) + getLiveAppContext()
 │   │                        #   (fresh context for data snapshots: characters, tags, characterId)
 │   ├── settingsStore.ts     # extensionSettings bridge + services bootstrap
+│   ├── saveGate.ts          # Spec 008: the only publisher of the workspace into settings —
+│   │                        #   guarded save, silent load, restore, conflict state, push gate
+│   ├── savedSettings.ts     # Reads the saved namespace (/api/settings/get)
 │   ├── worldInfoAdapter.ts  # Book load/save/create/delete/rename composition
 │   ├── activeBooksAdapter.ts# Native #world_info select read + drive by option TEXT (FR-017)
 │   ├── bookStates.ts        # Book facts: global activation, character/chat binding, bound folder
@@ -218,6 +223,7 @@ src/
 │   └── logger.ts            # Namespaced console debug + toastr
 ├── ui/                  # React components
 │   ├── WorkspaceApp.tsx     # Layout root: tree and assistant splitters, bulk bar, banners, modals
+│   ├── StaleBanner.tsx      # Spec 008 conflict banner (both sides' changes, two choices)
 │   ├── StructureTree.tsx    # Real tree: toolbar, DnD + long-press menu, multi-select
 │   ├── ItemEditor.tsx       # entry / image / folder(+root book settings) views
 │   ├── LorebooksPanel.tsx   # All native books: activation, import/update (+ conflict

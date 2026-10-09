@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-22
 
-**Status**: Draft
+**Status**: Implemented (2026-09-25; owner-run items H12/H24 tracked in quickstart.md)
 
 **Input**: User description: "Начнём и полностью имплементируем следующую по roadmap
 фазу" — i.e., deliver the next phase of `specs/001-workspace-plugin-roadmap/spec.md`.

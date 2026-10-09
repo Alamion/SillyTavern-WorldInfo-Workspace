@@ -112,7 +112,7 @@ Account restored from backup afterwards. This was a fast pass, not the full H0�
 | H16 | PASS — `designated`, `undesignated`, `imported`, `book-deleted` each fired once. `book-renamed` not exercised |
 | H14, H15 | ACCEPTED by the owner on the evidence above |
 | H8, H9, H10 | NOT RUN (H8 needs the folder picker, H10 a double-size dataset; H9 is covered by the integration suite) |
-| H12 | BLOCKED — the main API reports `no_connection` for the openrouter profile on the dev account (the profile switch worked, the Connect button did nothing); needs the owner to connect it |
+| H12 | PARTLY COVERED 2026-10-09 — entries of a workspace-managed WI root (Realm of Aldermeer) were activated in real main-chat generation and appear in the prompt in the server log (spec 007 live pass 2, C33). The full 100-card space in real chat stays with the owner's day-to-day use |
 | H21 | PASS — owner: an outside tester followed the README; the problems they found were fixed in earlier sessions |
 | H24 | WAITING for a real candidate — the report template is now the GitHub issue form (`.github/ISSUE_TEMPLATE/report.yml`, blank issues disabled), so the first real report goes through it |
 | H25 | see the triage sample below |
@@ -136,3 +136,7 @@ Harness note: a leftover `data-shot` attribute made a scripted click toggle a ro
 | 11 | Raise the native push debounce from 1000 ms to 1500 ms | **spec** (native sync semantics) | AGENTS.md states 1000 ms as the contract |
 
 Result: 11/11 routed by the written rule alone; 5 maintenance, 6 spec. Owner confirmation of the routing: pending.
+
+Applied in practice (2026-10-09): backlog item B1 (a stale tab overwrites the workspace)
+touched the persistence contract, was routed to a spec by the rule, and the owner
+agreed — delivered as spec 008.

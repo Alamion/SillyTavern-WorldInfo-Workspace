@@ -90,6 +90,11 @@ criteria. Implementation detail belongs in `tasks.md`.
 The phase closes when C0–C40 pass (interop scenarios for absent extensions: skipped and
 noted), the summary matrix C4–C12 passes completely, and the four gates are green.
 
+**Closed by the owner 2026-10-09.** Every scenario passed live or by automation (two live
+passes below); the summary matrix is complete (C8–C10 live in pass 2). The rate scenarios
+C19 (catalog answers) and C40 (picking hits) are measured during the owner's real use,
+not as a release gate.
+
 ## Results
 
 ### Live pass — 2026-10-07 (dev account, free OpenRouter router, fixtures in `.live/README-fixtures.md`)

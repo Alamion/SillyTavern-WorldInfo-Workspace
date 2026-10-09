@@ -324,6 +324,11 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 
 **Order amendments**:
 
+- 2026-10-09: Phase 6 closed by the owner (spec 007; two live passes, the second with
+  request logs from an own server process; the C19/C40 rates are measured in real use).
+  A maintenance report (B1: a tab opened earlier overwrote the workspace saved by another
+  device) touched the persistence contract and was delivered as spec 008 (stale-tab
+  protection). Phase 5 (AI Images) is next.
 - 2026-10-07: Phase 6 (Context & Retrieval) implemented (spec 007, all five user stories);
   live validation and the owner's release decision pending.
 - 2026-10-06: Phase 6 (Context & Retrieval) added and delivered next — spec 007, owner

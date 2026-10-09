@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-09
 
-**Status**: Draft
+**Status**: Implemented (owner-approved 2026-10-09; live pass T0–T11 in quickstart.md)
 
 **Input**: Maintenance backlog item B1 (moved here, see "Original report" at the end), owner
 choice 2026-10-09: "option 1 — the cheap staleness check". Observed on the `dev` account:

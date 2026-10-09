@@ -42,6 +42,8 @@ criteria; implementation detail belongs in `tasks.md`.
 
 ## Results
 
+**Approved by the owner 2026-10-09** after review of the live pass below.
+
 ### Live pass — 2026-10-09 (two independent browser sessions `-s=A` / `-s=B`, own server)
 
 | # | Result |

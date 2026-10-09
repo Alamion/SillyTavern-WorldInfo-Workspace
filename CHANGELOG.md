@@ -3,7 +3,7 @@
 User-visible changes, newest first. Internal-only work (refactors, tests, tooling) is not
 listed here — see the git history for that.
 
-## 0.5.0 — 2026-10-07
+## 0.5.0 — 2026-10-09
 
 ### Added
 

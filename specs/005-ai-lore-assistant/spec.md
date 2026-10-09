@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-15
 
-**Status**: Draft
+**Status**: Implemented (closed by the owner 2026-09-22; live validation A0–A37 in quickstart.md)
 
 **Input**: User description: "Время для следующей фазы и введения нейронок поисследуй что
 там как, если что-то будет непонятно на стадии clarify отвечу на все твои вопросы.
