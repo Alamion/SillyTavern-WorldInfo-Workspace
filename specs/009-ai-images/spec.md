@@ -167,7 +167,8 @@ the third stays uncaptioned.
 3. **Given** some requests fail, **When** the run ends, **Then** the review lists them as
    failed with the reason, and the rest can still be kept.
 4. **Given** the review, **When** the user keeps proposals, **Then** only those captions are
-   stored, as one change that can be undone like other edits.
+   stored, in one change (the workspace has no general undo for manual edits; the review is
+   the safeguard).
 5. **Given** a folder without uncaptioned images, **When** the menu is shown, **Then** the
    action is shown as having nothing to do.
 
@@ -218,8 +219,9 @@ that every dependent control is marked and explains itself on tap (touch) and ho
   the user comes back, or drops it if the item was deleted.
 - Another tab changed the same image item while a candidate was pending (spec 008): Keep
   applies to the current item and goes through the usual stale-tab protection.
-- The picture is a link to another site or an inline SVG: captioning sends the picture as
-  the model can read it; SVGs and unreachable links are reported as not captionable.
+- The picture is a link to another site or an inline SVG: SVGs are converted to an
+  ordinary picture before sending; links the browser is not allowed to read are reported
+  as not captionable.
 - A very large picture: it is reduced before it is sent for a caption, so the request
   stays within common provider limits.
 - Image Generation also keeps its own copy of the picture in its own folder: the workspace
@@ -277,7 +279,7 @@ that every dependent control is marked and explains itself on tap (touch) and ho
 - **FR-015**: Folder menus MUST offer "Caption all images without captions" for the folder
   and its subfolders: a confirmation with the count and profile, sequential requests with
   progress and Stop, then one review list where proposals are kept all, partly or edited;
-  kept captions are applied as one undoable change.
+  kept captions are applied as one change.
 - **FR-016**: A failure caused by a model that cannot read images MUST be explained as such
   and suggest a vision-capable profile.
 
