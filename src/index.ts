@@ -99,7 +99,7 @@ export function initWorkspace(): void {
 
     const ctx = getAppContext();
     ctx.eventSource.on(ctx.eventTypes.APP_READY, () => {
-        debugLog(`workspace v${'0.3.0'} ready`);
+        debugLog('workspace ready');
         const services = initWorkspaceState();
         pickInterceptor = services.picking.interceptor;
         mountPickIndicator(services.picking, onPickRecorded);
