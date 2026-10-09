@@ -36,6 +36,12 @@ field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (mat
 opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
 interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
 contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
+**Next increment (spec 008, planned 2026-10-09)**: stale-tab protection (maintenance
+backlog B1, option 1). A `_save` marker `{ rev, writer, at, hash }` in the namespace; a
+save gate in `settingsStore.ts` checks the saved copy (`/api/settings/get`) on
+visibility/focus/workspace shown, before saves and native pushes, and every 2 minutes
+while visible — then loads newer work, restores over stale overwrites, or shows a
+conflict banner. Design: `specs/008-stale-tab-protection/` (research R1–R8).
 **Earlier increment (spec 005, implemented 2026-09-15; live validation A0–A37 completed
 and the phase closed by the owner 2026-09-22 — results and the SC-005 rate in
 `quickstart.md`)**: roadmap
