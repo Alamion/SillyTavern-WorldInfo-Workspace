@@ -46,6 +46,8 @@ criteria; implementation detail belongs in `tasks.md`.
 
 ## Results
 
+**Approved by the owner 2026-10-10.** I12 (VS Code browser, phone) stays an owner check.
+
 ### Live pass — 2026-10-09 (owner's server, `dev`, Image Generation on OpenRouter `google/gemini-3.1-flash-lite-image`, captions and prompt drafts on profile "openrouter almost free" with model `google/gemma-3-12b-it`)
 
 | # | Result |
@@ -64,7 +66,7 @@ criteria; implementation detail belongs in `tasks.md`.
 | I11 | PASS — Connection Manager and Image Generation disabled (`/extension-disable`), reload: lore picking button, Send, Write prompt, Write caption and Generate carry the badge and the reason; pressing Generate opened "Not available" with reason, fix and the reload note |
 | I12 | Owner (VS Code browser, phone) — frame detection is automated |
 | I13 | PASS — both re-enabled, reload: no marks |
-| I14 | Automated only (folder record round trip with `wi_prompt`; reconcile compares the record text) |
+| I14 | PASS (owner, 2026-10-10) — images, captions and prompts unchanged after a markdown folder sync; also automated (folder record round trip with `wi_prompt`) |
 
 Fixes from this pass: the image source type now follows a stored file that arrives from
 elsewhere (it stayed "Resource URL" after Keep); captions and prompt drafts never stream

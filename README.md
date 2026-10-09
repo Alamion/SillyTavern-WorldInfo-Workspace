@@ -4,7 +4,7 @@ One place for your lore in **SillyTavern**: a folder tree of any depth, kept in 
 real World Info books, with a markdown folder on disk and an AI lore assistant attached to
 the same tree.
 
-![The workspace: tree, entry editor with live preview, and the assistant](docs/images/workspace.png)
+![The workspace: tree, entry editor with summary and live preview, and the assistant's proposals](docs/images/workspace.png)
 
 > Replaces the native Worlds/Lorebooks editor while it is enabled — the native editor is
 > always one button away, and nothing is converted until you ask for it.
@@ -19,6 +19,12 @@ the same tree.
   folder for continuous two-way sync. Obsidian vaults work as they are.
 - **Puts an AI assistant next to the tree.** It proposes entries, edits and
   reorganisations; nothing is applied until you accept it, and any batch can be undone.
+  A context preview shows exactly what it is sent and why.
+- **Lets a model pick the lore for your chat** (optional): before each reply it reads the
+  recent chat and the summaries of your active entries, and activates what the scene
+  needs through World Info itself.
+- **Makes pictures and captions** for image items with SillyTavern's Image Generation
+  extension and a picture-reading model — previewed, kept only when you say so.
 - **Keeps every native field.** Keys, strategy, order, position, depth, role, character
   filters, triggers — the full World Info entry, grouped so the common fields are up front.
 
@@ -144,7 +150,7 @@ its settings.
 
 <table>
   <tr>
-    <td><img src="docs/images/assistant.png" alt="Two proposed entries, each pending your decision, with Accept, Deny, Edit and Diff" width="360"></td>
+    <td><img src="docs/images/assistant.png" alt="Two proposed entries, each pending your decision, with Accept, Deny, Edit and Diff" width="380"></td>
     <td valign="top">
       <b>Nothing is applied until you accept it.</b><br><br>
       Each proposal can be reviewed as a diff, edited before accepting, accepted with the
@@ -179,11 +185,19 @@ words with your message even when no key matches exactly ("taverns" for a key
 sentence end. Choices you use often can be saved as a named *context set* and applied to
 any conversation in one click.
 
-**Preview context** (the layers button next to the context chip under the conversation,
-also in the context menu) lists everything your next message would send:
-each entry with the reason it is there (selected, the key that matched, the entry that
-pulled it in through recursion…), its estimated size, and what was left out because it
-did not fit. The same layers icon on a reply shows the list for what was actually sent.
+<table>
+  <tr>
+    <td><img src="docs/images/context-preview.png" alt="Context preview: every part of the next request with the reason it is there and its estimated size" width="430"></td>
+    <td valign="top">
+      <b>Preview context</b> (the layers button next to the context chip under the
+      conversation, also in the context menu) lists everything your next message would
+      send: each entry with the reason it is there — selected, the key that matched, the
+      entry that pulled it in through recursion — its estimated size, and what was left out
+      because it did not fit.<br><br>
+      The same layers icon on a reply shows the list for what was actually sent.
+    </td>
+  </tr>
+</table>
 
 It needs the Connection Manager extension and at least one
 [connection profile](https://docs.sillytavern.app/usage/core-concepts/connection-profiles/).
@@ -194,6 +208,8 @@ happened.
 
 Image items can get their picture and caption from AI, right in the image editor. Nothing
 replaces what you have until you keep it.
+
+<img src="docs/images/ai-images.jpg" alt="The image editor: a proposed caption under the current one, and a generated picture beside the current picture with Keep, Discard and Generate again" width="560">
 
 - **Generate** — type what the picture should show and press *Generate*. The picture is
   made by SillyTavern's **Image Generation** extension with its own settings (source,
@@ -233,6 +249,8 @@ order and budget behave exactly as for keyword matches; nothing is injected arou
 - Summaries make picking much better: the model decides from them.
 - Folders can be left out with *Exclude from lore picking*; disabled entries never take part.
 - Quiet generations (other extensions' background requests) and impersonation are skipped.
+
+<img src="docs/images/lore-picking.png" alt="Lore picking settings: on by default or per chat, the connection profile, and limits" width="430">
 
 ## Optional dependencies
 

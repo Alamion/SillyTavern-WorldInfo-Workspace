@@ -36,7 +36,7 @@ field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (mat
 opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
 interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
 contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
-**Current increment (spec 009, implemented 2026-10-09; owner review pending)**: roadmap Phase 5 —
+**Current increment (spec 009, owner-approved 2026-10-10; released in 0.6.0)**: roadmap Phase 5 —
 AI images, plus a cross-cutting availability rule. Image editor: *Generate* through the
 Image Generation extension's `imagine` command object (called directly, `quiet`,
 `gallery=false`, `extend=false`, `multimodal=false`; the temporary file is copied into

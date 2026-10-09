@@ -328,6 +328,9 @@ Phase order is a proposal; the owner confirms or reshuffles it during review/cla
 
 **Order amendments**:
 
+- 2026-10-10: Phase 5 closed by the owner; specs 007–009 released together as 0.6.0.
+  Phases 1–6 are delivered; Phase 7 stays unscheduled until real use of lore picking
+  shows a need.
 - 2026-10-09: Phase 5 (AI Images) implemented as spec 009 (generation via the Image
   Generation extension, captions and prompt drafts via connection profiles, folder
   captions) together with a cross-cutting availability rule: every function whose
