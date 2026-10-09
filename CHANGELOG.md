@@ -30,6 +30,8 @@ listed here — see the git history for that.
 
 ### Changed
 
+- README warns that a workspace open in another tab or device can overwrite newer changes
+  with its old copy until a fix lands.
 - Every input, select and text area in the workspace follows the theme (no white fields on
   dark themes in new panels); settings panels share one layout of options, fields and
   sections.

@@ -86,6 +86,13 @@ Changes made outside the workspace merge in silently when they do not collide. I
 entry changed on both sides you get a conflict banner and decide. If a save fails, a banner
 offers **Retry** and nothing is lost.
 
+> [!WARNING]
+> **One open tab at a time.** The workspace is stored in SillyTavern's settings, and every
+> open tab or device saves its own copy of them, for any reason, without checking for
+> newer changes. If you edit the workspace on one device while it is open on another,
+> reload the other one before using it, or its next save brings back the old tree (your
+> lorebooks themselves keep the changes). A proper fix is planned.
+
 <table>
   <tr>
     <td><img src="docs/images/lorebooks.png" alt="The Lorebooks panel listing every native book with activation and import controls" width="430"></td>
