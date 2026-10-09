@@ -135,3 +135,25 @@ Fixes made during the pass (each with a test): catalog rules in the system messa
 picking response length; read-round continuation on a new paragraph; DeepLore
 "no matches" label; catalog lines use the cached node index (P-10).
 
+### Live pass 2 — 2026-10-09 (own server process with request logging)
+
+The server ran as a separate process (`~/apps/SillyTavern/start.sh`, output to a log), so
+every request body could be checked; streamed replies of picking requests were captured
+in the page (`.live/pick-tap.js`).
+
+| # | Result |
+|---|---|
+| C8 | PASS — export of a folder: `wi_summary` in front matter, no `wi_extensions` duplicate; linked folder: summary edited on disk → Sync → workspace and native book updated (the push first hit a conflict banner: stale sync hashes left by the B1 incident, resolved with Push anyway — not a code defect) |
+| C9 | PASS — the exported folder imported back: summaries kept; designated as a WI root: the new book file carries `extensions.wiw_summary` |
+| C10 | PASS — a test character bound to that book: the exported card's `character_book` entries keep `extensions.wiw_summary`; the app's own `convertCharacterBook` brings them back; test character, book and folder removed afterwards |
+| C16 | PASS (compliant branch) — catalog-only "Cinderhollow" asked for without naming it: the model wrote only `<op type="read" ids="e2">`, round 1 delivered it, the edit came after the read; the non-compliant branch stays covered by tests |
+| C33 | PASS — "where the charcoal burners trade" with no key of Cinderhollow: fresh pick chose Cinderhollow by its summary (+ Verdant Span, Pale Roads); the server log shows all three in the main prompt |
+| C34 | PASS — neutral turn after a finished background pick: `prepared`, 0 ms, 16 s whole turn. An earlier neutral turn sent while a slow background pick (2.5 min) was still running correctly fell back to the earlier pick after the 20 s limit |
+
+Fixes from this pass (each with a test): the summary leaked into the assistant's entry
+`fields:` line as `summary=[object Object]`, and `<fields>summary=…</fields>` could have
+replaced the whole `extensions` object; a picking reply in another format (the free
+router once sent a pick to a safety classifier: "User Safety: safe") passed for an empty
+pick — now `<none/>` is the explicit "nothing needed" and anything else is a visible
+failure; a fallback recorded "0 ms" instead of the time the reply waited.
+
