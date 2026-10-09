@@ -180,6 +180,8 @@ describe('main-chat picking (spec 007 US5)', () => {
         expect(rig.notices[0]).toMatch(/timed out.*keywords only/);
         expect(rig.host.forced).toHaveLength(0);
         expect(rig.emitted[0]).toMatchObject({ payload: { source: 'fallback' } });
+        // The record says how long the reply waited, not 0 ms.
+        expect((rig.emitted[0] as { payload: { durationMs: number } }).payload.durationMs).toBeGreaterThanOrEqual(4000);
     });
 
     it('a reply in another format is a visible failure, not a silent empty pick (live 2026-10-09)', async () => {

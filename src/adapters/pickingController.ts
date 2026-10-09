@@ -367,6 +367,7 @@ export function createPickingController(host: PickingHost): PickingController {
             preparing?.abort();
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), settings().timeoutSec * 1000);
+            const waitStarted = host.now();
             const result = await runPick(candidates, controller.signal);
             clearTimeout(timer);
             if (chatId() !== id) {
@@ -394,7 +395,8 @@ export function createPickingController(host: PickingHost): PickingController {
                     source: 'fallback',
                     picked: fallback,
                     ignored: [],
-                    durationMs: 0,
+                    // How long the reply waited (live 2026-10-09: a timeout read "0 ms").
+                    durationMs: host.now() - waitStarted,
                     failure: { kind: result.kind, message: result.message },
                     profileName: result.profileName,
                     at,
