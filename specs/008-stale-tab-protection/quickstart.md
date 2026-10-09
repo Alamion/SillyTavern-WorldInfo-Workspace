@@ -42,4 +42,23 @@ criteria; implementation detail belongs in `tasks.md`.
 
 ## Results
 
-*(to be filled in by the live pass)*
+### Live pass — 2026-10-09 (two independent browser sessions `-s=A` / `-s=B`, own server)
+
+| # | Result |
+|---|---|
+| T0 | PASS (automated + live: neither tab showed a notice or banner while nothing changed elsewhere) |
+| T1 | PASS — B edited Cinderhollow's summary (rev 2); focus on A → loaded, notice "Updated with changes made in another tab or device." |
+| T2 | PASS — an app settings save in A afterwards left B's edit in `settings.json` |
+| T3 | PASS — A visible and untouched picked up B's edit after 46 s (2-minute poll) |
+| T4 / T11 | PASS — B with only a folder collapsed loaded A's rev 7 silently; the folder stayed collapsed |
+| T5 | PASS — B edited Bristlemark, A edited Cinderhollow without a focus change: banner "Changed here: Cinderhollow — edited / Changed there: Bristlemark — edited"; file and book kept B's version; A's namespace stayed the seen copy |
+| T6 | PASS — conflict on Lamp Night (not in a lorebook) → "Use the saved version": A's edit gone, B's Cinderhollow loaded, the open editor field refreshed |
+| T7 | PASS — "Keep this version" saved rev 6 above B's 4. Finding: B's Bristlemark edit was NOT lost — B had already pushed it to the book, and A's released push merged it back as a clean-side native change. Lorebook entries the other side already pushed survive "Keep"; workspace-only items (notes, folders, images) are replaced as the banner says |
+| T9 | PASS — stale B saved its old namespace (rev 4) through an app save; A on focus restored rev 7 with the restore notice |
+| T8, T10, T12, T13 | Automated (`stale-tabs` integration: edits during the banner, earlier-version marker, server down, recovery) |
+| T14 | Not run live (markdown link with two browsers); covered by design: a load is a store change the link handles as any other |
+
+Fix from this pass (with a regression scenario): after a load, a push compared the other
+tab's in-sync hashes with this tab's stale app book cache and raised a false divergence
+conflict — bound books are now read fresh from the server on the next push (research R9).
+The banner's action buttons were also right-aligned (the shared banner stretches spans).

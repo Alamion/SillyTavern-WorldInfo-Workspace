@@ -125,3 +125,19 @@ Decisions for spec 008. Facts were checked against the vendored app source
   reasons. Such a save is repaired by the newest open tab at its next check (FR-007). If
   no newer tab is open, it is lost from the workspace; the native books still hold
   everything that was pushed. The README states this (FR-014).
+
+## R9 — The app's per-tab book cache after a load (found in the live pass)
+
+- **Finding** (2026-10-09, two browsers): the app caches each lorebook per tab
+  (`loadWorldInfo` → `worldInfoCache`) and never re-reads it. After tab A loaded B's
+  workspace — whose entries carry B's in-sync hashes for B's pushes — A compared those
+  hashes with its OLD cached book. The engine took that for a native change, and with an
+  edit in A it raised a divergence conflict ("1 drifted entry, push blocked").
+- **Decision**: the cache cannot be evicted from outside. After every load the gate marks
+  all bound books stale (`sync.markBooksStale()`); the next push of a stale book reads it
+  from the server (`/api/worldinfo/get`, `worldInfo.loadBook(name, { fresh: true })`).
+  Our own save then refreshes the cache (`saveWorldInfo` sets it).
+- **Residual**: until this tab pushes the book, the app's main-chat generation in this tab
+  still reads the cached (older) book — a pre-existing multi-device limitation of the app,
+  not of the workspace.
+

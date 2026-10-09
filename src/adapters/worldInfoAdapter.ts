@@ -14,7 +14,12 @@ import { fnv1a, stableStringify } from '../core/sync/fingerprint';
 export interface WorldInfoAdapter {
     listBooks(): string[];
     refreshBooks(): Promise<void>;
-    loadBook(name: string): Promise<WorldInfoBook | null>;
+    /**
+     * `fresh` bypasses the app's per-tab book cache (it cannot be evicted from
+     * outside) and reads the server file: after the workspace was loaded from
+     * another tab, the cache may predate that tab's pushes (spec 008).
+     */
+    loadBook(name: string, options?: { fresh?: boolean }): Promise<WorldInfoBook | null>;
     saveBook(name: string, book: WorldInfoBook, immediately?: boolean): Promise<void>;
     getLastOutbound(name?: string): WorldInfoBook | null;
     /**
@@ -37,7 +42,23 @@ function errorText(error: unknown): string {
     return String(error);
 }
 
-export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapter {
+export interface WorldInfoAdapterOptions {
+    /** Reads a book from the server, bypassing the app cache (tests inject a fake). */
+    fetchFresh?(name: string): Promise<WorldInfoBook | null>;
+}
+
+export function createWorldInfoAdapter(ctx: SillyTavernContext, options: WorldInfoAdapterOptions = {}): WorldInfoAdapter {
+    const fetchFresh =
+        options.fetchFresh ??
+        (async (name: string): Promise<WorldInfoBook | null> => {
+            const response = await fetch('/api/worldinfo/get', {
+                method: 'POST',
+                headers: ctx.getRequestHeaders(),
+                body: JSON.stringify({ name }),
+                cache: 'no-cache',
+            });
+            return response.ok ? ((await response.json()) as WorldInfoBook) : null;
+        });
     let lastOutbound: WorldInfoBook | null = null;
     // Per-book outbound payloads: WORLDINFO_UPDATED passes the same reference
     // the app cached (cloneOnSet:false), but with several books saved in a row
@@ -81,13 +102,13 @@ export function createWorldInfoAdapter(ctx: SillyTavernContext): WorldInfoAdapte
 
     const bookFingerprint = (book: WorldInfoBook): string => fnv1a(stableStringify(book));
 
-    const loadBook = async (name: string): Promise<WorldInfoBook | null> => {
+    const loadBook = async (name: string, load: { fresh?: boolean } = {}): Promise<WorldInfoBook | null> => {
         // Never load a name outside the current list — the module cache cannot be
         // evicted externally after an adapter-level delete (research R3 caveat).
         if (!ctx.getWorldInfoNames().includes(name)) {
             return null;
         }
-        const book = await ctx.loadWorldInfo(name);
+        const book = load.fresh === true ? await fetchFresh(name) : await ctx.loadWorldInfo(name);
         if (!book) {
             return null;
         }

@@ -330,4 +330,24 @@ describe('spec 007 budgets at scale', () => {
         });
         expect(elapsed).toBeLessThan(1);
     });
+
+    it('P-12 the stale-tab content hash of the scale dataset < 100 ms; after one edit only the edited spine is rehashed', async () => {
+        const { contentHash } = await import('../../src/core/state/staleness');
+        const { commitEntryField } = await import('../../src/core/tree/operations');
+        const { firstEntry } = await import('../support/scaleDataset');
+        // Fresh parses (as from the server) have no cached node hashes.
+        const fresh = Array.from({ length: 5 }, () => structuredClone(buildScaleDataset().state));
+        const cold = fastest(5, () => {
+            contentHash(fresh.pop()!);
+        });
+        const state = buildScaleDataset().state;
+        contentHash(state);
+        let edited = state;
+        const warm = fastest(20, () => {
+            edited = commitEntryField(edited, firstEntry(state).id, 'content', `edit ${String(Math.random())}`);
+            contentHash(edited);
+        });
+        expect(cold).toBeLessThan(100);
+        expect(warm).toBeLessThan(10);
+    });
 });

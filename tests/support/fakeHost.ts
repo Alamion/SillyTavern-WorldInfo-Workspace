@@ -52,8 +52,26 @@ export class FakeHost {
         },
     };
 
+    /**
+     * The saved settings file as the server holds it (spec 008): every app settings
+     * save copies the CURRENT namespace object into it, exactly like the real
+     * whole-settings save. `undefined` until the first save.
+     */
+    serverWorkspace: unknown = undefined;
+    /** Simulated outage of `/api/settings/get`. */
+    settingsServerDown = false;
+
     saveSettingsDebounced = (): void => {
         this.savedSettings += 1;
+        this.serverWorkspace = structuredClone(this.extensionSettings['WorldInfoWorkspace']);
+    };
+
+    /** What `readSavedWorkspace` would return: a fresh parse of the saved file. */
+    readSaved = async (): Promise<unknown> => {
+        if (this.settingsServerDown) {
+            throw new TypeError('NetworkError when attempting to fetch resource.');
+        }
+        return structuredClone(this.serverWorkspace);
     };
 
     uuidv4 = (): string => `u-${(this.uuidCounter += 1)}`;
@@ -122,7 +140,13 @@ export function buildRig(): Rig {
     const host = new FakeHost();
     const ctx = host as unknown as SillyTavernContext;
     const store = new WorkspaceStore(createDefaultState());
-    const worldInfo = createWorldInfoAdapter(ctx);
+    const worldInfo = createWorldInfoAdapter(ctx, {
+        // The server file: successful saves, or the seeded book when never saved.
+        fetchFresh: async (name) => {
+            const book = host.server.get(name) ?? host.books.get(name);
+            return book ? (structuredClone(book) as WorldInfoBook) : null;
+        },
+    });
     const events: Array<{ event: string; payload: unknown }> = [];
     const engine = createSyncEngine({
         ctx,

@@ -334,6 +334,52 @@ $overlay-scrim: color-mix(in srgb, var(--SmartThemeShadowColor), transparent 25%
     margin: 0 $spacing-md $spacing-sm;
 }
 
+// Another tab or device changed the workspace (spec 008): text, the two sides'
+// changes side by side (stacked when narrow), and the two choices.
+.wiw-stale-banner {
+    flex-wrap: wrap;
+
+    > .wiw-stale-text {
+        flex: 1 1 16rem;
+    }
+}
+
+.wiw-stale-sides {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: $spacing-md;
+    flex: 1 1 100%;
+}
+
+.wiw-stale-side {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    min-width: 0;
+
+    strong {
+        font-weight: 600;
+        color: var(--SmartThemeEmColor);
+    }
+
+    ul {
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    li {
+        overflow-wrap: anywhere;
+    }
+}
+
+.wiw-stale-banner > .wiw-stale-actions {
+    // The banner's own `span { flex: 1 1 auto }` stretches this row: align inside it.
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+}
+
 // ---------------------------------------------------------------------------
 // Menus — the tree context menu (long-press / right-click).
 // ---------------------------------------------------------------------------

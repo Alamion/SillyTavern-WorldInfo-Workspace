@@ -30,8 +30,10 @@ listed here — see the git history for that.
 
 ### Changed
 
-- README warns that a workspace open in another tab or device can overwrite newer changes
-  with its old copy until a fix lands.
+- **Several tabs and devices**: a tab picks up changes saved elsewhere when you come back
+  to it (or within two minutes while visible); when both sides changed, a banner lists the
+  differences and asks which version to keep, and nothing is saved or pushed until then;
+  an outdated tab's save is repaired by the newest open tab.
 - Every input, select and text area in the workspace follows the theme (no white fields on
   dark themes in new panels); settings panels share one layout of options, fields and
   sections.

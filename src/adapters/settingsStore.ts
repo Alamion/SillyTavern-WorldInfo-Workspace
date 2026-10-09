@@ -1,6 +1,9 @@
 import { getAppContext } from './appApi';
 import { confirmDialog } from './popups';
-import { notifyWarning } from './logger';
+import { notifyInfo, notifyWarning } from './logger';
+import { createSaveGate, type SaveGate } from './saveGate';
+import { readSavedWorkspace } from './savedSettings';
+import { hasPendingDrafts } from './draftRegistry';
 import type { SaveEvent } from './saveEvents';
 import {
     MODULE_NAMESPACE,
@@ -44,7 +47,12 @@ export interface WorkspaceStateServices {
     assistant: AssistantController;
     /** Spec 007: main-chat lore picking (the generation interceptor). */
     picking: PickingController;
+    /** Spec 008: stale-tab protection (save gate, conflict banner state). */
+    gate: SaveGate;
 }
+
+/** Spec 008 clarification: a visible tab nobody touches checks every 2 minutes. */
+const STALE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 
 let services: WorkspaceStateServices | null = null;
 const pickRecordedListeners = new Set<(messageId: number) => void>();
@@ -86,10 +94,6 @@ export function initWorkspaceState(): WorkspaceStateServices {
     if (!recoveredNow) {
         publish();
     }
-    store.subscribe(() => {
-        publish();
-        ctx.saveSettingsDebounced();
-    });
 
     if (recoveredNow) {
         notifyWarning(
@@ -102,6 +106,45 @@ export function initWorkspaceState(): WorkspaceStateServices {
     const activeBooks = createActiveBooksAdapter();
     const emit = createHookEmitter(ctx);
     const sync = createSyncEngine({ ctx, store, worldInfo, emit });
+
+    // Spec 008: the save gate is the only publisher of the workspace into the app's
+    // settings. It compares with the saved copy before saves and pushes, picks up
+    // newer work from other tabs, restores over stale overwrites, or asks.
+    const gate = createSaveGate({
+        store,
+        readSaved: () => readSavedWorkspace(ctx),
+        publish: (next) => {
+            ctx.extensionSettings[MODULE_NAMESPACE] = next;
+        },
+        save: () => ctx.saveSettingsDebounced(),
+        writerId: Math.random().toString(16).slice(2, 10).padEnd(8, '0'),
+        now: () => Date.now(),
+        hasPendingDrafts,
+        isRecoveryPending,
+        notify: notifyInfo,
+        onReleased: () => void sync.pushPendingNow('conflict-decided'),
+        onLoaded: () => {
+            // "Use the saved version" during a recovery replaces the fallback.
+            recoveryPending = false;
+            // The other tab's pushes are newer than this tab's app book cache.
+            sync.markBooksStale();
+        },
+    });
+    sync.setGate(gate);
+    const checkNow = (): void => {
+        void gate.check();
+    };
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkNow();
+        }
+    });
+    window.addEventListener('focus', checkNow);
+    window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            checkNow();
+        }
+    }, STALE_CHECK_INTERVAL_MS);
 
     /**
      * Public tree events (FR-007/FR-009). Derived from the store rather than from
@@ -188,7 +231,7 @@ export function initWorkspaceState(): WorkspaceStateServices {
     });
     picking.start();
 
-    services = { store, worldInfo, activeBooks, sync, md, assistant, picking };
+    services = { store, worldInfo, activeBooks, sync, md, assistant, picking, gate };
     return services;
 }
 

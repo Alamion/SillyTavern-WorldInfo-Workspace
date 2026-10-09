@@ -86,12 +86,20 @@ Changes made outside the workspace merge in silently when they do not collide. I
 entry changed on both sides you get a conflict banner and decide. If a save fails, a banner
 offers **Retry** and nothing is lost.
 
-> [!WARNING]
-> **One open tab at a time.** The workspace is stored in SillyTavern's settings, and every
-> open tab or device saves its own copy of them, for any reason, without checking for
-> newer changes. If you edit the workspace on one device while it is open on another,
-> reload the other one before using it, or its next save brings back the old tree (your
-> lorebooks themselves keep the changes). A proper fix is planned.
+**Several tabs and devices.** The workspace is stored in SillyTavern's settings, which every
+open tab saves as a whole. The workspace checks what is saved when you come back to a tab,
+before it saves, and every two minutes while the tab is visible:
+
+- changes made elsewhere are picked up quietly when you have not changed anything here
+  (your open folders and panel sizes stay as they are);
+- if both sides changed, a banner lists the differences and you choose which version to
+  keep — nothing from this tab is saved or pushed to a lorebook until you do;
+- if an older tab saved its outdated copy, the newest open tab writes its version back.
+
+What remains: an outdated tab can still be saved by SillyTavern for its own reasons (a chat
+switch, another extension). That is repaired only while a newer tab is open; otherwise
+reload old tabs before using them. Your lorebooks keep every change that was pushed either
+way.
 
 <table>
   <tr>

@@ -81,6 +81,8 @@ function initSurface(services: WorkspaceStateServices): void {
     shell.onModeChange(announceVisibility);
     shell.onWorkspaceShown(() => {
         announceVisibility();
+        // Spec 008: pick up work saved by another tab or device before editing here.
+        void services.gate.check();
         void services.md.link.onWorkspaceOpened({ userActivation: navigator.userActivation?.isActive ?? true });
     });
 }

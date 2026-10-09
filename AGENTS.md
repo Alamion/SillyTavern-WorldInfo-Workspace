@@ -36,7 +36,7 @@ field/order protection), Doom's Enhancement Suite (scene cast) and DeepLore (mat
 opt-in main-chat lore picking through the native `WORLDINFO_FORCE_ACTIVATE` (generation
 interceptor `wiwPickInterceptor`). Design: `specs/007-context-retrieval/` (research R1–R14,
 contracts for protocol v2, markdown/sync deltas, main-chat picking, hooks, UI).
-**Next increment (spec 008, planned 2026-10-09)**: stale-tab protection (maintenance
+**Current increment (spec 008, implemented 2026-10-09)**: stale-tab protection (maintenance
 backlog B1, option 1). A `_save` marker `{ rev, writer, at, hash }` in the namespace; a
 save gate in `settingsStore.ts` checks the saved copy (`/api/settings/get`) on
 visibility/focus/workspace shown, before saves and native pushes, and every 2 minutes
@@ -298,6 +298,17 @@ live in settings. Node kinds: folder (expanded,
 isWiRoot, book binding `{ bookName, orphans, tombstones }`), entry (full native entry
 incl. `triggers` and the native `characterFilter` object + sync), image (src/caption).
 Sync is PER BOOK: `sync.books[bookName] = { uid, hash (FNV-1a), status in-sync|dirty }`.
+
+Saving (spec 008): the workspace is published into the app's settings ONLY by the save
+gate (`adapters/saveGate.ts`). A mutation schedules a guarded save (1000 ms): the saved
+payload is read and classified against the tab's last seen copy by
+`core/state/staleness.ts` (content hash without bookkeeping; `_save = { rev, writer, at,
+hash }` trusted only while its hash matches) → save with a new marker, silent load,
+restore over a stale copy, or the conflict banner (`ui/StaleBanner.tsx`). Native pushes
+await `gate.ready()` and are held during a conflict. After a load the bound books are marked
+stale and their next push reads the server file (`loadBook(name, { fresh: true })`): the
+app's per-tab book cache cannot be evicted and predates the other tab's pushes. New code that must save goes through
+the store; never write `extensionSettings['WorldInfoWorkspace']` directly.
 
 Load rules (`migrate`): `parentId` is derived from the nesting; missing native fields
 are filled and legacy shapes migrated (v1 single-book sync, flat character-filter keys)

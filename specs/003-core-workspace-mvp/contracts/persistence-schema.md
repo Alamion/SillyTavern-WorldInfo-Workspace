@@ -126,3 +126,23 @@ ImageNode:
 - Saved debounced (1000 ms) after every mutation; a hard crash within the debounce
   window can lose ≤1 s of tree edits (books are flushed more aggressively — see the
   native contract). Documented, accepted trade-off.
+
+## Amendment 2026-10-09 — stale-tab protection (spec 008)
+
+Full delta: `specs/008-stale-tab-protection/contracts/persistence-delta.md`. In short:
+
+- New optional top-level key `_save: { rev, writer, at, hash }` (schema version stays 1).
+  `hash` is the content hash of the saved payload (bookkeeping excluded); the marker is
+  trusted only while it matches, so payloads written by earlier versions read as
+  "unknown age".
+- "Saved debounced after every mutation" is replaced by a **guarded save**: 1000 ms after
+  a mutation the saved payload is read (`/api/settings/get`) and compared with the tab's
+  last seen copy — unchanged/older → publish + save with a new marker (older also shows a
+  restore notice); newer without local content edits → loaded (tab bookkeeping kept), no
+  save; newer with edits or unknown age → nothing is published, native pushes are held,
+  the conflict banner asks.
+- Checks also run on visibility, focus, workspace shown, before native pushes, and every
+  2 minutes while the page is visible.
+- The recovery no-publish rule is unchanged and takes precedence; a valid newer saved
+  payload during a recovery is offered, never loaded silently.
+

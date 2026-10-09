@@ -56,7 +56,21 @@ export interface SyncEngineInput {
     emit?: HookEmitter;
 }
 
+/** Spec 008: native pushes wait for the stale-tab save gate (research R4). */
+export interface PushGate {
+    /** False while a conflict with another tab is open: the push waits. */
+    ready(): Promise<boolean>;
+}
+
 export interface SyncEngine {
+    /** Spec 008: set once by the settings bridge; tests without a gate push as before. */
+    setGate(gate: PushGate | null): void;
+    /**
+     * Spec 008: the workspace was loaded from another tab, whose pushes this tab's
+     * app book cache has not seen. The next push of these books (all bound books
+     * when omitted) reads the server file instead of the cache.
+     */
+    markBooksStale(books?: readonly string[]): void;
     refreshStructure(): void;
     markBooksDirty(books: readonly string[]): void;
     recordEntityDeletions(deletions: ReadonlyArray<{ bookName: string; uid: number }>): void;
@@ -327,7 +341,8 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
             pendingBooks.delete(bookName);
             return;
         }
-        const current = await worldInfo.loadBook(bookName);
+        const fresh = staleBooks.delete(bookName);
+        const current = await worldInfo.loadBook(bookName, { fresh });
         if (!current) {
             emitBookFailure(bookName, `Native book "${bookName}" is missing from the app's book list.`);
             emitPush(bookName, root.id, 'book-missing', {
@@ -479,11 +494,24 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         notify();
     };
 
+    let gate: PushGate | null = null;
+    const staleBooks = new Set<string>();
+
     const pushPendingNow = async (reason?: string): Promise<void> => {
         void reason;
         // Commit uncommitted field drafts first, so a flush triggered by
         // GENERATION_STARTED carries the last thing the user typed (spec 006 R3).
         flushDrafts();
+        if (dirtyBooksOf(store.getState()).size === 0) {
+            return;
+        }
+        // Spec 008: a stale tab must not push unconfirmed edits into the books, or
+        // "Use the saved version" would pull them back in through the clean-side
+        // merge. The books stay dirty and are pushed once the conflict is decided.
+        if (gate && !(await gate.ready())) {
+            debugLog('push held: the workspace changed in another tab');
+            return;
+        }
         const books = [...dirtyBooksOf(store.getState())];
         for (const bookName of books) {
             await pushBook(bookName);
@@ -614,6 +642,13 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
     };
 
     const engine: SyncEngine = {
+        setGate: (next: PushGate | null): void => {
+            gate = next;
+        },
+        markBooksStale: (books?: readonly string[]): void => {
+            const names = books ?? rootsWithBooks(store.getState()).map((root) => root.book!.bookName);
+            names.forEach((name) => staleBooks.add(name));
+        },
         refreshStructure,
         markBooksDirty: (books: readonly string[]): void => {
             books.forEach((book) => {

@@ -49,6 +49,7 @@ import { isMemoryEntry, losesMemoryNumber } from '../core/interop/memoryBooks';
 import { AssistantPanel } from './AssistantPanel';
 import { LorebooksPanel } from './LorebooksPanel';
 import { PickingSettings } from './PickingSettings';
+import { StaleBanner } from './StaleBanner';
 import { FormSection, OptionRow } from './formControls';
 import { MarkdownControl } from './MarkdownControl';
 import { ItemEditor } from './ItemEditor';
@@ -907,6 +908,7 @@ export function WorkspaceApp({ services }: { services: WorkspaceStateServices })
                         onClose={() => setLorebooksOpen(false)}
                     />
                 )}
+                <StaleBanner gate={services.gate} />
                 {state._recovered !== undefined && (
                     <RecoveryBanner onRestore={handleRestoreBackup} onDiscard={() => void handleDiscardBackup()} />
                 )}

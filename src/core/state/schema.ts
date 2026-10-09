@@ -137,12 +137,28 @@ export interface LayoutSettings {
     previewWidth: number;
 }
 
+/**
+ * Stale-tab protection marker (spec 008, contracts/persistence-delta.md): stamped
+ * on every save by this extension. `hash` is the content hash of the saved payload
+ * (core/state/staleness.ts); the marker is trusted only while it matches, so a
+ * payload written by an earlier extension version (which carries the old marker
+ * along: migrate() returns valid payloads by reference) reads as "unknown age".
+ */
+export interface SaveMarker {
+    rev: number;
+    writer: string;
+    at: string;
+    hash: string;
+}
+
 export interface WorkspaceState {
     version: 1;
     root: FolderNode;
     settings: WorkspaceSettings;
     /** Set by migrate() when the persisted payload could not be restored. */
     _recovered?: unknown;
+    /** Spec 008: who saved this payload and how new it is (optional, additive). */
+    _save?: SaveMarker;
 }
 
 export function createDefaultNativeEntry(uid: number): NativeWorldInfoEntry {
